@@ -18,3 +18,8 @@ $RECYCLE.BIN/
 .terminal-ai/
 *.bak
 *.orig
+
+# .NET build output
+**/bin/
+**/obj/
+
