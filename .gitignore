@@ -1,0 +1,20 @@
+# Temporary and log files
+*.log
+*.tmp
+*.temp
+
+# Test output
+TestResults/
+*.coverage
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# User-specific runtime configs & backups
+.terminal-ai/
+*.bak
+*.orig
