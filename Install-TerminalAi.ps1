@@ -2,10 +2,35 @@
 [CmdletBinding()]
 param(
     [switch]$SkipTerminalConfig,
-    [string]$PreferredModel
+    [string]$PreferredModel,
+    [switch]$AutoConfirm
 )
 
 $ErrorActionPreference = "Stop"
+
+function Show-SpinnerWait {
+    param(
+        [string]$Message,
+        [scriptblock]$Condition,
+        [int]$TimeoutSec = 20
+    )
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $chars = @('⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏')
+    $i = 0
+    while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
+        if (& $Condition) {
+            Write-Host "`r   ✔ $Message - готово! ($([Math]::Round($sw.Elapsed.TotalSeconds, 1))с)          " -ForegroundColor Green
+            return $true
+        }
+        $c = $chars[$i % $chars.Count]
+        $i++
+        $elapsed = [Math]::Round($sw.Elapsed.TotalSeconds, 1)
+        Write-Host -NoNewline "`r   $c $Message (${elapsed}с / ${TimeoutSec}с)... "
+        Start-Sleep -Milliseconds 250
+    }
+    Write-Host "`n   ⚠ Час очікування вичерпано." -ForegroundColor DarkYellow
+    return $false
+}
 
 Write-Host "`n═══════════════════════════════════════════════════════════════" -ForegroundColor Cyan
 Write-Host "   Встановлення TerminalAI (Windows Terminal & Ollama AI)   " -ForegroundColor Cyan
@@ -21,36 +46,175 @@ if (-not (Test-Path $manifestPath)) {
     return
 }
 
-# 2. Перевірка зв'язку з локальною Ollama
-Write-Host "1. Перевірка локальної Ollama..." -ForegroundColor Yellow
-$ollamaUrl = "http://localhost:11434"
-$installedModels = @()
-try {
-    $tags = Invoke-RestMethod -Uri "$ollamaUrl/api/tags" -TimeoutSec 4 -ErrorAction Stop
-    $installedModels = $tags.models.name
-    Write-Host "   ✔ Ollama активна! Знайдено моделей: $($installedModels.Count)" -ForegroundColor Green
-} catch {
-    Write-Host "   ⚠ Увага: Ollama не відповідає на $ollamaUrl." -ForegroundColor DarkYellow
-    Write-Host "     Переконайтеся, що Ollama запущена (виконайте 'ollama serve')." -ForegroundColor DarkGray
+# 2. Перевірка наявності та встановлення Ollama
+Write-Host "1. Перевірка Ollama в системі..." -ForegroundColor Yellow
+$ollamaCmd = Get-Command ollama -ErrorAction SilentlyContinue
+$ollamaExeCandidates = @(
+    "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe",
+    "${env:ProgramFiles}\Ollama\ollama.exe"
+)
+
+if (-not $ollamaCmd) {
+    foreach ($candidate in $ollamaExeCandidates) {
+        if (Test-Path $candidate) {
+            $ollamaDir = Split-Path -Parent $candidate
+            $env:Path = "$ollamaDir;" + $env:Path
+            $ollamaCmd = Get-Command ollama -ErrorAction SilentlyContinue
+            break
+        }
+    }
 }
 
-# Визначаємо найкращу модель
-$selectedModel = "qwen2.5-coder:7b"
+if (-not $ollamaCmd) {
+    Write-Host "   ⚠ Ollama не знайдено на вашому комп'ютері." -ForegroundColor DarkYellow
+    $shouldInstall = $false
+    if ($AutoConfirm) {
+        $shouldInstall = $true
+    } elseif (-not [Console]::IsInputRedirected) {
+        $ans = Read-Host "   Бажаєте встановити Ollama автоматично зараз? [Y/n]"
+        $shouldInstall = ($ans -match '^(y|yes|так|т|$)' -or [string]::IsNullOrWhiteSpace($ans))
+    }
+
+    if ($shouldInstall) {
+        Write-Host "   ▶ Початок встановлення Ollama..." -ForegroundColor Cyan
+        $installedViaWinget = $false
+        if (Get-Command winget -ErrorAction SilentlyContinue) {
+            Write-Host "   • Встановлення через winget з таймером та прогресом..." -ForegroundColor DarkGray
+            try {
+                & winget install Ollama.Ollama --accept-source-agreements --accept-package-agreements
+                if ($LASTEXITCODE -eq 0) { $installedViaWinget = $true }
+            } catch { }
+        }
+
+        if (-not $installedViaWinget) {
+            $installerUrl = "https://ollama.com/download/OllamaSetup.exe"
+            $installerPath = Join-Path $env:TEMP "OllamaSetup.exe"
+            Write-Host "   • Завантаження інсталятора з $installerUrl..." -ForegroundColor DarkGray
+            Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath -UseBasicParsing
+            Write-Host "   • Запуск тихого встановлення Ollama..." -ForegroundColor DarkGray
+            Start-Process -FilePath $installerPath -ArgumentList "/silent" -Wait
+        }
+
+        # Оновлюємо PATH після встановлення
+        $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+        foreach ($candidate in $ollamaExeCandidates) {
+            if (Test-Path $candidate) {
+                $env:Path = (Split-Path -Parent $candidate) + ";" + $env:Path
+                break
+            }
+        }
+        $ollamaCmd = Get-Command ollama -ErrorAction SilentlyContinue
+        if ($ollamaCmd) {
+            Write-Host "   ✔ Ollama успішно встановлена!" -ForegroundColor Green
+        } else {
+            Write-Host "   ⚠ Встановлення завершено, але ollama.exe не знайдено в PATH." -ForegroundColor DarkYellow
+        }
+    } else {
+        Write-Host "   ⚠ Встановлення Ollama пропущено користувачем." -ForegroundColor DarkGray
+    }
+} else {
+    Write-Host "   ✔ Ollama знайдена: $($ollamaCmd.Source)" -ForegroundColor Green
+}
+
+$ollamaUrl = "http://localhost:11434"
+$installedModels = @()
+
+# Перевірка доступності API
+$isApiReady = $false
+try {
+    $tags = Invoke-RestMethod -Uri "$ollamaUrl/api/tags" -TimeoutSec 2 -ErrorAction Stop
+    $installedModels = @($tags.models.name)
+    $isApiReady = $true
+} catch { }
+
+if (-not $isApiReady -and (Get-Command ollama -ErrorAction SilentlyContinue)) {
+    Write-Host "   • Служба Ollama не активна. Запуск фонового процесу..." -ForegroundColor DarkYellow
+    Start-Process "ollama" -ArgumentList "serve" -WindowStyle Hidden -ErrorAction SilentlyContinue
+
+    $isApiReady = Show-SpinnerWait -Message "Очікування запуску локальної служби Ollama" -TimeoutSec 15 -Condition {
+        try {
+            $t = Invoke-RestMethod -Uri "$ollamaUrl/api/tags" -TimeoutSec 1 -ErrorAction Stop
+            $script:installedModels = @($t.models.name)
+            return $true
+        } catch {
+            return $false
+        }
+    }
+}
+
+if ($isApiReady) {
+    Write-Host "   ✔ Служба Ollama активна! Встановлено моделей: $($installedModels.Count)" -ForegroundColor Green
+} else {
+    Write-Host "   ⚠ Ollama не відповідає на $ollamaUrl. Переконайтеся, що вона запущена ('ollama serve')." -ForegroundColor DarkYellow
+}
+
+# 3. Аналіз апаратного забезпечення та підбір моделі
+Write-Host "`n2. Аналіз конфігурації комп'ютера..." -ForegroundColor Yellow
+$ramGb = 16
+$gpuName = "Не визначено"
+try {
+    $ramGb = [Math]::Round(((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB), 1)
+    $gpuList = @(Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name | Where-Object { $_ -notmatch 'Virtual|Remote|Basic' })
+    if ($gpuList.Count -gt 0) { $gpuName = $gpuList[0] }
+} catch { }
+
+Write-Host "   • Оперативна пам'ять (RAM): $ramGb GB" -ForegroundColor White
+Write-Host "   • Графічний адаптер (GPU):  $gpuName" -ForegroundColor White
+
+# Визначаємо оптимальну рекомендовану модель за апаратними характеристиками
+$recommendedModel = if ($ramGb -ge 16 -or $gpuName -match 'RTX|Radeon RX') {
+    "qwen2.5-coder:7b"
+} elseif ($ramGb -ge 12) {
+    "qwen2.5-coder:3b"
+} else {
+    "qwen2.5-coder:1.5b"
+}
+
+Write-Host "   💡 Рекомендована модель для вашої конфігурації: " -NoNewline -ForegroundColor Cyan
+Write-Host "$recommendedModel" -ForegroundColor Green
+
+$selectedModel = $recommendedModel
 if ($PreferredModel) {
     $selectedModel = $PreferredModel
 } elseif ($installedModels.Count -gt 0) {
-    $candidats = @("qwen2.5-coder:7b", "qwen3.5-coder:9b", "granite4.2:8b", "qwen3.5:9b")
-    foreach ($cand in $candidats) {
+    $candidates = @("qwen2.5-coder:7b", "qwen2.5-coder:3b", "qwen2.5-coder:1.5b", "qwen3.5-coder:9b", "granite4.2:8b", "qwen3.5:9b")
+    foreach ($cand in $candidates) {
         if ($installedModels -contains $cand) {
             $selectedModel = $cand
             break
         }
     }
 }
-Write-Host "   Вибрана модель за замовчуванням: $selectedModel" -ForegroundColor Cyan
 
-# 3. Встановлення модуля у PSModulePath
-Write-Host "`n2. Реєстрація модуля PowerShell..." -ForegroundColor Yellow
+# Якщо рекомендованої/обраної моделі ще немає серед встановлених
+if ($installedModels -notcontains $selectedModel -and (Get-Command ollama -ErrorAction SilentlyContinue)) {
+    Write-Host "`n   ⚠ Модель '$selectedModel' ще не завантажена в Ollama." -ForegroundColor DarkYellow
+    $shouldPull = $false
+    if ($AutoConfirm) {
+        $shouldPull = $true
+    } elseif (-not [Console]::IsInputRedirected) {
+        $pullChoice = Read-Host "   Завантажити '$selectedModel' зараз через 'ollama pull'? [Y/n] (або введіть іншу назву моделі)"
+        if ($pullChoice -match '^(y|yes|так|т|$)' -or [string]::IsNullOrWhiteSpace($pullChoice)) {
+            $shouldPull = $true
+        } elseif ($pullChoice -notmatch '^(n|no|ні|н)$') {
+            $selectedModel = $pullChoice.Trim()
+            $shouldPull = $true
+        }
+    }
+
+    if ($shouldPull) {
+        Write-Host "   ▶ Завантаження моделі '$selectedModel' (з нативним індикатором прогресу Ollama)..." -ForegroundColor Cyan
+        & ollama pull $selectedModel
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "   ✔ Модель '$selectedModel' успішно завантажена!" -ForegroundColor Green
+        }
+    }
+}
+
+Write-Host "   Вибрана активна модель: $selectedModel" -ForegroundColor Cyan
+
+# 4. Встановлення модуля у PSModulePath
+Write-Host "`n3. Реєстрація модуля PowerShell..." -ForegroundColor Yellow
 $userModuleBase = ($env:PSModulePath -split ';')[0]
 if (-not (Test-Path $userModuleBase)) {
     New-Item -ItemType Directory -Path $userModuleBase -Force | Out-Null
@@ -71,7 +235,7 @@ Copy-Item -Path (Join-Path $projectDir "TerminalAiAssistant.ps1") -Destination $
 Write-Host "   ✔ Модуль скопійовано до: $destModuleDir" -ForegroundColor Green
 
 # 4. Додавання автоімпорту до $PROFILE
-Write-Host "`n3. Оновлення профілю PowerShell ($PROFILE)..." -ForegroundColor Yellow
+Write-Host "`n4. Оновлення профілю PowerShell ($PROFILE)..." -ForegroundColor Yellow
 if (-not (Test-Path $PROFILE)) {
     $profileDir = Split-Path -Parent $PROFILE
     if (-not (Test-Path $profileDir)) {
@@ -95,7 +259,7 @@ Set-TerminalAiConfig -Model $selectedModel -OllamaUrl $ollamaUrl | Out-Null
 
 # 5. Інтеграція з Windows Terminal (settings.json)
 if (-not $SkipTerminalConfig) {
-    Write-Host "`n4. Налаштування Windows Terminal (actions & palette)..." -ForegroundColor Yellow
+    Write-Host "`n5. Налаштування Windows Terminal (actions & palette)..." -ForegroundColor Yellow
 
     $wtSettingsCandidates = @(
         "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json",
