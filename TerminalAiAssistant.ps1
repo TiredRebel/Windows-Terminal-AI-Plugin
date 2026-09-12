@@ -500,7 +500,7 @@ while ($true) {
             $capturedErrorMessage = ""
 
             try {
-                $execRaw = Invoke-Expression $lastCodeBlock 2>&1
+                $execRaw = Invoke-AiExecutionGate -Command $lastCodeBlock -ReturnOutput -AutoConfirm
                 foreach ($item in $execRaw) {
                     if ($item -is [System.Management.Automation.ErrorRecord]) {
                         $hasExecutionError = $true

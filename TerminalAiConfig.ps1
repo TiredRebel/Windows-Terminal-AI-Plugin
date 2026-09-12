@@ -1,7 +1,11 @@
 ﻿# TerminalAiConfig.ps1 - Конфігурація TerminalAI, керування мовами та шрифтами
 
 function Get-TerminalAiConfigPath {
-    $configDir = Join-Path $HOME ".terminal-ai"
+    $configDir = if ($env:TERMINAL_AI_CONFIG_DIR) {
+        $env:TERMINAL_AI_CONFIG_DIR
+    } else {
+        Join-Path $HOME ".terminal-ai"
+    }
     if (-not (Test-Path $configDir)) {
         New-Item -ItemType Directory -Path $configDir -Force | Out-Null
     }
@@ -312,15 +316,19 @@ function Set-TerminalAiLanguage {
     Set-TerminalAiConfig -Language $normalizedLang | Out-Null
 
     # 2. Фіксуємо у середовищі користувача Windows ($env:TERMINAL_AI_LANG) та поточної сесії
-    try {
-        [Environment]::SetEnvironmentVariable("TERMINAL_AI_LANG", $normalizedLang, "User")
-    } catch { }
+    if ($Permanent -and -not $env:TERMINAL_AI_CONFIG_DIR) {
+        try {
+            [Environment]::SetEnvironmentVariable("TERMINAL_AI_LANG", $normalizedLang, "User")
+        } catch { }
+    }
     $env:TERMINAL_AI_LANG = $normalizedLang
 
     # 3. Оновлюємо JSON фрагмент розширення Windows Terminal
-    try {
-        Update-TerminalAiFragment -Language $normalizedLang
-    } catch { }
+    if (-not $env:TERMINAL_AI_CONFIG_DIR) {
+        try {
+            Update-TerminalAiFragment -Language $normalizedLang
+        } catch { }
+    }
 
     $cfgPath = Get-TerminalAiConfigPath
     if ($normalizedLang -eq "uk") {

@@ -49,7 +49,9 @@
         'Clear-AiInputBuffer',
         'Get-AiMenuKeyPress',
         'Show-TerminalAiHelp',
-        'Register-TerminalAiArgumentCompleters'
+        'Register-TerminalAiArgumentCompleters',
+        'Test-AiCommandAst',
+        'Invoke-AiExecutionGate'
     )
 
     # Командлети, що експортуються

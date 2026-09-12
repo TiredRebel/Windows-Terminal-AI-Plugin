@@ -1,4 +1,4 @@
-@{
+﻿@{
     RootModule = 'bin/Release/net10.0/TerminalAI.Aot.dll'
     ModuleVersion = '1.0.0'
     GUID = 'a07e1143-4a07-4a07-b007-a07e11434a07'

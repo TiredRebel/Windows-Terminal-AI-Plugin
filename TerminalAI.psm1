@@ -193,6 +193,7 @@ function Get-TerminalAiText {
             "MenuFull"          = "Повні"
             "MenuExplain"       = "Пояснити код"
             "MenuAsk"           = "Текстова відповідь"
+            "MenuWhatIf"        = "Симуляція (-WhatIf)"
             "MenuCancel"        = "Скасувати"
             "Copied"            = "Скопійовано в буфер обміну!"
             "Inserted"          = "Команду вставлено у рядок введення!"
@@ -228,6 +229,7 @@ function Get-TerminalAiText {
             "MenuFull"          = "Full"
             "MenuExplain"       = "Explain code"
             "MenuAsk"           = "Text answer"
+            "MenuWhatIf"        = "Preview (-WhatIf)"
             "MenuCancel"        = "Cancel"
             "Copied"            = "Copied to clipboard!"
             "Inserted"          = "Command inserted into input line!"
@@ -683,7 +685,10 @@ function Show-AiCodeCard {
 }
 
 function Show-AiActionMenu {
-    param([bool]$UseAliases = $false)
+    param(
+        [bool]$UseAliases = $false,
+        [bool]$CanPreview = $false
+    )
 
     $tEnter = Get-TerminalAiText "MenuEnter"
     $tCopy = Get-TerminalAiText "MenuCopy"
@@ -691,6 +696,7 @@ function Show-AiActionMenu {
     $tAlias = if ($UseAliases) { Get-TerminalAiText "MenuFull" } else { Get-TerminalAiText "MenuAlias" }
     $tExplain = Get-TerminalAiText "MenuExplain"
     $tAsk = Get-TerminalAiText "MenuAsk"
+    $tWhatIf = Get-TerminalAiText "MenuWhatIf"
     $tCancel = Get-TerminalAiText "MenuCancel"
 
     $conWidth = 80
@@ -702,7 +708,7 @@ function Show-AiActionMenu {
         }
     } catch { }
 
-    if ($conWidth -ge 110) {
+    if ($conWidth -ge 120) {
         Write-Host "    [Enter] " -NoNewline -ForegroundColor Green
         Write-Host "$tEnter   " -NoNewline -ForegroundColor White
         Write-Host "[C] " -NoNewline -ForegroundColor Yellow
@@ -711,6 +717,10 @@ function Show-AiActionMenu {
         Write-Host "$tInsert   " -NoNewline -ForegroundColor White
         Write-Host "[S] " -NoNewline -ForegroundColor DarkYellow
         Write-Host "$tAlias   " -NoNewline -ForegroundColor White
+        if ($CanPreview) {
+            Write-Host "[W] " -NoNewline -ForegroundColor DarkCyan
+            Write-Host "$tWhatIf   " -NoNewline -ForegroundColor White
+        }
         Write-Host "[X] " -NoNewline -ForegroundColor Magenta
         Write-Host "$tExplain   " -NoNewline -ForegroundColor White
         Write-Host "[A] " -NoNewline -ForegroundColor Blue
@@ -727,6 +737,10 @@ function Show-AiActionMenu {
 
         Write-Host "    [S]     " -NoNewline -ForegroundColor DarkYellow
         Write-Host ("{0,-14} " -f $tAlias) -NoNewline -ForegroundColor White
+        if ($CanPreview) {
+            Write-Host "[W] " -NoNewline -ForegroundColor DarkCyan
+            Write-Host ("{0,-14} " -f $tWhatIf) -NoNewline -ForegroundColor White
+        }
         Write-Host "[X] " -NoNewline -ForegroundColor Magenta
         Write-Host ("{0,-14} " -f $tExplain) -NoNewline -ForegroundColor White
         Write-Host "[A] " -NoNewline -ForegroundColor Blue
@@ -763,7 +777,7 @@ function Get-AiMenuKeyPress {
     #>
     [CmdletBinding()]
     param(
-        [string[]]$AllowedActions = @('Execute', 'Copy', 'Insert', 'ShortAlias', 'Ask', 'Explain', 'Cancel')
+        [string[]]$AllowedActions = @('Execute', 'Copy', 'Insert', 'ShortAlias', 'Ask', 'Explain', 'WhatIf', 'Cancel')
     )
 
     while ($true) {
@@ -864,6 +878,13 @@ function Get-AiMenuKeyPress {
         if ('Explain' -in $AllowedActions) {
             if ($keyEnum -eq [System.ConsoleKey]::X -or $vk -eq 88 -or $keyChar -in @('x', 'X', 'х', 'Х', 'ч', 'Ч')) {
                 return 'Explain'
+            }
+        }
+
+        # 8. W (WhatIf / Preview) - англійська W/w, або фізична W в укр розкладці (Ц/ц)
+        if ('WhatIf' -in $AllowedActions) {
+            if ($keyEnum -eq [System.ConsoleKey]::W -or $vk -eq 87 -or $keyChar -in @('w', 'W', 'ц', 'Ц')) {
+                return 'WhatIf'
             }
         }
     }
@@ -1097,6 +1118,644 @@ $aliasGuide
 "@
 }
 
+# --- P0: ДЕТЕРМІНОВАНИЙ AST АНАЛІЗАТОР ТА ОЦІНКА РИЗИКІВ ---
+
+function Test-AiCommandAst {
+    <#
+    .SYNOPSIS
+        Детермінований AST-аналізатор команд PowerShell для безпекової фази P0.
+    .DESCRIPTION
+        Рекурсивно аналізує рядок коду через PowerShell AST: знаходить усі CommandAst,
+        розпізнає командлети, функції, аліаси та зовнішні бінарні файли;
+        валідує параметри; виявляє динамічні виклики та splatting; витягує цілі
+        та обчислює рівень ризику без виконання коду.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true, Position = 0)]
+        [string]$Command
+    )
+
+    $tokens = $null
+    $parseErrors = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseInput($Command, [ref]$tokens, [ref]$parseErrors)
+
+    if ($parseErrors -and $parseErrors.Count -gt 0) {
+        return [PSCustomObject]@{
+            IsValid                  = $false
+            ParseErrors              = $parseErrors
+            Commands                 = @()
+            OverallCategory          = "DynamicOrUnknown"
+            OverallRisk              = "High"
+            RequiresConfirmation     = $true
+            CanPreview               = $false
+            PreviewUnavailableReason = "Синтаксична помилка у команді: $($parseErrors[0].Message)"
+            Targets                  = @("Unknown target")
+            HasDynamicInvocation     = $false
+            HasSplatting             = $false
+            HasDynamicTarget         = $false
+        }
+    }
+
+    # Рекурсивний пошук CommandAst
+    $commandAsts = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.CommandAst] }, $true)
+
+    # Пошук динамічних викликів (& $x або Invoke-Expression / iex)
+    $dynamicInvocations = $ast.FindAll({
+        $node = $args[0]
+        ($node -is [System.Management.Automation.Language.CommandAst] -and $node.InvocationOperator -eq 'Ampersand') -or
+        ($node -is [System.Management.Automation.Language.CommandAst] -and $node.GetCommandName() -in @('Invoke-Expression', 'iex')) -or
+        ($node -is [System.Management.Automation.Language.CommandAst] -and $node.CommandElements.Count -gt 0 -and $node.CommandElements[0] -is [System.Management.Automation.Language.VariableExpressionAst])
+    }, $true)
+    $hasDynamicInvocation = ($dynamicInvocations.Count -gt 0)
+
+    # Пошук splatting (@params)
+    $splattedVars = $ast.FindAll({
+        $args[0] -is [System.Management.Automation.Language.VariableExpressionAst] -and $args[0].Splatted
+    }, $true)
+    $hasSplatting = ($splattedVars.Count -gt 0)
+
+    $analyzedCommands = [System.Collections.Generic.List[object]]::new()
+    $allTargets = [System.Collections.Generic.List[string]]::new()
+    $hasDynamicTarget = $false
+
+    foreach ($cAst in $commandAsts) {
+        $rawName = $cAst.GetCommandName()
+        $originalName = if ($rawName) { $rawName } else { $cAst.CommandElements[0].Extent.Text }
+
+        $resolvedTarget = $null
+        $cmdInfo = $null
+        $commandType = "Unknown"
+        $category = "DynamicOrUnknown"
+        $risk = "Medium"
+        $supportsWhatIf = $false
+        $invalidParams = [System.Collections.Generic.List[string]]::new()
+        $paramsFound = [System.Collections.Generic.List[string]]::new()
+        $cmdTargets = [System.Collections.Generic.List[string]]::new()
+
+        if ([string]::IsNullOrWhiteSpace($rawName)) {
+            $commandType = "DynamicInvocation"
+            $category = "DynamicOrUnknown"
+            $risk = "High"
+            $hasDynamicInvocation = $true
+        } else {
+            # Перевіряємо, чи це аліас
+            $alias = Get-Alias -Name $rawName -ErrorAction SilentlyContinue
+            if ($alias) {
+                $commandType = "Alias"
+                $resolvedTarget = $alias.Definition
+                $effectiveName = $resolvedTarget
+                $cmdInfo = Get-Command -Name $resolvedTarget -ErrorAction SilentlyContinue
+            } else {
+                $effectiveName = $rawName
+                $cmdInfo = Get-Command -Name $rawName -ErrorAction SilentlyContinue
+            }
+
+            if ($cmdInfo) {
+                if ($cmdInfo.CommandType -in @('Cmdlet', 'Function', 'Filter', 'Script')) {
+                    if ($commandType -ne "Alias") { $commandType = $cmdInfo.CommandType.ToString() }
+                    $resolvedTarget = $cmdInfo.Name
+
+                    # Перевіряємо WhatIf
+                    if ($cmdInfo.Parameters.ContainsKey('WhatIf')) {
+                        $supportsWhatIf = $true
+                    } elseif ($cmdInfo.ImplementingType) {
+                        try {
+                            $cmdAttr = [System.Management.Automation.CmdletAttribute][Attribute]::GetCustomAttribute(
+                                $cmdInfo.ImplementingType, [System.Management.Automation.CmdletAttribute]
+                            )
+                            if ($cmdAttr -and $cmdAttr.SupportsShouldProcess) {
+                                $supportsWhatIf = $true
+                            }
+                        } catch { }
+                    }
+                } elseif ($cmdInfo.CommandType -eq 'Application') {
+                    $commandType = "ExternalProgram"
+                    $resolvedTarget = $cmdInfo.Source
+                    $category = "ExternalProgram"
+                    $risk = "Medium"
+                    $supportsWhatIf = $false
+                }
+            } else {
+                $commandType = "Unknown"
+                $category = "DynamicOrUnknown"
+                $risk = "High"
+            }
+        }
+
+        # Аналіз параметрів
+        $paramAsts = $cAst.FindAll({ $args[0] -is [System.Management.Automation.Language.CommandParameterAst] }, $false)
+        foreach ($p in $paramAsts) {
+            $pName = $p.ParameterName
+            $paramsFound.Add($pName)
+            if ($cmdInfo -and $cmdInfo.Parameters) {
+                $commonParams = @('Verbose', 'Debug', 'ErrorAction', 'WarningAction', 'InformationAction', 'ErrorVariable', 'WarningVariable', 'InformationVariable', 'OutVariable', 'OutBuffer', 'PipelineVariable', 'WhatIf', 'Confirm')
+                $known = $cmdInfo.Parameters.ContainsKey($pName) -or ($commonParams -contains $pName)
+                if (-not $known) {
+                    $matchedPrefix = $cmdInfo.Parameters.Keys | Where-Object { $_.StartsWith($pName, [System.StringComparison]::OrdinalIgnoreCase) }
+                    if (-not $matchedPrefix) {
+                        $matchedPrefix = $commonParams | Where-Object { $_.StartsWith($pName, [System.StringComparison]::OrdinalIgnoreCase) }
+                    }
+                    if ($matchedPrefix) { $known = $true }
+                }
+                if (-not $known) {
+                    $invalidParams.Add($pName)
+                }
+            }
+        }
+
+        # Витягнення аргументів та цілей
+        for ($i = 1; $i -lt $cAst.CommandElements.Count; $i++) {
+            $elem = $cAst.CommandElements[$i]
+            if ($elem -is [System.Management.Automation.Language.CommandParameterAst]) {
+                continue
+            }
+            if ($elem -is [System.Management.Automation.Language.StringConstantExpressionAst]) {
+                $val = $elem.Value
+                if (-not [string]::IsNullOrWhiteSpace($val) -and $val -notmatch '^-') {
+                    $cmdTargets.Add($val)
+                    if (-not $allTargets.Contains($val)) { $allTargets.Add($val) }
+                }
+            } elseif ($elem -is [System.Management.Automation.Language.ExpandableStringExpressionAst]) {
+                $val = $elem.Extent.Text.Trim('"', "'")
+                if (-not [string]::IsNullOrWhiteSpace($val)) {
+                    $cmdTargets.Add($val)
+                    if (-not $allTargets.Contains($val)) { $allTargets.Add($val) }
+                }
+            } elseif ($elem -is [System.Management.Automation.Language.VariableExpressionAst]) {
+                $cmdTargets.Add("Unknown target")
+                $hasDynamicTarget = $true
+                if (-not $allTargets.Contains("Unknown target")) { $allTargets.Add("Unknown target") }
+            } elseif ($elem -is [System.Management.Automation.Language.SubExpressionAst] -or $elem -is [System.Management.Automation.Language.ScriptBlockExpressionAst]) {
+                $cmdTargets.Add("Unknown target")
+                $hasDynamicTarget = $true
+                if (-not $allTargets.Contains("Unknown target")) { $allTargets.Add("Unknown target") }
+            }
+        }
+
+        # Класифікація категорій та ризику для Cmdlet/Function/Unknown
+        $eff = if ($resolvedTarget) { $resolvedTarget } else { $originalName }
+
+        if ($commandType -eq "ExternalProgram") {
+            $category = "ExternalProgram"
+            if ($eff -match '^(?:rm|del|erase|format|fdisk|dd|diskpart|mkfs)$') {
+                $risk = "High"
+                $category = "Deletion"
+            } else {
+                $risk = "Medium"
+            }
+        } elseif ($commandType -eq "Unknown") {
+            $category = "DynamicOrUnknown"
+            $risk = "High"
+        } else {
+            # Аналіз префіксів/дієслів та імен
+            if ($eff -match '^(?:Remove-|Clear-|Reset-)') {
+                $category = "Deletion"
+                $risk = "High"
+            } elseif ($eff -match '^(?:Stop-Process|kill|Stop-Service|Restart-Service|Suspend-Service|Set-Service)') {
+                $category = "ServiceOrProcess"
+                $risk = "High"
+            } elseif ($eff -match '^(?:Set-ItemProperty|New-ItemProperty|Remove-ItemProperty|Clear-ItemProperty)' -or
+                      ($eff -match '^(?:Get-ItemProperty|New-Item|Remove-Item|Set-Item)' -and ($Command -match '(?i)\b(?:HKCU:|HKLM:|HKCR:|HKU:|HKCC:|Registry::)'))) {
+                $category = "Registry"
+                $risk = "High"
+            } elseif ($eff -match '(?i)(?:-Disk\b|-Partition\b|-Volume\b|Format-Volume|Initialize-Disk|Clear-Disk)') {
+                $category = "DiskOrPartition"
+                $risk = "Critical"
+            } elseif ($eff -match '(?i)^(?:Set-Net|New-Net|Remove-Net|Disable-Net|Enable-Net|Rename-Net)') {
+                $category = "NetworkChange"
+                $risk = "High"
+            } elseif ($eff -match '(?i)^(?:Set-|New-|Add-|Register-|Unregister-|Install-|Uninstall-|Enable-|Disable-|Grant-|Revoke-)') {
+                $category = "SystemChange"
+                $risk = "Medium"
+            } elseif ($eff -match '(?i)^(?:Get-|Select-|Where-|ForEach-|Measure-|Sort-|Out-|Format-|Export-|Test-|Show-|Find-|Read-|Compare-|Group-)') {
+                $category = "ReadOnly"
+                $risk = "Low"
+            } else {
+                $category = "DynamicOrUnknown"
+                $risk = "Medium"
+            }
+        }
+
+        if ($invalidParams.Count -gt 0 -and $risk -eq "Low") {
+            $risk = "Medium"
+        }
+
+        $analyzedCommands.Add([PSCustomObject]@{
+            OriginalName      = $originalName
+            CommandName       = $eff
+            ResolvedTarget    = $resolvedTarget
+            CommandType       = $commandType
+            Category          = $category
+            Risk              = $risk
+            SupportsWhatIf    = $supportsWhatIf
+            Parameters        = @($paramsFound)
+            InvalidParameters = @($invalidParams)
+            Targets           = @($cmdTargets)
+        })
+    }
+
+    $categoryOrder = @("DiskOrPartition", "Deletion", "Registry", "ServiceOrProcess", "NetworkChange", "DynamicOrUnknown", "ExternalProgram", "SystemChange", "ReadOnly")
+    $overallCat = "ReadOnly"
+    foreach ($cat in $categoryOrder) {
+        if ($analyzedCommands | Where-Object { $_.Category -eq $cat }) {
+            $overallCat = $cat
+            break
+        }
+    }
+
+    $riskOrder = @("Critical", "High", "Medium", "Low")
+    $overallRisk = "Low"
+    foreach ($r in $riskOrder) {
+        if ($analyzedCommands | Where-Object { $_.Risk -eq $r }) {
+            $overallRisk = $r
+            break
+        }
+    }
+    if ($hasDynamicInvocation -and $overallRisk -in @("Low", "Medium")) {
+        $overallRisk = "High"
+        $overallCat = "DynamicOrUnknown"
+    }
+
+    $requiresConfirm = ($overallRisk -in @("High", "Critical", "Unknown"))
+    if ($hasDynamicInvocation) { $requiresConfirm = $true }
+
+    $allWhatIf = $true
+    foreach ($c in $analyzedCommands) {
+        if ($c.Category -ne "ReadOnly" -and -not $c.SupportsWhatIf) {
+            $allWhatIf = $false
+            break
+        }
+    }
+
+    $canPreview = $allWhatIf
+    $previewReason = if ($canPreview) {
+        $null
+    } else {
+        if ($analyzedCommands | Where-Object { $_.CommandType -eq "ExternalProgram" }) {
+            "Безпечний попередній перегляд (-WhatIf) недоступний для зовнішніх бінарних програм"
+        } else {
+            "Безпечний попередній перегляд (-WhatIf) не підтримується однією або кількома командами"
+        }
+    }
+
+    if ($allTargets.Count -eq 0) {
+        $allTargets.Add("Unknown target")
+    }
+
+    return [PSCustomObject]@{
+        IsValid                  = $true
+        ParseErrors              = @()
+        Commands                 = @($analyzedCommands)
+        OverallCategory          = $overallCat
+        OverallRisk              = $overallRisk
+        RequiresConfirmation     = $requiresConfirm
+        CanPreview               = $canPreview
+        PreviewUnavailableReason = $previewReason
+        Targets                  = @($allTargets)
+        HasDynamicInvocation     = $hasDynamicInvocation
+        HasSplatting             = $hasSplatting
+        HasDynamicTarget         = $hasDynamicTarget
+    }
+}
+
+function Invoke-AiExecutionGate {
+    <#
+    .SYNOPSIS
+        Єдина безпекова точка входу для виконання команд PowerShell у TerminalAI.
+    .DESCRIPTION
+        Аналізує команду через Test-AiCommandAst.
+        1. Блокує виконання при синтаксичних помилках.
+        2. Відображає картку безпеки для операцій з високим/критичним/невідомим ризиком,
+           динамічними викликами або невідомими цілями.
+        3. Вимагає явного підтвердження користувача навіть при прапорці -AutoConfirm/-Execute,
+           якщо операція становить потенційну небезпеку.
+        4. Дозволяє автоматичний запуск лише для перевірених низькоризикових команд з -AutoConfirm.
+        5. Підтримує вивід через Out-Default або повернення результатів (-ReturnOutput).
+    .PARAMETER Command
+        Рядок команди PowerShell для перевірки та виконання.
+    .PARAMETER AutoConfirm
+        Автоматичне підтвердження виконання для низькоризикових операцій.
+        Для High/Critical/Unknown підтвердження все одно вимагається інтерактивно.
+    .PARAMETER ReturnOutput
+        Повернути вивід команди (stdout/stderr) замість відправки в Out-Default.
+    .PARAMETER ConfirmInput
+        Опціональна відповідь для емуляції вводу підтвердження ('y'/'n'), використовується в тестах та автоматизації.
+    .PARAMETER PassThru
+        Повернути детальний об'єкт звіту виконання [PSCustomObject] з результатами аналізу та статусом.
+    .PARAMETER SkipAstAnalysis
+        Пропустити AST-аналіз (лише для виняткових внутрішніх викликів).
+    #>
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param(
+        [Parameter(Mandatory = $true, Position = 0)]
+        [string]$Command,
+
+        [Parameter()]
+        [switch]$AutoConfirm,
+
+        [Parameter()]
+        [switch]$ReturnOutput,
+
+        [Parameter()]
+        [string]$ConfirmInput,
+
+        [Parameter()]
+        [switch]$PassThru,
+
+        [Parameter()]
+        [switch]$Preview,
+
+        [Parameter()]
+        [switch]$SkipAstAnalysis
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Command)) {
+        if ($PassThru) {
+            return [PSCustomObject]@{
+                Executed = $false
+                Status   = "EmptyCommand"
+                Command  = $Command
+                Analysis = $null
+                Output   = $null
+            }
+        }
+        return $null
+    }
+
+    $analysis = $null
+    if (-not $SkipAstAnalysis) {
+        $analysis = Test-AiCommandAst -Command $Command
+
+        # 1. Синтаксична перевірка: блокування при наявності помилок парсера
+        if (-not $analysis.IsValid -or ($analysis.ParseErrors -and $analysis.ParseErrors.Count -gt 0)) {
+            Write-Host ""
+            Write-Host "    ┌─────────────────────────────────────────────────────────────┐" -ForegroundColor Red
+            Write-Host "    │          ✖  TERMINAL AI SECURITY GATE: SYNTAX ERROR         │" -ForegroundColor Red
+            Write-Host "    └─────────────────────────────────────────────────────────────┘" -ForegroundColor Red
+            Write-Host "    Command execution BLOCKED due to syntax errors:" -ForegroundColor DarkYellow
+            foreach ($err in $analysis.ParseErrors) {
+                $lineNum = if ($err.Extent) { $err.Extent.StartLineNumber } else { 1 }
+                $colNum = if ($err.Extent) { $err.Extent.StartColumnNumber } else { 1 }
+                Write-Host "      • Line $lineNum, Col $($colNum): $($err.Message)" -ForegroundColor Red
+            }
+            Write-Host ""
+
+            if ($PassThru) {
+                return [PSCustomObject]@{
+                    Executed = $false
+                    Status   = "SyntaxError"
+                    Command  = $Command
+                    Analysis = $analysis
+                    Output   = $null
+                }
+            }
+            return $null
+        }
+    }
+
+    # 2. Попередній перегляд / WhatIf режим
+    $isWhatIf = $Preview -or ($PSBoundParameters.ContainsKey('WhatIf') -and $PSBoundParameters['WhatIf'])
+    if ($isWhatIf) {
+        if (-not $analysis.CanPreview) {
+            $reason = if ($analysis.PreviewUnavailableReason) { $analysis.PreviewUnavailableReason } else { "WhatIf preview is not supported for this command." }
+            Write-Host ""
+            Write-Host "    ⚠ [Preview Unavailable] $reason" -ForegroundColor DarkYellow
+            Write-Host "      Command contains external binaries or operations without SupportsShouldProcess." -ForegroundColor DarkGray
+            Write-Host ""
+            if ($PassThru) {
+                return [PSCustomObject]@{
+                    Executed = $false
+                    Status   = "PreviewUnavailable"
+                    Command  = $Command
+                    Analysis = $analysis
+                    Output   = $null
+                }
+            }
+            return $null
+        }
+
+        Write-Host "    🔍 [WhatIf Preview] Running command in safe simulation mode..." -ForegroundColor Cyan
+        try {
+            $sb = [ScriptBlock]::Create($Command)
+            if ($ReturnOutput) {
+                $output = & {
+                    $WhatIfPreference = $true
+                    . $sb
+                } 2>&1
+                if ($PassThru) {
+                    return [PSCustomObject]@{
+                        Executed = $true
+                        Status   = "Previewed"
+                        Command  = $Command
+                        Analysis = $analysis
+                        Output   = $output
+                    }
+                }
+                return $output
+            } else {
+                & {
+                    $WhatIfPreference = $true
+                    . $sb
+                } | Out-Default
+                if ($PassThru) {
+                    return [PSCustomObject]@{
+                        Executed = $true
+                        Status   = "Previewed"
+                        Command  = $Command
+                        Analysis = $analysis
+                        Output   = $null
+                    }
+                }
+            }
+            return $null
+        } catch {
+            Write-Error $_
+            if ($PassThru) {
+                return [PSCustomObject]@{
+                    Executed = $false
+                    Status   = "ExecutionError"
+                    Command  = $Command
+                    Analysis = $analysis
+                    Output   = $_
+                }
+            }
+            if ($ReturnOutput) { return $_ }
+            return $null
+        }
+    }
+
+    # 3. Перевірка небезпеки
+    $isDangerous = $false
+    if ($analysis) {
+        $isDangerous = $analysis.RequiresConfirmation -or ($analysis.OverallRisk -in @("High", "Critical", "Unknown"))
+    }
+
+    # Визначення, чи потрібне підтвердження
+    $needsPrompt = $true
+    if (-not $isDangerous -and $AutoConfirm) {
+        # Низький ризик + AutoConfirm -> пряме виконання
+        $needsPrompt = $false
+    }
+
+    if ($needsPrompt) {
+        # Формування та відображення картки безпеки
+        $risk = if ($analysis) { $analysis.OverallRisk } else { "Unknown" }
+        $category = if ($analysis) { $analysis.OverallCategory } else { "Unknown" }
+        $targets = if ($analysis -and $analysis.Targets) { $analysis.Targets } else { @() }
+
+        $headerColor = switch ($risk) {
+            'Critical' { 'Red' }
+            'High'     { 'Red' }
+            'Medium'   { 'Yellow' }
+            default    { 'Cyan' }
+        }
+
+        Write-Host ""
+        Write-Host "    ┌─────────────────────────────────────────────────────────────┐" -ForegroundColor $headerColor
+        Write-Host "    │               ⚠  TERMINAL AI SECURITY GATE  ⚠               │" -ForegroundColor $headerColor
+        Write-Host "    └─────────────────────────────────────────────────────────────┘" -ForegroundColor $headerColor
+        Write-Host "    Command:  " -NoNewline -ForegroundColor White
+        Write-Host $Command -ForegroundColor Cyan
+        Write-Host "    Category: " -NoNewline -ForegroundColor White
+        Write-Host $category -ForegroundColor Yellow
+        Write-Host "    Risk:     " -NoNewline -ForegroundColor White
+        Write-Host $risk -ForegroundColor $headerColor
+
+        if ($targets.Count -gt 0) {
+            Write-Host "    Targets:  " -NoNewline -ForegroundColor White
+            Write-Host ($targets -join ", ") -ForegroundColor Magenta
+        }
+
+        # Збір причин ризику
+        $reasons = [System.Collections.Generic.List[string]]::new()
+        if ($analysis) {
+            if ($analysis.HasDynamicInvocation) {
+                $reasons.Add("Dynamic command invocation detected (& `$var, Invoke-Expression, iex)")
+            }
+            if ($analysis.HasDynamicTarget) {
+                $reasons.Add("Dynamic or unresolved target (variable/expression in arguments)")
+            }
+            if ($analysis.HasSplatting) {
+                $reasons.Add("Parameter splatting detected (@params)")
+            }
+            foreach ($cmd in $analysis.Commands) {
+                if ($cmd.InvalidParameters -and $cmd.InvalidParameters.Count -gt 0) {
+                    $reasons.Add("Unknown parameter(s) for $($cmd.CommandName): $($cmd.InvalidParameters -join ', ')")
+                }
+                if ($cmd.Category -in @("Deletion", "DiskOrPartition", "Registry", "NetworkChange", "ServiceOrProcess")) {
+                    $reasons.Add("Operation category '$($cmd.Category)' modifies system state ($($cmd.CommandName))")
+                }
+            }
+        }
+        if ($reasons.Count -gt 0) {
+            Write-Host "    Reasons:" -ForegroundColor White
+            foreach ($r in $reasons) {
+                Write-Host "      • $r" -ForegroundColor DarkYellow
+            }
+        }
+
+        # Запит підтвердження
+        $promptDefault = if ($risk -in @("High", "Critical", "Unknown")) { "y/N" } else { "Y/n" }
+        $promptText = "    Execute this command? [$promptDefault]: "
+
+        $confirmed = $false
+        if ($PSBoundParameters.ContainsKey('ConfirmInput')) {
+            $response = $ConfirmInput
+        } else {
+            try {
+                $isInteractive = [Environment]::UserInteractive
+                if ([Console]::IsInputRedirected) { $isInteractive = $false }
+            } catch {
+                $isInteractive = $true
+            }
+
+            if (-not $isInteractive) {
+                Write-Host "    ✖ Non-interactive host detected. Unconfirmed command blocked." -ForegroundColor Red
+                if ($PassThru) {
+                    return [PSCustomObject]@{
+                        Executed = $false
+                        Status   = "BlockedNonInteractive"
+                        Command  = $Command
+                        Analysis = $analysis
+                        Output   = $null
+                    }
+                }
+                return $null
+            }
+
+            $response = Read-Host -Prompt $promptText
+        }
+
+        if ($risk -in @("High", "Critical", "Unknown")) {
+            if ($response -match '^(y|yes|так|т)$') {
+                $confirmed = $true
+            }
+        } else {
+            if ([string]::IsNullOrWhiteSpace($response) -or $response -match '^(y|yes|так|т)$') {
+                $confirmed = $true
+            }
+        }
+
+        if (-not $confirmed) {
+            Write-Host "    ✖ Execution canceled by user." -ForegroundColor DarkGray
+            if ($PassThru) {
+                return [PSCustomObject]@{
+                    Executed = $false
+                    Status   = "Denied"
+                    Command  = $Command
+                    Analysis = $analysis
+                    Output   = $null
+                }
+            }
+            return $null
+        }
+    }
+
+    # 3. Виконання команди
+    try {
+        $sb = [ScriptBlock]::Create($Command)
+        if ($ReturnOutput) {
+            $output = . $sb 2>&1
+            if ($PassThru) {
+                return [PSCustomObject]@{
+                    Executed = $true
+                    Status   = "Executed"
+                    Command  = $Command
+                    Analysis = $analysis
+                    Output   = $output
+                }
+            }
+            return $output
+        } else {
+            . $sb | Out-Default
+            if ($PassThru) {
+                return [PSCustomObject]@{
+                    Executed = $true
+                    Status   = "Executed"
+                    Command  = $Command
+                    Analysis = $analysis
+                    Output   = $null
+                }
+            }
+        }
+    } catch {
+        Write-Error $_
+        if ($PassThru) {
+            return [PSCustomObject]@{
+                Executed = $false
+                Status   = "ExecutionError"
+                Command  = $Command
+                Analysis = $analysis
+                Output   = $_
+            }
+        }
+        if ($ReturnOutput) {
+            return $_
+        }
+    }
+}
+
 function Invoke-AiCommand {
     <#
     .SYNOPSIS
@@ -1152,6 +1811,9 @@ function Invoke-AiCommand {
 
         [Alias("chat", "question")]
         [switch]$Ask,
+
+        [Alias("w", "WhatIf")]
+        [switch]$Preview,
 
         [string]$Model
     )
@@ -1475,7 +2137,13 @@ function Invoke-AiCommand {
     # Якщо вказано -Execute (-x або -y)
     if ($Execute) {
         Write-Host "    ▶ $(Get-TerminalAiText 'Executing') $command" -ForegroundColor Yellow
-        Invoke-Expression $command | Out-Default
+        Invoke-AiExecutionGate -Command $command -AutoConfirm
+        return
+    }
+
+    # Якщо вказано -Preview / -WhatIf (-w)
+    if ($Preview) {
+        Invoke-AiExecutionGate -Command $command -WhatIf
         return
     }
 
@@ -1487,13 +2155,24 @@ function Invoke-AiCommand {
 
     # Дворівневе структуроване меню дій з можливістю перемикання аліасів
     while ($true) {
-        Show-AiActionMenu -UseAliases $preferAliases
+        $cmdAst = Test-AiCommandAst -Command $command
+        Show-AiActionMenu -UseAliases $preferAliases -CanPreview $cmdAst.CanPreview
 
-        $action = Get-AiMenuKeyPress -AllowedActions @('Execute', 'Copy', 'Insert', 'ShortAlias', 'Ask', 'Explain', 'Cancel')
+        $allowedActions = if ($cmdAst.CanPreview) {
+            @('Execute', 'Copy', 'Insert', 'ShortAlias', 'Ask', 'Explain', 'WhatIf', 'Cancel')
+        } else {
+            @('Execute', 'Copy', 'Insert', 'ShortAlias', 'Ask', 'Explain', 'Cancel')
+        }
+
+        $action = Get-AiMenuKeyPress -AllowedActions $allowedActions
         switch ($action) {
+            'WhatIf' {
+                Invoke-AiExecutionGate -Command $command -WhatIf
+                continue
+            }
             'Execute' {
                 Write-Host "    ▶ $(Get-TerminalAiText 'Executing')`n" -ForegroundColor Yellow
-                Invoke-Expression $command | Out-Default
+                Invoke-AiExecutionGate -Command $command -AutoConfirm
                 return
             }
             'Cancel' {
@@ -1689,7 +2368,7 @@ Rules:
         switch ($fixAction) {
             'Execute' {
                 Write-Host "    ▶ $(Get-TerminalAiText 'ExecutingFixed')`n" -ForegroundColor Yellow
-                Invoke-Expression $fixedCode | Out-Default
+                Invoke-AiExecutionGate -Command $fixedCode -AutoConfirm
             }
             'Copy' {
                 Set-Clipboard -Value $fixedCode
@@ -2210,7 +2889,9 @@ Export-ModuleMember -Function @(
     "Show-TerminalAiWelcome",
     "Get-AiSystemPrompt",
     "Clear-AiInputBuffer",
-    "Get-AiMenuKeyPress"
+    "Get-AiMenuKeyPress",
+    "Test-AiCommandAst",
+    "Invoke-AiExecutionGate"
 ) -Alias @(
     "ai",
     "??",

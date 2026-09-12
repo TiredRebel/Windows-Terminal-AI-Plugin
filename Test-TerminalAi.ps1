@@ -1,14 +1,32 @@
 ﻿# Test-TerminalAi.ps1 - Комплексний тест перевірки TerminalAI
+[CmdletBinding()]
+param(
+    [switch]$RunLiveTests
+)
 
 $ErrorActionPreference = "Stop"
 
 Write-Host "`n═══════════════════════════════════════════════════════════════" -ForegroundColor Cyan
 Write-Host "             Запуск тестів розширення TerminalAI               " -ForegroundColor Cyan
+if (-not $RunLiveTests) {
+    Write-Host "       [Режим: Детермінований (Live-тести Ollama пропущено)]   " -ForegroundColor Yellow
+} else {
+    Write-Host "       [Режим: Повний (з живими запитами до локальної Ollama)]  " -ForegroundColor Magenta
+}
 Write-Host "═══════════════════════════════════════════════════════════════`n" -ForegroundColor Cyan
 
 $allPassed = $true
 $tests = 0
 $passed = 0
+$skipped = 0
+
+# Ізоляція тестового середовища (захист реальної конфігурації користувача та $PROFILE)
+$origConfigDir = $env:TERMINAL_AI_CONFIG_DIR
+$origLang = $env:TERMINAL_AI_LANG
+$testTempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("TerminalAiTest_" + [System.Guid]::NewGuid().ToString("N"))
+$testConfigDir = Join-Path $testTempRoot "config"
+New-Item -ItemType Directory -Path $testConfigDir -Force | Out-Null
+$env:TERMINAL_AI_CONFIG_DIR = $testConfigDir
 
 function Assert-Test {
     param(
@@ -32,8 +50,37 @@ function Assert-Test {
     }
 }
 
+function Assert-LiveTest {
+    param(
+        [string]$Name,
+        [scriptblock]$TestBlock
+    )
+    $script:tests++
+    Write-Host "Тест $script:tests : $Name ... " -NoNewline -ForegroundColor White
+    if (-not $RunLiveTests) {
+        $script:skipped++
+        Write-Host "ПРОПУЩЕНО (потрібен -RunLiveTests)" -ForegroundColor Yellow
+        return
+    }
+    try {
+        $result = & $TestBlock
+        if ($result -ne $false) {
+            $script:passed++
+            Write-Host "ПРОЙДЕНО" -ForegroundColor Green
+        } else {
+            $script:allPassed = $false
+            Write-Host "НЕВДАЛО (Умова не виконана)" -ForegroundColor Red
+        }
+    } catch {
+        $script:allPassed = $false
+        Write-Host "ПОМИЛКА: $($_.Exception.Message)" -ForegroundColor Red
+    }
+}
+
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
+
+try {
 
 # 1. Тест конфігурації
 Assert-Test "Збереження та читання конфігурації" {
@@ -53,14 +100,14 @@ Assert-Test "Імпорт модуля TerminalAI.psd1 та перевірка �
 }
 
 # 3. Тест зв'язку з Ollama
-Assert-Test "З'єднання з локальною Ollama та отримання моделей" {
+Assert-LiveTest "З'єднання з локальною Ollama та отримання моделей" {
     $models = Get-TerminalAiModels
     return ($models.Count -gt 0)
 }
 
 # 4. Тест генерації команди через Ollama
 $testModel = (Get-TerminalAiConfig).Model
-Assert-Test "Генерація PowerShell команди через Ollama ($testModel)" {
+Assert-LiveTest "Генерація PowerShell команди через Ollama ($testModel)" {
     $code = Invoke-OllamaApi -Prompt "Write a single PowerShell command to get the current date in yyyy-MM-dd format" -Model $testModel -Temperature 0.1
     $clean = Clean-AiCodeOutput -Text $code
     Write-Host "`n    [Згенеровано]: $clean" -ForegroundColor DarkCyan
@@ -230,7 +277,7 @@ Assert-Test "Стійкість Read-AssistantLine до неінтерактив
 }
 
 # 21. Тест виклику ендпоінта /api/chat через Invoke-OllamaApi -Messages
-Assert-Test "Підтримка діалогового режиму Invoke-OllamaApi -Messages (/api/chat)" {
+Assert-LiveTest "Підтримка діалогового режиму Invoke-OllamaApi -Messages (/api/chat)" {
     $cfg = Get-TerminalAiConfig
     $testMessages = @(
         @{ role = "user"; content = "respond with the exact word CHAT_TEST_OK only" }
@@ -249,14 +296,75 @@ Assert-Test "Підтримка сесійної пам'яті та команд
     return ($hasHistoryVar -and $hasResetCmd -and $hasContextCmd -and $hasInspectCmd)
 }
 
+# 23. Детермінований тест серіалізації багатодіалогового payload без виклику мережі
+Assert-Test "Детерміноване формування payload діалогу (/api/chat) з системним промптом" {
+    $testMsgs = @(
+        @{ role = "user"; content = "Перший запит" },
+        @{ role = "assistant"; content = "Перша відповідь" },
+        @{ role = "user"; content = "Другий запит" }
+    )
+    $sysPrompt = "Системний інженерний промпт"
+    $chatList = [System.Collections.Generic.List[object]]::new()
+    $chatList.Add(@{ role = "system"; content = $sysPrompt })
+    foreach ($m in $testMsgs) { $chatList.Add($m) }
+
+    $payload = @{
+        model = "qwen2.5-coder:7b"
+        messages = $chatList
+        stream = $false
+        options = @{ temperature = 0.2; num_ctx = 4096 }
+    }
+    $json = $payload | ConvertTo-Json -Depth 5
+    $roundTrip = $json | ConvertFrom-Json
+
+    return ($roundTrip.messages.Count -eq 4 -and `
+            $roundTrip.messages[0].role -eq "system" -and `
+            $roundTrip.messages[1].content -eq "Перший запит" -and `
+            $roundTrip.messages[2].role -eq "assistant" -and `
+            $roundTrip.messages[3].content -eq "Другий запит")
+}
+
+# 24. Регресійний парсерний тест деінсталятора Uninstall-TerminalAi.ps1 (PS 7 та PS 5.1)
+Assert-Test "Регресійний парсерний тест Uninstall-TerminalAi.ps1 (PS 7 та PS 5.1)" {
+    $uninstPath = Join-Path $PSScriptRoot "Uninstall-TerminalAi.ps1"
+    $tokens = $null; $errors = $null
+    [System.Management.Automation.Language.Parser]::ParseFile($uninstPath, [ref]$tokens, [ref]$errors) | Out-Null
+    $ps7Valid = ($errors.Count -eq 0)
+
+    $escapedPath = $uninstPath -replace "'", "''"
+    $cmd = "& { `$tokens = `$null; `$errors = `$null; `$null = [System.Management.Automation.Language.Parser]::ParseFile('$escapedPath', [ref]`$tokens, [ref]`$errors); `$errors.Count }"
+    $ps51ErrCount = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command $cmd
+    $ps51Valid = ($null -ne $ps51ErrCount -and [int]($ps51ErrCount | Select-Object -Last 1) -eq 0)
+
+    return ($ps7Valid -and $ps51Valid)
+}
+
+# 25. Перевірка ізоляції тестового середовища
+Assert-Test "Ізоляція тестового середовища (відсутність запису у $HOME\.terminal-ai)" {
+    $realConfigDir = Join-Path $HOME ".terminal-ai"
+    $isIsolated = ($env:TERMINAL_AI_CONFIG_DIR -ne $realConfigDir -and (Test-Path $env:TERMINAL_AI_CONFIG_DIR))
+    return $isIsolated
+}
+
 Write-Host "`n═══════════════════════════════════════════════════════════════" -ForegroundColor Cyan
-$score = [Math]::Round(($passed / $tests) * 100, 1)
+$evaluatedTests = $passed + ($tests - $passed - $skipped)
+$score = if ($evaluatedTests -gt 0) { [Math]::Round(($passed / $evaluatedTests) * 100, 1) } else { 100.0 }
 if ($allPassed) {
-    Write-Host "  Всі тести успішно пройдені! ($passed / $tests) • 100%" -ForegroundColor Green
+    Write-Host "  Всі оцінювані тести успішно пройдені! ($passed / $evaluatedTests, пропущено live: $skipped) • 100%" -ForegroundColor Green
 } else {
-    Write-Host "  Деякі тести завершилися з помилкою ($passed / $tests) • Score: $score / 100" -ForegroundColor Yellow
+    Write-Host "  Деякі тести завершилися з помилкою ($passed / $evaluatedTests) • Score: $score / 100" -ForegroundColor Yellow
 }
 Write-Host "  EVALUATOR_SCORE: $score / 100" -ForegroundColor Cyan
 Write-Host "═══════════════════════════════════════════════════════════════`n" -ForegroundColor Cyan
+
+}
+finally {
+    # Гарантоване очищення тимчасового середовища
+    $env:TERMINAL_AI_CONFIG_DIR = $origConfigDir
+    $env:TERMINAL_AI_LANG = $origLang
+    if ($testTempRoot -and (Test-Path $testTempRoot)) {
+        Remove-Item -Path $testTempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
 
 
