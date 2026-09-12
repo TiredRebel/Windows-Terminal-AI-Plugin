@@ -188,6 +188,59 @@
   - Both cycles of Phase P1 (Cycles 5 and 6) are completely implemented and verified.
 - **Verdict**: **PASSED**
 
+### Cycle 7/10: Multi-User Profile Isolation & Clean Uninstaller
+- **Date**: 2026-09-12
+- **Hypothesis**: Providing explicit scope control (`-Scope CurrentUser` vs `-Scope AllUsers`), non-invasive delimited `$PROFILE` blocks (`# >>> TerminalAI Initialization >>>` ... `# <<< TerminalAI Initialization <<<`), automatic timestamped backups before modification, and an uninstaller that excises only the marked block guarantees that multi-user installations and uninstallations never corrupt surrounding custom profile logic or leave orphaned module files.
+- **Changed Files**:
+  - `Install-TerminalAi.ps1`: Added `-Scope CurrentUser|AllUsers` with elevation checks. Added `-CustomProfilePath`, `-CustomModulePath`, `-CustomFragmentPath`, `-SkipOllamaCheck`. Standardized delimited profile blocks and added automated `.bak.yyyyMMdd_HHmmss` backup creation.
+  - `Uninstall-TerminalAi.ps1`: Added `-Scope`, `-PurgeConfig`, and custom path override parameters. Implemented precise regex-based excision of the delimited initialization block, preserving all custom user profile functions, aliases, and variables. Added module directory removal and Windows Terminal fragment cleanup. Preserves user configuration by default unless `-PurgeConfig` is specified.
+  - `tests/P2-MultiUserStability.Tests.ps1`: Added fixtures FIX-P2-01 to FIX-P2-07 covering multi-user scopes, profile delimiters, backup creation, non-destructive uninstall, and config retention/purge.
+- **Tests Executed**:
+  - `pwsh -NoProfile -File .\tests\P2-MultiUserStability.Tests.ps1` (FIX-P2-01 to FIX-P2-07: PASS).
+  - `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\P2-MultiUserStability.Tests.ps1` (FIX-P2-01 to FIX-P2-07: PASS).
+- **Verdict**: **PASSED**
+
+### Cycle 8/10: Cross-Version PowerShell Compatibility (PS 5.1 & PS 7 Parity)
+- **Date**: 2026-09-12
+- **Hypothesis**: Eliminating all PowerShell 7-exclusive operators (`??=`, `&&`, ternary `?:`) across the shared codebase and configuring dual shell profiles ensures full functional parity between Windows PowerShell 5.1 (Desktop) and PowerShell 7+ (Core).
+- **Changed Files**:
+  - `terminalai.json`: Added dual profiles for PowerShell 7 (`pwsh.exe`) and Windows PowerShell 5.1 (`powershell.exe`) with dedicated GUIDs and icons.
+  - Audited all `.ps1`, `.psm1`, and `.psd1` files to guarantee syntax compatibility across both PowerShell engines.
+  - `tests/P2-MultiUserStability.Tests.ps1`: Added fixtures FIX-P2-08 (cmdlets, functions, and aliases parity) and FIX-P2-09 (absence of PS7-exclusive operators).
+- **Tests Executed**:
+  - `tools/check_syntax.ps1` in PS 7 and PS 5.1 -> 12 / 12 files parsed with 0 errors.
+  - `tests/P2-MultiUserStability.Tests.ps1` (FIX-P2-08 to FIX-P2-09: PASS).
+- **Verdict**: **PASSED**
+
+### Cycle 9/10: Windows Terminal Fragments Schema Stability
+- **Date**: 2026-09-12
+- **Hypothesis**: Deploying integration via official Windows Terminal JSON Fragments without directly mutating the user's `settings.json` by default provides a stable, non-invasive UX that survives Windows Terminal updates and cleanly unregisters upon uninstallation.
+- **Changed Files**:
+  - `terminalai.json`: Validated against Windows Terminal JSON Fragment specification. Configured unique GUIDs (`{7a3b0431-411a-4d74-a6c8-53e70d49fcf8}` and `{c0f8d167-9321-4f3b-87b4-3580436d93b1}`), set `startingDirectory = "%USERPROFILE%"`, and provided 4 custom actions (`ai-assistant`, `ai-fix`, `ai-script`, `ai-explain`).
+  - `Install-TerminalAi.ps1`: Made JSON fragment copying the default integration mechanism, only touching `settings.json` if explicitly opted into.
+  - `tests/P2-MultiUserStability.Tests.ps1`: Added fixtures FIX-P2-10 (schema validation & unique GUIDs) and FIX-P2-11 (non-invasive fragment deployment).
+- **Tests Executed**:
+  - `tests/P2-MultiUserStability.Tests.ps1` (FIX-P2-10 to FIX-P2-11: PASS in PS 7 and PS 5.1).
+- **Verdict**: **PASSED**
+
+### Cycle 10/10: Self-Diagnostics & Troubleshooting (`ai-doctor`)
+- **Date**: 2026-09-12
+- **Hypothesis**: An automated diagnostic cmdlet (`Test-TerminalAiInstallation` / `ai-doctor`) that inspects PowerShell environment, module registration, profile block, WT fragment file, Ollama connectivity and latency, active model readiness, AST Security Gate, and secret protection engine enables users to self-diagnose and immediately resolve configuration issues.
+- **Changed Files**:
+  - `TerminalAI.psm1`: Implemented `Test-TerminalAiInstallation` with alias `ai-doctor`. Probes 8 subsystems, outputs a structured report, and supports `-PassThru` returning a PSCustomObject with `OverallHealthy`, `PassCount`, `WarningCount`, `ErrorCount`, and detailed `Subsystems`.
+  - `TerminalAI.psm1`: Exported `Test-TerminalAiInstallation` and alias `ai-doctor`.
+  - `TerminalAI.psd1`: Added `Test-TerminalAiInstallation` to `FunctionsToExport` and `ai-doctor` to `AliasesToExport`.
+  - `tests/P2-MultiUserStability.Tests.ps1`: Added fixtures FIX-P2-12 (`-PassThru` diagnostic health verification) and FIX-P2-13 (`ai-doctor` alias invocation).
+- **Tests Executed**:
+  - `tests/P2-MultiUserStability.Tests.ps1` (FIX-P2-12 to FIX-P2-13: PASS in PS 7 and PS 5.1).
+  - Full suite `tests/P2-MultiUserStability.Tests.ps1` -> 13 / 13 passed in PS 7 and PS 5.1.
+  - Regression suite `tests/P1-UxAssistant.Tests.ps1` -> 13 / 13 passed in PS 7 and PS 5.1.
+  - Regression suite `tests/P0-SecurityGate.Tests.ps1` -> 30 / 30 passed in PS 7 and PS 5.1.
+  - Regression suite `Test-TerminalAi.ps1` -> 22 / 22 evaluated tests passed (Score 100/100) in PS 7 and PS 5.1.
+- **Phase P2 Completion**:
+  - All 4 cycles of Phase P2 (Cycles 7, 8, 9, and 10) are completely implemented and verified.
+- **Verdict**: **PASSED**
+
 ---
 
 ## 7. Hallucinations & Discrepancies Log
@@ -245,6 +298,28 @@
   - Raw `Set-Content` for AI script generation completely eliminated (`New-AiScript` and `/save` route 100% through `Save-AiScriptFile`).
   - Direct `$script:AiChatHistory.Add` calls centralized exclusively inside `Add-AssistantHistoryMessage` with deterministic secret redaction and 16-message FIFO cap.
 - **Encoding Audit**: 100% UTF-8 BOM compliance confirmed across all 12 PowerShell scripts.
+- **Independent Verdict**: **PASS (100% ACCEPTED)**
+
+### Independent Verifier Report — Phase P2 (Cycles 7–10) (2026-09-12)
+- **Verifier Agent**: `Independent Verifier Phase P2` (Conversation `52c1ca5c-486e-47ba-85f6-9a84e40ef2b8`)
+- **Parser Audit**: `.\tools\check_syntax.ps1` executed across all 13 files in PS 7 and PS 5.1: **0 errors**.
+- **Phase P2 Fixtures**: 13 / 13 fixtures (FIX-P2-01 to FIX-P2-13) passed with 100% in both PowerShell 7 and Windows PowerShell 5.1:
+  - Multi-user installer scopes (`-Scope CurrentUser|AllUsers`) & isolated delimited `$PROFILE` blocks (`# >>> TerminalAI Initialization >>>` ... `# <<< TerminalAI Initialization <<<`).
+  - Automatic timestamped backup creation (`.bak.yyyyMMdd_HHmmss`).
+  - Clean non-destructive uninstallation excising only the delimited block while preserving user code.
+  - Configuration retention by default vs `-PurgeConfig` full removal.
+  - Dual host compatibility: PS 5.1 & PS 7 parity, zero unsupported operators (`??=`, `&&`, `?:`).
+  - Windows Terminal JSON Fragment schema compliance, unique GUIDs, non-invasive deployment leaving `settings.json` untouched.
+  - Diagnostic engine `Test-TerminalAiInstallation` / `ai-doctor` testing 8 core subsystems.
+- **Regression Audit**:
+  - `tests/P1-UxAssistant.Tests.ps1`: 13 / 13 passed in PS 7 & PS 5.1.
+  - `tests/P0-SecurityGate.Tests.ps1`: 30 / 30 passed in PS 7 & PS 5.1.
+  - `Test-TerminalAi.ps1`: 22 / 22 evaluated tests passed (Score 100/100) in PS 7 & PS 5.1.
+- **Encoding Audit**: 100% UTF-8 BOM compliance across all 13 PowerShell scripts.
+- **Static Code Audit**:
+  - Verified exports of `Test-TerminalAiInstallation` and alias `ai-doctor` in both `TerminalAI.psm1` and `TerminalAI.psd1`.
+  - Verified exact delimiters in installer and uninstaller.
+  - Verified portability of `terminalai.json` using `%USERPROFILE%` with zero absolute user-bound paths.
 - **Independent Verdict**: **PASS (100% ACCEPTED)**
 
 ---

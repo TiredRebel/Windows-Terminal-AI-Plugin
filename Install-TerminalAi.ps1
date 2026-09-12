@@ -1,12 +1,33 @@
-﻿# Install-TerminalAi.ps1 - Інсталятор розширення TerminalAI для Windows Terminal та PowerShell
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
+    [ValidateSet("CurrentUser", "AllUsers")]
+    [string]$Scope = "CurrentUser",
+
     [switch]$SkipTerminalConfig,
+    [switch]$SkipOllamaCheck,
     [string]$PreferredModel,
-    [switch]$AutoConfirm
+    [switch]$AutoConfirm,
+    [switch]$ModifySettingsJson,
+    [string]$CustomProfilePath,
+    [string]$CustomModulePath,
+    [string]$CustomFragmentPath
 )
 
 $ErrorActionPreference = "Stop"
+
+if ($Scope -eq "AllUsers") {
+    $isAdmin = $false
+    try {
+        $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+        $principal = [Security.Principal.WindowsPrincipal]$identity
+        $isAdmin = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    } catch { }
+
+    if (-not $isAdmin) {
+        Write-Error "[TerminalAI] Встановлення для всіх користувачів (-Scope AllUsers) вимагає прав адміністратора (Run as Administrator)."
+        return
+    }
+}
 
 function Show-SpinnerWait {
     param(
@@ -119,34 +140,36 @@ if (-not $ollamaCmd) {
 $ollamaUrl = "http://localhost:11434"
 $installedModels = @()
 
-# Перевірка доступності API (перевіряємо localhost та прямий IPv4 127.0.0.1)
+# Перевірка доступності API (перевіряємо прямий IPv4 127.0.0.1, потім localhost)
 $isApiReady = $false
-foreach ($candUrl in @("http://localhost:11434", "http://127.0.0.1:11434")) {
-    try {
-        $tags = Invoke-RestMethod -Uri "$candUrl/api/tags" -TimeoutSec 2 -ErrorAction Stop
-        $installedModels = @($tags.models.name)
-        $isApiReady = $true
-        $ollamaUrl = $candUrl
-        break
-    } catch { }
-}
-
-if (-not $isApiReady -and (Get-Command ollama -ErrorAction SilentlyContinue)) {
-    Write-Host "   • Служба Ollama не активна. Запуск фонового процесу..." -ForegroundColor DarkYellow
-    Start-Process "ollama" -ArgumentList "serve" -WindowStyle Hidden -ErrorAction SilentlyContinue
-
-    $isApiReady = Show-SpinnerWait -Message "Очікування запуску локальної служби Ollama" -TimeoutSec 15 -Condition {
-        foreach ($candUrl in @("http://localhost:11434", "http://127.0.0.1:11434")) {
-            try {
-                $t = Invoke-RestMethod -Uri "$candUrl/api/tags" -TimeoutSec 1 -ErrorAction Stop
-                $script:installedModels = @($t.models.name)
-                $script:ollamaUrl = $candUrl
-                return $true
-            } catch { }
-        }
-        return $false
+if (-not $SkipOllamaCheck) {
+    foreach ($candUrl in @("http://127.0.0.1:11434", "http://localhost:11434")) {
+        try {
+            $tags = Invoke-RestMethod -Uri "$candUrl/api/tags" -TimeoutSec 1 -ErrorAction Stop
+            $installedModels = @($tags.models.name)
+            $isApiReady = $true
+            $ollamaUrl = $candUrl
+            break
+        } catch { }
     }
-    if ($script:installedModels) { $installedModels = $script:installedModels }
+
+    if (-not $isApiReady -and (Get-Command ollama -ErrorAction SilentlyContinue)) {
+        Write-Host "   • Служба Ollama не активна. Запуск фонового процесу..." -ForegroundColor DarkYellow
+        Start-Process "ollama" -ArgumentList "serve" -WindowStyle Hidden -ErrorAction SilentlyContinue
+
+        $isApiReady = Show-SpinnerWait -Message "Очікування запуску локальної служби Ollama" -TimeoutSec 10 -Condition {
+            foreach ($candUrl in @("http://127.0.0.1:11434", "http://localhost:11434")) {
+                try {
+                    $t = Invoke-RestMethod -Uri "$candUrl/api/tags" -TimeoutSec 1 -ErrorAction Stop
+                    $script:installedModels = @($t.models.name)
+                    $script:ollamaUrl = $candUrl
+                    return $true
+                } catch { }
+            }
+            return $false
+        }
+        if ($script:installedModels) { $installedModels = $script:installedModels }
+    }
 }
 
 if ($isApiReady) {
@@ -194,7 +217,7 @@ if ($PreferredModel) {
 }
 
 # Якщо рекомендованої/обраної моделі ще немає серед встановлених
-if ($installedModels -notcontains $selectedModel -and (Get-Command ollama -ErrorAction SilentlyContinue)) {
+if (-not $SkipOllamaCheck -and $installedModels -notcontains $selectedModel -and (Get-Command ollama -ErrorAction SilentlyContinue)) {
     Write-Host "`n   ⚠ Модель '$selectedModel' ще не завантажена в Ollama." -ForegroundColor DarkYellow
     $shouldPull = $false
     if ($AutoConfirm) {
@@ -220,16 +243,26 @@ if ($installedModels -notcontains $selectedModel -and (Get-Command ollama -Error
 
 Write-Host "   Вибрана активна модель: $selectedModel" -ForegroundColor Cyan
 
-# 4. Встановлення модуля у PSModulePath (як для PowerShell 7+, так і для Windows PowerShell 5.1)
-Write-Host "`n3. Реєстрація модуля PowerShell..." -ForegroundColor Yellow
+# 4. Встановлення модуля у PSModulePath (CurrentUser або AllUsers)
+Write-Host "`n3. Реєстрація модуля PowerShell ($Scope)..." -ForegroundColor Yellow
 
-$docsPath = [Environment]::GetFolderPath([Environment+SpecialFolder]::MyDocuments)
-$candidateRoots = @(
-    ($env:PSModulePath -split ';')[0],
-    (Join-Path $docsPath "PowerShell\Modules"),
-    (Join-Path $docsPath "WindowsPowerShell\Modules")
-) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
+$candidateRoots = @()
+if ($CustomModulePath) {
+    $candidateRoots = @($CustomModulePath)
+} elseif ($Scope -eq "AllUsers") {
+    $candidateRoots = @(
+        "$env:ProgramFiles\PowerShell\Modules",
+        "${env:ProgramFiles}\WindowsPowerShell\Modules"
+    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
+} else {
+    $docsPath = [Environment]::GetFolderPath([Environment+SpecialFolder]::MyDocuments)
+    $candidateRoots = @(
+        (Join-Path $docsPath "PowerShell\Modules"),
+        (Join-Path $docsPath "WindowsPowerShell\Modules")
+    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
+}
 
+$destModuleDir = $null
 foreach ($userModuleBase in $candidateRoots) {
     if (-not (Test-Path $userModuleBase)) {
         New-Item -ItemType Directory -Path $userModuleBase -Force | Out-Null
@@ -270,122 +303,84 @@ foreach ($userModuleBase in $candidateRoots) {
     Write-Host "   ✔ Модуль успішно синхронізовано з: $destModuleDir" -ForegroundColor Green
 }
 
-# 4. Додавання автоімпорту до $PROFILE
-Write-Host "`n4. Оновлення профілю PowerShell ($PROFILE)..." -ForegroundColor Yellow
-if (-not (Test-Path $PROFILE)) {
-    $profileDir = Split-Path -Parent $PROFILE
-    if (-not (Test-Path $profileDir)) {
-        New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
-    }
-    New-Item -ItemType File -Path $PROFILE -Force | Out-Null
+# 4. Додавання автоімпорту до $PROFILE з чіткими межами блоку
+$targetProfile = if ($CustomProfilePath) {
+    $CustomProfilePath
+} elseif ($Scope -eq "AllUsers") {
+    if ($PROFILE.AllUsersAllHosts) { $PROFILE.AllUsersAllHosts } else { $PROFILE.AllUsersCurrentHost }
+} else {
+    if ($PROFILE.CurrentUserCurrentHost) { $PROFILE.CurrentUserCurrentHost } else { $PROFILE }
 }
 
-$profileContent = Get-Content -Path $PROFILE -Raw -ErrorAction SilentlyContinue
-if ($profileContent -notmatch 'Import-Module\s+TerminalAI') {
-    $importSnippet = "`n# TerminalAI - Windows Terminal AI Extension for Ollama`nImport-Module TerminalAI -Force -ErrorAction SilentlyContinue`n"
-    Add-Content -Path $PROFILE -Value $importSnippet -Encoding UTF8
-    Write-Host "   ✔ Додано 'Import-Module TerminalAI' у $PROFILE" -ForegroundColor Green
-} else {
-    Write-Host "   ✔ Модуль вже прописано в $PROFILE" -ForegroundColor DarkGreen
+Write-Host "`n4. Оновлення профілю PowerShell ($targetProfile)..." -ForegroundColor Yellow
+
+$startMarker = "# >>> TerminalAI Initialization >>>"
+$endMarker = "# <<< TerminalAI Initialization <<<"
+$blockContent = @"
+$startMarker
+# TerminalAI - Windows Terminal AI Extension for Ollama
+if (Get-Module -ListAvailable -Name TerminalAI) {
+    Import-Module TerminalAI -ErrorAction SilentlyContinue
 }
+$endMarker
+"@
+
+$profileDir = Split-Path -Parent $targetProfile
+if ($profileDir -and -not (Test-Path $profileDir)) {
+    New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
+}
+
+$profileExists = Test-Path $targetProfile
+if ($profileExists) {
+    $backupFile = "$targetProfile.bak." + (Get-Date -Format "yyyyMMdd_HHmmss")
+    try {
+        Copy-Item -Path $targetProfile -Destination $backupFile -Force
+        Write-Host "   ✔ Створено резервну копію профілю: $backupFile" -ForegroundColor DarkGray
+    } catch { }
+
+    $profileContent = try {
+        [System.IO.File]::ReadAllText($targetProfile, [System.Text.Encoding]::UTF8)
+    } catch {
+        Get-Content -Path $targetProfile -Raw -ErrorAction SilentlyContinue
+    }
+    if ($null -eq $profileContent) { $profileContent = "" }
+
+    if ($profileContent -match '(?ms)# >>> TerminalAI Initialization >>>.*?# <<< TerminalAI Initialization <<<') {
+        $newProfileContent = [regex]::Replace($profileContent, '(?ms)# >>> TerminalAI Initialization >>>.*?# <<< TerminalAI Initialization <<<', $blockContent)
+        Write-Host "   ✔ Оновлено наявний блок TerminalAI у $targetProfile" -ForegroundColor DarkGreen
+    } elseif ($profileContent -match '(?ms)\r?\n?# TerminalAI[^\r\n]*\r?\n?Import-Module\s+TerminalAI[^\r\n]*') {
+        $newProfileContent = [regex]::Replace($profileContent, '(?ms)\r?\n?# TerminalAI[^\r\n]*\r?\n?Import-Module\s+TerminalAI[^\r\n]*', "`n$blockContent")
+        Write-Host "   ✔ Оновлено застарілий виклик Import-Module на маркований блок у $targetProfile" -ForegroundColor Green
+    } else {
+        $separator = if ($profileContent.Length -gt 0 -and -not $profileContent.EndsWith("`n")) { "`n`n" } else { "`n" }
+        $newProfileContent = $profileContent + $separator + $blockContent
+        Write-Host "   ✔ Додано маркований блок TerminalAI у $targetProfile" -ForegroundColor Green
+    }
+} else {
+    $newProfileContent = $blockContent
+    Write-Host "   ✔ Створено новий профіль з маркованим блоком: $targetProfile" -ForegroundColor Green
+}
+
+$enc = New-Object System.Text.UTF8Encoding($true)
+[System.IO.File]::WriteAllText($targetProfile, $newProfileContent, $enc)
 
 # Ініціалізуємо конфіг
 . (Join-Path $projectDir "TerminalAiConfig.ps1")
 Set-TerminalAiConfig -Model $selectedModel -OllamaUrl $ollamaUrl | Out-Null
 
-# 5. Інтеграція з Windows Terminal (settings.json)
+# 5. Інтеграція з Windows Terminal
 if (-not $SkipTerminalConfig) {
-    Write-Host "`n5. Налаштування Windows Terminal (actions & palette)..." -ForegroundColor Yellow
+    Write-Host "`n5. Налаштування Windows Terminal (Fragments & Actions)..." -ForegroundColor Yellow
 
-    $wtSettingsCandidates = @(
-        "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json",
-        "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe\LocalState\settings.json",
-        "$env:LOCALAPPDATA\Microsoft\Windows Terminal\settings.json"
-    )
-
-    $wtSettingsFile = $null
-    foreach ($candidate in $wtSettingsCandidates) {
-        if (Test-Path $candidate) {
-            $wtSettingsFile = $candidate
-            break
-        }
-    }
-
-    if ($wtSettingsFile) {
-        try {
-            $backupFile = "$wtSettingsFile.terminalai.backup.json"
-            Copy-Item -Path $wtSettingsFile -Destination $backupFile -Force
-            Write-Host "   ✔ Створено резервну копію: $backupFile" -ForegroundColor DarkGray
-
-            $wtJson = Get-Content -Path $wtSettingsFile -Raw | ConvertFrom-Json
-
-            if ($null -eq $wtJson.actions) {
-                $wtJson | Add-Member -MemberType NoteProperty -Name "actions" -Value @()
-            }
-
-            # Створюємо потрібні дії
-            $aiActions = @(
-                [ordered]@{
-                    name = "AI: Запитати Ollama (ai)"
-                    command = [ordered]@{
-                        action = "sendInput"
-                        input = "ai `""
-                    }
-                },
-                [ordered]@{
-                    name = "AI: Виправити останню помилку (ai-fix)"
-                    command = [ordered]@{
-                        action = "sendInput"
-                        input = "ai-fix`r"
-                    }
-                },
-                [ordered]@{
-                    name = "AI: Згенерувати сценарій (ai-script)"
-                    command = [ordered]@{
-                        action = "sendInput"
-                        input = "ai-script `""
-                    }
-                },
-                [ordered]@{
-                    name = "AI: Відкрити асистента у спліт-панелі"
-                    command = [ordered]@{
-                        action = "splitPane"
-                        split = "vertical"
-                        size = 0.4
-                        commandline = "pwsh.exe -NoExit -File `"$((Join-Path $destModuleDir 'TerminalAiAssistant.ps1') -replace '\\', '\\')`""
-                    }
-                }
-            )
-
-            $existingNames = $wtJson.actions | ForEach-Object { $_.name }
-            $addedCount = 0
-
-            $newActionsList = [System.Collections.Generic.List[object]]::new()
-            if ($wtJson.actions) {
-                foreach ($a in $wtJson.actions) { $newActionsList.Add($a) }
-            }
-
-            foreach ($action in $aiActions) {
-                if ($existingNames -notcontains $action.name) {
-                    $newActionsList.Add($action)
-                    $addedCount++
-                }
-            }
-
-            $wtJson.actions = $newActionsList.ToArray()
-            $newSettingsJson = $wtJson | ConvertTo-Json -Depth 10
-            Set-Content -Path $wtSettingsFile -Value $newSettingsJson -Encoding UTF8
-            Write-Host "   ✔ Додано дій Windows Terminal: $addedCount (файл: $wtSettingsFile)" -ForegroundColor Green
-        }
-        catch {
-            Write-Warning "   Не вдалося модифікувати налаштування Windows Terminal: $($_.Exception.Message)"
-        }
+    # Реєстрація офіційного JSON Fragment Extension у Windows Terminal
+    $fragDir = if ($CustomFragmentPath) {
+        $CustomFragmentPath
+    } elseif ($Scope -eq "AllUsers") {
+        "$env:ProgramData\Microsoft\Windows Terminal\Fragments\TerminalAI"
     } else {
-        Write-Host "   Налаштувань Windows Terminal не знайдено за стандартними шляхами." -ForegroundColor DarkYellow
+        "$env:LOCALAPPDATA\Microsoft\Windows Terminal\Fragments\TerminalAI"
     }
 
-    # Реєстрація офіційного JSON Fragment Extension у Windows Terminal (вкладка 'Extensions')
-    $fragDir = "$env:LOCALAPPDATA\Microsoft\Windows Terminal\Fragments\TerminalAI"
     try {
         if (-not (Test-Path $fragDir)) {
             New-Item -ItemType Directory -Path $fragDir -Force | Out-Null
@@ -393,10 +388,101 @@ if (-not $SkipTerminalConfig) {
         $fragSource = Join-Path $projectDir "terminalai.json"
         if (Test-Path $fragSource) {
             Copy-Item -Path $fragSource -Destination (Join-Path $fragDir "terminalai.json") -Force
-            Write-Host "   ✔ Зареєстровано Windows Terminal Fragment Extension у вкладці 'Extensions': $fragDir" -ForegroundColor Green
+            Write-Host "   ✔ Зареєстровано Windows Terminal Fragment Extension ($Scope): $fragDir" -ForegroundColor Green
         }
     } catch {
         Write-Warning "   Не вдалося створити Fragment Extension: $($_.Exception.Message)"
+    }
+
+    if ($ModifySettingsJson) {
+        Write-Host "   • Оновлення налаштувань actions у settings.json (legacy mode)..." -ForegroundColor DarkGray
+        $wtSettingsCandidates = @(
+            "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json",
+            "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe\LocalState\settings.json",
+            "$env:LOCALAPPDATA\Microsoft\Windows Terminal\settings.json"
+        )
+
+        $wtSettingsFile = $null
+        foreach ($candidate in $wtSettingsCandidates) {
+            if (Test-Path $candidate) {
+                $wtSettingsFile = $candidate
+                break
+            }
+        }
+
+        if ($wtSettingsFile) {
+            try {
+                $backupFile = "$wtSettingsFile.terminalai.backup.json"
+                Copy-Item -Path $wtSettingsFile -Destination $backupFile -Force
+                Write-Host "   ✔ Створено резервну копію: $backupFile" -ForegroundColor DarkGray
+
+                $wtJson = Get-Content -Path $wtSettingsFile -Raw | ConvertFrom-Json
+
+                if ($null -eq $wtJson.actions) {
+                    $wtJson | Add-Member -MemberType NoteProperty -Name "actions" -Value @()
+                }
+
+                # Створюємо потрібні дії
+                $assistantScriptPath = if ($destModuleDir) { Join-Path $destModuleDir "TerminalAiAssistant.ps1" } else { Join-Path $projectDir "TerminalAiAssistant.ps1" }
+                $aiActions = @(
+                    [ordered]@{
+                        name = "AI: Запитати Ollama (ai)"
+                        command = [ordered]@{
+                            action = "sendInput"
+                            input = "ai `""
+                        }
+                    },
+                    [ordered]@{
+                        name = "AI: Виправити останню помилку (ai-fix)"
+                        command = [ordered]@{
+                            action = "sendInput"
+                            input = "ai-fix`r"
+                        }
+                    },
+                    [ordered]@{
+                        name = "AI: Згенерувати сценарій (ai-script)"
+                        command = [ordered]@{
+                            action = "sendInput"
+                            input = "ai-script `""
+                        }
+                    },
+                    [ordered]@{
+                        name = "AI: Відкрити асистента у спліт-панелі"
+                        command = [ordered]@{
+                            action = "splitPane"
+                            split = "vertical"
+                            size = 0.4
+                            commandline = "pwsh.exe -NoExit -File `"$($assistantScriptPath -replace '\\', '\\')`""
+                        }
+                    }
+                )
+
+                $existingNames = $wtJson.actions | ForEach-Object { $_.name }
+                $addedCount = 0
+
+                $newActionsList = [System.Collections.Generic.List[object]]::new()
+                if ($wtJson.actions) {
+                    foreach ($a in $wtJson.actions) { $newActionsList.Add($a) }
+                }
+
+                foreach ($action in $aiActions) {
+                    if ($existingNames -notcontains $action.name) {
+                        $newActionsList.Add($action)
+                        $addedCount++
+                    }
+                }
+
+                $wtJson.actions = $newActionsList.ToArray()
+                $newSettingsJson = $wtJson | ConvertTo-Json -Depth 10
+                Set-Content -Path $wtSettingsFile -Value $newSettingsJson -Encoding UTF8
+                Write-Host "   ✔ Додано дій Windows Terminal: $addedCount (файл: $wtSettingsFile)" -ForegroundColor Green
+            }
+            catch {
+                Write-Warning "   Не вдалося модифікувати налаштування Windows Terminal: $($_.Exception.Message)"
+            }
+        }
+    } else {
+        Write-Host "   ℹ Windows Terminal Fragment Extension активовано (неінвазивний режим, settings.json залишено чистим)." -ForegroundColor DarkCyan
     }
 }
 

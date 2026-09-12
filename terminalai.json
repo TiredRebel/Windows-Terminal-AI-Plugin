@@ -1,19 +1,36 @@
 {
+  "$schema": "https://aka.ms/terminal-profiles-schema",
   "profiles": [
     {
-      "name": "Terminal AI Assistant",
+      "name": "Terminal AI Assistant (PowerShell 7)",
       "guid": "{62068dd4-52e9-41f7-9feb-987581e2e117}",
       "commandline": "pwsh.exe -NoExit -Command \"Import-Module TerminalAI -ErrorAction SilentlyContinue; Invoke-AiAssistant\"",
       "icon": "🤖",
-      "tabTitle": "AI Assistant (Ollama)",
+      "tabTitle": "AI Assistant (PS 7)",
       "startingDirectory": "%USERPROFILE%"
     },
     {
-      "name": "PowerShell with TerminalAI",
+      "name": "PowerShell 7 with TerminalAI",
       "guid": "{7a3b4c5d-6e7f-8a9b-0c1d-2e3f4a5b6c7d}",
       "commandline": "pwsh.exe -NoExit -Command \"Import-Module TerminalAI; Clear-Host; Show-TerminalAiWelcome\"",
       "icon": "⚡",
-      "tabTitle": "PowerShell (AI)",
+      "tabTitle": "PowerShell 7 (AI)",
+      "startingDirectory": "%USERPROFILE%"
+    },
+    {
+      "name": "Terminal AI Assistant (Windows PowerShell)",
+      "guid": "{8b4c5d6e-7f8a-9b0c-1d2e-3f4a5b6c7d8e}",
+      "commandline": "powershell.exe -NoExit -Command \"Import-Module TerminalAI -ErrorAction SilentlyContinue; Invoke-AiAssistant\"",
+      "icon": "🤖",
+      "tabTitle": "AI Assistant (PS 5.1)",
+      "startingDirectory": "%USERPROFILE%"
+    },
+    {
+      "name": "Windows PowerShell with TerminalAI",
+      "guid": "{9c5d6e7f-8a9b-0c1d-2e3f-4a5b6c7d8e9f}",
+      "commandline": "powershell.exe -NoExit -Command \"Import-Module TerminalAI; Clear-Host; Show-TerminalAiWelcome\"",
+      "icon": "⚡",
+      "tabTitle": "PowerShell 5.1 (AI)",
       "startingDirectory": "%USERPROFILE%"
     }
   ],
@@ -45,7 +62,7 @@
         "action": "splitPane",
         "split": "vertical",
         "size": 0.4,
-        "commandline": "pwsh.exe -NoExit -Command \"Import-Module TerminalAI -ErrorAction SilentlyContinue; Invoke-AiAssistant\""
+        "commandline": "powershell.exe -NoExit -Command \"if (Get-Command pwsh -ErrorAction SilentlyContinue) { & pwsh -NoExit -Command 'Import-Module TerminalAI -ErrorAction SilentlyContinue; Invoke-AiAssistant' } else { Import-Module TerminalAI -ErrorAction SilentlyContinue; Invoke-AiAssistant }\""
       }
     }
   ]

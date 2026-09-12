@@ -54,7 +54,8 @@
         'Invoke-AiExecutionGate',
         'Protect-AiSecretData',
         'Format-AiScriptDiff',
-        'Save-AiScriptFile'
+        'Save-AiScriptFile',
+        'Test-TerminalAiInstallation'
     )
 
     # Командлети, що експортуються
@@ -80,6 +81,7 @@
         'ai-lang-default',
         'ai-chat',
         'ai-assistant',
+        'ai-doctor',
         'Clean-AiCodeOutput'
     )
 

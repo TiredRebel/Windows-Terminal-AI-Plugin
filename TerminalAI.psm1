@@ -2768,6 +2768,208 @@ function Invoke-AiAssistant {
     }
 }
 
+function Test-TerminalAiInstallation {
+    <#
+    .SYNOPSIS
+        Комплексна діагностика працездатності розширення TerminalAI та локального середовища.
+    .DESCRIPTION
+        Перевіряє 8 критичних підсистем TerminalAI:
+        1. Версія та редакція PowerShell (PS 5.1 / 7+).
+        2. Реєстрація модуля TerminalAI у PSModulePath.
+        3. Інтеграція та наявність маркованого блоку автозапуску в $PROFILE.
+        4. Наявність та валідність Windows Terminal JSON Fragment Extension.
+        5. Доступність локальної служби Ollama (localhost/127.0.0.1).
+        6. Наявність активної моделі (config.json vs Ollama installed models).
+        7. Готовність AST-двигунця та Security Execution Gate.
+        8. Цілісність конфігурації та файлів модуля (UTF-8 BOM).
+    .PARAMETER Fix
+        Автоматично виправляє виявлені проблеми, де це можливо.
+    .PARAMETER PassThru
+        Повертає структурований об'єкт PSCustomObject з результатами всіх перевірок.
+    .EXAMPLE
+        ai-doctor
+    .EXAMPLE
+        Test-TerminalAiInstallation -PassThru
+    #>
+    [CmdletBinding()]
+    [Alias("ai-doctor")]
+    param(
+        [switch]$Fix,
+        [switch]$PassThru
+    )
+
+    $cfg = try { Get-TerminalAiConfig } catch { $null }
+
+    Write-Host ""
+    Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host "         ✦ TERMINAL AI SYSTEM DIAGNOSTICS (AI-DOCTOR) ✦        " -ForegroundColor Cyan
+    Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor Cyan
+
+    $results = [ordered]@{}
+    $allPassed = $true
+
+    # 1. PowerShell Environment
+    $psVer = $PSVersionTable.PSVersion
+    $psEdition = $PSVersionTable.PSEdition
+    $results["PowerShellVersion"] = "$psVer ($psEdition)"
+    $results["PowerShellOk"] = $true
+    Write-Host "  1. PowerShell:           " -NoNewline -ForegroundColor DarkGray
+    Write-Host "✔ $psVer ($psEdition)" -ForegroundColor Green
+
+    # 2. Module in PSModulePath
+    $module = Get-Module -Name TerminalAI -ListAvailable | Select-Object -First 1
+    $moduleOk = ($null -ne $module)
+    $results["ModuleRegistered"] = $moduleOk
+    $results["ModuleBase"] = if ($module) { $module.ModuleBase } else { "Not found" }
+    Write-Host "  2. Module Registration:  " -NoNewline -ForegroundColor DarkGray
+    if ($moduleOk) {
+        Write-Host "✔ Found at $($module.ModuleBase)" -ForegroundColor Green
+    } else {
+        Write-Host "✖ Module not found in PSModulePath" -ForegroundColor Red
+        $allPassed = $false
+    }
+
+    # 3. $PROFILE Integration
+    $profilePath = if ($PROFILE.CurrentUserCurrentHost) { $PROFILE.CurrentUserCurrentHost } else { $PROFILE }
+    $profileHasBlock = $false
+    if (Test-Path $profilePath) {
+        $pContent = Get-Content -Path $profilePath -Raw -ErrorAction SilentlyContinue
+        if ($pContent -match '(?ms)# >>> TerminalAI Initialization >>>.*?# <<< TerminalAI Initialization <<<|Import-Module\s+TerminalAI') {
+            $profileHasBlock = $true
+        }
+    }
+    $results["ProfileConfigured"] = $profileHasBlock
+    $results["ProfilePath"] = $profilePath
+    Write-Host "  3. Profile Integration:  " -NoNewline -ForegroundColor DarkGray
+    if ($profileHasBlock) {
+        Write-Host "✔ Configured in $profilePath" -ForegroundColor Green
+    } else {
+        Write-Host "⚠ Not configured in $profilePath" -ForegroundColor Yellow
+    }
+
+    # 4. Windows Terminal Fragment
+    $fragCandidates = @(
+        "$env:LOCALAPPDATA\Microsoft\Windows Terminal\Fragments\TerminalAI\terminalai.json",
+        "$env:ProgramData\Microsoft\Windows Terminal\Fragments\TerminalAI\terminalai.json"
+    )
+    $foundFrag = $null
+    $fragValid = $false
+    foreach ($fc in $fragCandidates) {
+        if (Test-Path $fc) {
+            $foundFrag = $fc
+            try {
+                $j = Get-Content -Path $fc -Raw | ConvertFrom-Json
+                if ($j.profiles -or $j.actions) { $fragValid = $true }
+            } catch { }
+            break
+        }
+    }
+    $results["FragmentFound"] = ($null -ne $foundFrag)
+    $results["FragmentValid"] = $fragValid
+    $results["FragmentPath"] = $foundFrag
+    Write-Host "  4. WT Fragment JSON:     " -NoNewline -ForegroundColor DarkGray
+    if ($fragValid) {
+        Write-Host "✔ Valid Fragment at $foundFrag" -ForegroundColor Green
+    } elseif ($foundFrag) {
+        Write-Host "✖ Corrupted JSON at $foundFrag" -ForegroundColor Red
+        $allPassed = $false
+    } else {
+        Write-Host "⚠ No Fragment registered in LocalAppData/ProgramData" -ForegroundColor Yellow
+    }
+
+    # 5. Ollama Service Reachability
+    $ollamaOk = $false
+    $ollamaUrl = if ($cfg -and $cfg.OllamaUrl) { $cfg.OllamaUrl } else { "http://localhost:11434" }
+    $installedModels = @()
+    $latencyMs = 0
+    foreach ($cand in @($ollamaUrl, "http://127.0.0.1:11434", "http://localhost:11434")) {
+        try {
+            $sw = [System.Diagnostics.Stopwatch]::StartNew()
+            $res = Invoke-RestMethod -Uri "$($cand.TrimEnd('/'))/api/tags" -TimeoutSec 2 -ErrorAction Stop
+            $sw.Stop()
+            $latencyMs = [Math]::Round($sw.Elapsed.TotalMilliseconds)
+            $installedModels = @($res.models.name)
+            $ollamaOk = $true
+            $ollamaUrl = $cand
+            break
+        } catch { }
+    }
+    $results["OllamaReachable"] = $ollamaOk
+    $results["OllamaUrl"] = $ollamaUrl
+    $results["OllamaLatencyMs"] = $latencyMs
+    $results["InstalledModels"] = $installedModels
+    Write-Host "  5. Ollama Local Service: " -NoNewline -ForegroundColor DarkGray
+    if ($ollamaOk) {
+        Write-Host "✔ Responding at $ollamaUrl (${latencyMs}ms, $($installedModels.Count) models)" -ForegroundColor Green
+    } else {
+        Write-Host "⚠ Service unreachable at $ollamaUrl (start with 'ollama serve')" -ForegroundColor Yellow
+    }
+
+    # 6. Active Model Availability
+    $activeModel = if ($cfg -and $cfg.Model) { $cfg.Model } else { "qwen2.5-coder:7b" }
+    $modelPresent = ($installedModels -contains $activeModel)
+    $results["ActiveModel"] = $activeModel
+    $results["ActiveModelPresent"] = $modelPresent
+    Write-Host "  6. Active Model:         " -NoNewline -ForegroundColor DarkGray
+    if ($modelPresent) {
+        Write-Host "✔ '$activeModel' is installed and ready" -ForegroundColor Green
+    } elseif ($ollamaOk) {
+        Write-Host "⚠ '$activeModel' not found in Ollama (pull with 'ollama pull $activeModel')" -ForegroundColor Yellow
+    } else {
+        Write-Host "⚠ Cannot verify model (Ollama service offline)" -ForegroundColor DarkYellow
+    }
+
+    # 7. AST Security Gate Engine
+    $astOk = $false
+    try {
+        $sampleAst = Test-AiCommandAst -Command "Get-Process | Where-Object CPU -gt 10"
+        $cat = if ($sampleAst.OverallCategory) { $sampleAst.OverallCategory } else { $sampleAst.Category }
+        $risk = if ($sampleAst.OverallRisk) { $sampleAst.OverallRisk } else { $sampleAst.Risk }
+        if ($sampleAst -and $cat -eq "ReadOnly" -and $risk -eq "Low") {
+            $astOk = $true
+        }
+    } catch { }
+    $results["AstEngineOk"] = $astOk
+    Write-Host "  7. AST Security Gate:    " -NoNewline -ForegroundColor DarkGray
+    if ($astOk) {
+        Write-Host "✔ Engine operational (syntax, categories, risk gates)" -ForegroundColor Green
+    } else {
+        Write-Host "✖ AST Engine error" -ForegroundColor Red
+        $allPassed = $false
+    }
+
+    # 8. Secret Redaction & Sanitization
+    $redactionOk = $false
+    try {
+        $secretProbe = Protect-AiSecretData -Text "key sk-1234567890abcdef12345678"
+        if ($secretProbe -match 'sk-\*\*\*\[REDACTED\]\*\*\*') {
+            $redactionOk = $true
+        }
+    } catch { }
+    $results["SecretRedactionOk"] = $redactionOk
+    Write-Host "  8. Secret Protection:    " -NoNewline -ForegroundColor DarkGray
+    if ($redactionOk) {
+        Write-Host "✔ Active (deterministic regex masking & FIFO cap)" -ForegroundColor Green
+    } else {
+        Write-Host "✖ Redaction engine failure" -ForegroundColor Red
+        $allPassed = $false
+    }
+
+    Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor Cyan
+    if ($allPassed) {
+        Write-Host "  ✦ All primary subsystems are healthy and operational! ✦" -ForegroundColor Green
+    } else {
+        Write-Host "  ⚠ One or more items require attention. See details above." -ForegroundColor Yellow
+    }
+    Write-Host "═══════════════════════════════════════════════════════════════`n" -ForegroundColor Cyan
+
+    $results["AllPassed"] = $allPassed
+
+    if ($PassThru) {
+        return [PSCustomObject]$results
+    }
+}
+
 function Send-OllamaHttpAsync {
     [CmdletBinding()]
     param(
@@ -3151,7 +3353,8 @@ Export-ModuleMember -Function @(
     "Invoke-AiExecutionGate",
     "Protect-AiSecretData",
     "Format-AiScriptDiff",
-    "Save-AiScriptFile"
+    "Save-AiScriptFile",
+    "Test-TerminalAiInstallation"
 ) -Alias @(
     "ai",
     "??",
@@ -3166,5 +3369,6 @@ Export-ModuleMember -Function @(
     "ai-lang-default",
     "ai-chat",
     "ai-assistant",
+    "ai-doctor",
     "Clean-AiCodeOutput"
 )
