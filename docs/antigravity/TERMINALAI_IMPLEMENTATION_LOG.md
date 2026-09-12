@@ -365,6 +365,36 @@
   - End-to-end `ai-doctor` & `ai-agent -CheckOnly`: 100% clean English diagnostics across both engines.
 - **Phase P3 Completion**: **PASSED & ACCEPTED**
 
+### Cycle 13: Bugfix — `ai-chat` `/run` Formatting Stream Unrolling & AST Error Isolation
+- **Date**: 2026-09-12
+- **Issue**: User reported `/run` command inside `ai-chat` failing with `✖ Execution error: Object reference not set to an instance of an object.` when executing multi-line scripts containing formatting cmdlets (`Format-Table`, `Format-List`, etc.).
+- **Root Cause Analysis**:
+  1. `TerminalAiAssistant.ps1:534-545`: The `/run` handler captured output via `Invoke-AiExecutionGate -Command $lastCodeBlock -ReturnOutput -AutoConfirm`. When the script contained formatting cmdlets, the returned array contained PowerShell internal formatting records (`FormatStartData`, `GroupStartData`, `FormatEntryData`, `FormatEndData`). The code looped over `$execRaw` and piped each individual record to `Out-Host` in isolation (`$item | Out-Host`). This broke internal formatter state, throwing `System.NullReferenceException: Object reference not set to an instance of an object` in Windows PowerShell 5.1 and `System.InvalidOperationException` in PowerShell 7.
+  2. `TerminalAI.psm1:1217-1225`: `Test-AiCommandAst` invoked `Get-Alias -Name $rawName -ErrorAction SilentlyContinue`. In PowerShell, `-ErrorAction SilentlyContinue` suppresses console output but still records non-terminating errors in `$global:Error`. When any command was a Cmdlet/Function rather than an Alias (e.g. `Format-Table`, `Get-NetAdapter`), an error was added to `$global:Error`. `TerminalAiAssistant.ps1` checked `$global:Error.Count -gt $errCountBefore` and falsely triggered an execution error with message `"This command cannot find a matching alias because an alias with the name '...' does not exist."`.
+  3. `TerminalAiAssistant.ps1`: Error properties (`$err.Exception.Message`) were accessed without checking if `$err.Exception` was null.
+- **Implementation & Bugfix**:
+  - `TerminalAiAssistant.ps1`:
+    - Updated `/run` execution to invoke `Invoke-AiExecutionGate -Command $lastCodeBlock -ReturnOutput -AutoConfirm -PassThru`.
+    - Preserved formatting pipeline stream integrity by piping the unified collection directly to `Out-Host` (`if ($null -ne $gateRes.Output) { $gateRes.Output | Out-Host }`).
+    - Handled security gate cancellation cleanly (`$gateRes.Status -eq 'Denied'`).
+    - Protected all `.Exception.Message` property accesses with null checks (`if ($err.Exception -and $err.Exception.Message) { ... }`).
+  - `TerminalAI.psm1`:
+    - Changed `Get-Alias` and `Get-Command` calls in `Test-AiCommandAst` (lines 1217, 1222, 1225) and line 2134 from `-ErrorAction SilentlyContinue` to `-ErrorAction Ignore`, eliminating `$global:Error` pollution.
+  - `tests/P1-UxAssistant.Tests.ps1`:
+    - Added fixture `FIX-P1-14` (AST Error Stream Isolation).
+    - Added fixture `FIX-P1-15` (Multi-line Formatting Pipeline Coherence).
+  - Synchronized and verified via `Install-TerminalAi.ps1 -AutoConfirm`.
+- **Verification Results**:
+  - `tools/check_syntax.ps1`: 15/15 OK (0 errors in PS 7 & PS 5.1).
+  - `tests/P1-UxAssistant.Tests.ps1`: 15/15 PASS (100%) in PS 7 & PS 5.1.
+  - `tests/P0-SecurityGate.Tests.ps1`: 30/30 PASS in PS 7 & PS 5.1.
+  - `tests/P2-MultiUserStability.Tests.ps1`: 13/13 PASS in PS 7 & PS 5.1.
+  - `tests/P3-AgentMode.Tests.ps1`: 12/12 PASS in PS 7 & PS 5.1.
+  - `Test-TerminalAi.ps1`: 22/22 evaluated PASS (Score 100/100) in PS 7 & PS 5.1.
+  - `tools/ensure_bom.ps1`: 15/15 UTF-8 BOM compliant.
+  - End-to-end `ai-doctor`: 100% healthy across PS 7 & PS 5.1.
+- **Verdict**: **PASSED & ACCEPTED**
+
 ---
 
 ## 9. Deferred Tasks

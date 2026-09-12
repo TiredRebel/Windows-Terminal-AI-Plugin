@@ -528,40 +528,62 @@ while ($true) {
             $lastExitBefore = $LASTEXITCODE
             $hasExecutionError = $false
             $capturedErrorMessage = ""
+            $wasDeniedOrBlocked = $false
 
             try {
-                $execRaw = Invoke-AiExecutionGate -Command $lastCodeBlock -ReturnOutput -AutoConfirm
-                foreach ($item in $execRaw) {
-                    if ($item -is [System.Management.Automation.ErrorRecord]) {
-                        $hasExecutionError = $true
-                        if (-not $capturedErrorMessage) {
-                            $capturedErrorMessage = $item.Exception.Message
-                            if (-not $capturedErrorMessage) { $capturedErrorMessage = $item.ToString() }
-                        }
-                        Write-Host $item.ToString() -ForegroundColor Red
+                $gateRes = Invoke-AiExecutionGate -Command $lastCodeBlock -ReturnOutput -AutoConfirm -PassThru
+                if (-not $gateRes.Executed) {
+                    if ($gateRes.Status -eq "Denied") {
+                        $wasDeniedOrBlocked = $true
                     } else {
-                        if ($null -ne $item) { $item | Out-Host }
+                        $hasExecutionError = $true
+                        $capturedErrorMessage = "Command execution was blocked ($($gateRes.Status))"
                     }
-                }
+                } else {
+                    # Safely render output stream to host as a coherent collection to preserve formatting pipeline objects
+                    if ($null -ne $gateRes.Output) {
+                        $gateRes.Output | Out-Host
+                    }
 
-                if (-not $hasExecutionError -and ($global:Error.Count -gt $errCountBefore)) {
-                    $hasExecutionError = $true
-                    $newErr = $global:Error[0]
-                    $capturedErrorMessage = $newErr.Exception.Message
-                    if (-not $capturedErrorMessage) { $capturedErrorMessage = $newErr.ToString() }
-                }
+                    # Check for any ErrorRecords in the returned output stream
+                    $streamErrors = @($gateRes.Output | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] })
+                    if ($streamErrors.Count -gt 0) {
+                        $hasExecutionError = $true
+                        $firstErr = $streamErrors[0]
+                        $capturedErrorMessage = if ($firstErr.Exception -and $firstErr.Exception.Message) {
+                            $firstErr.Exception.Message
+                        } else {
+                            $firstErr.ToString()
+                        }
+                    }
 
-                if (-not $hasExecutionError -and ($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne $lastExitBefore)) {
-                    $hasExecutionError = $true
-                    $capturedErrorMessage = "Native process exited with code $LASTEXITCODE"
+                    if (-not $hasExecutionError -and ($global:Error.Count -gt $errCountBefore)) {
+                        $hasExecutionError = $true
+                        $newErr = $global:Error[0]
+                        $capturedErrorMessage = if ($newErr.Exception -and $newErr.Exception.Message) {
+                            $newErr.Exception.Message
+                        } else {
+                            $newErr.ToString()
+                        }
+                    }
+
+                    if (-not $hasExecutionError -and ($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne $lastExitBefore)) {
+                        $hasExecutionError = $true
+                        $capturedErrorMessage = "Native process exited with code $LASTEXITCODE"
+                    }
                 }
             } catch {
                 $hasExecutionError = $true
-                $capturedErrorMessage = $_.Exception.Message
-                if (-not $capturedErrorMessage) { $capturedErrorMessage = $_.ToString() }
+                $capturedErrorMessage = if ($_.Exception -and $_.Exception.Message) {
+                    $_.Exception.Message
+                } else {
+                    $_.ToString()
+                }
             }
 
-            if ($hasExecutionError) {
+            if ($wasDeniedOrBlocked) {
+                # User declined gate confirmation or execution was blocked non-interactively
+            } elseif ($hasExecutionError) {
                 Write-Host "`n✖ $($txt.RunError): $capturedErrorMessage`n" -ForegroundColor Red
 
                 # Запитуємо користувача, чи передати помилку AI для негайного аналізу та виправлення

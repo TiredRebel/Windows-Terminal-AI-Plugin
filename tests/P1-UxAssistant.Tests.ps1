@@ -208,6 +208,27 @@ MIIEowIBAAKCAQEA0Y1u5...
         ($res.Saved -eq $true) -and ($res.Status -eq "Overwritten") -and ($fileContent -match "Version 2.0") -and $hasBom
     }
 
+    # FIX-P1-14: AST Error Stream Isolation
+    Assert-P1Fixture "FIX-P1-14" "Test-AiCommandAst does not pollute `$global:Error when analyzing non-alias cmdlets" {
+        $errCountBefore = $global:Error.Count
+        $res = Test-AiCommandAst -Command "Get-Process | Format-Table Name, CPU -AutoSize"
+        $errCountAfter = $global:Error.Count
+
+        ($errCountAfter -eq $errCountBefore) -and ($res.IsValid -eq $true)
+    }
+
+    # FIX-P1-15: Multi-line Formatting Pipeline Coherence
+    Assert-P1Fixture "FIX-P1-15" "Invoke-AiExecutionGate with formatting pipeline executes and renders without throwing" {
+        $code = @"
+`$items = @([PSCustomObject]@{ Id = 1; Name = 'Alpha' }, [PSCustomObject]@{ Id = 2; Name = 'Beta' })
+`$items | Format-Table Id, Name -AutoSize
+"@
+        $gateRes = Invoke-AiExecutionGate -Command $code -ReturnOutput -AutoConfirm -PassThru
+        $streamErrors = @($gateRes.Output | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] })
+
+        ($gateRes.Executed -eq $true) -and ($streamErrors.Count -eq 0) -and ($null -ne $gateRes.Output)
+    }
+
 } finally {
     if (Test-Path $testDir) {
         Remove-Item -Path $testDir -Recurse -Force -ErrorAction SilentlyContinue

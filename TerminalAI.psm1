@@ -1214,15 +1214,15 @@ function Test-AiCommandAst {
             $hasDynamicInvocation = $true
         } else {
             # Перевіряємо, чи це аліас
-            $alias = Get-Alias -Name $rawName -ErrorAction SilentlyContinue
+            $alias = Get-Alias -Name $rawName -ErrorAction Ignore
             if ($alias) {
                 $commandType = "Alias"
                 $resolvedTarget = $alias.Definition
                 $effectiveName = $resolvedTarget
-                $cmdInfo = Get-Command -Name $resolvedTarget -ErrorAction SilentlyContinue
+                $cmdInfo = Get-Command -Name $resolvedTarget -ErrorAction Ignore
             } else {
                 $effectiveName = $rawName
-                $cmdInfo = Get-Command -Name $rawName -ErrorAction SilentlyContinue
+                $cmdInfo = Get-Command -Name $rawName -ErrorAction Ignore
             }
 
             if ($cmdInfo) {
@@ -2131,7 +2131,7 @@ function Invoke-AiCommand {
     $isUnknownCmdlet = $false
     $firstWord = ($command.Trim() -split '[\s|\(]')[0].TrimStart('(').Trim()
     if ($firstWord -match '^[A-Za-z]+-[A-Za-z0-9]+$') {
-        if (-not (Get-Command -Name $firstWord -ErrorAction SilentlyContinue)) {
+        if (-not (Get-Command -Name $firstWord -ErrorAction Ignore)) {
             $isUnknownCmdlet = $true
         }
     }
