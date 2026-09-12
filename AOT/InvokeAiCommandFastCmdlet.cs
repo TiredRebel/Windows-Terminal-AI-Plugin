@@ -40,15 +40,41 @@ public class InvokeAiCommandFastCmdlet : PSCmdlet
         // 1. Дефект: коли промпт порожній -> показуємо швидку довідку замість обов'язкового запиту
         if (string.IsNullOrWhiteSpace(fullPrompt))
         {
-            ShowQuickReference(isUk);
+            ShowHelpTopic("all", isUk);
             return;
         }
 
-        // 2. Підтримка команд допомоги
+        // 2. Підтримка команд допомоги та навчальних посібників: aif help [topic]
         var lowerPrompt = fullPrompt.ToLowerInvariant();
-        if (lowerPrompt is "help" or "/?" or "-?" or "--help" or "-h" or "довідка" or "допомога")
+        var helpMatch = Regex.Match(fullPrompt, @"^(?:help|довідка|допомога)(?:\s+(all|shortcuts|models|examples|workflow|config))?\s*$", RegexOptions.IgnoreCase);
+        if (helpMatch.Success)
         {
-            ShowQuickReference(isUk);
+            var topic = helpMatch.Groups[1].Success ? helpMatch.Groups[1].Value.ToLowerInvariant() : "all";
+            ShowHelpTopic(topic, isUk);
+            return;
+        }
+
+        if (lowerPrompt is "/?" or "-?" or "--help" or "-h")
+        {
+            ShowHelpTopic("all", isUk);
+            return;
+        }
+
+        if (lowerPrompt is "shortcuts" or "гарячі клавіші" or "клавіші")
+        {
+            ShowHelpTopic("shortcuts", isUk);
+            return;
+        }
+
+        if (lowerPrompt is "examples" or "приклади")
+        {
+            ShowHelpTopic("examples", isUk);
+            return;
+        }
+
+        if (lowerPrompt is "workflow" or "робота")
+        {
+            ShowHelpTopic("workflow", isUk);
             return;
         }
 
@@ -296,59 +322,312 @@ public class InvokeAiCommandFastCmdlet : PSCmdlet
         Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, new string(' ', pad) + " │");
     }
 
-    private void ShowQuickReference(bool isUk)
+    private void ShowHelpTopic(string topic, bool isUk)
     {
-        const int bw = 70;
+        const int bw = 74;
         Host.UI.WriteLine("");
-        if (isUk)
+        switch (topic.ToLowerInvariant())
         {
-            Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, "    ✦ Terminal AI Fast (AOT) • Швидка довідка та аліаси");
-            Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╭" + new string('─', bw) + "╮");
-            RenderHelpLine("", ConsoleColor.White, bw);
-            RenderHelpLine("Основні команди та аліаси:", ConsoleColor.Cyan, bw);
-            RenderHelpLine("  aif <запит>  або  ai-fast <запит>    (швидкий бінарний модуль C#)", ConsoleColor.White, bw);
-            RenderHelpLine("  ?? <запит>   або  ai <запит>         (стандартний модуль)", ConsoleColor.White, bw);
-            RenderHelpLine("  F2                                   (інлайн-генерація в консолі)", ConsoleColor.Yellow, bw);
-            RenderHelpLine("", ConsoleColor.White, bw);
-            RenderHelpLine("Швидкі підкоманди та скорочення:", ConsoleColor.Cyan, bw);
-            RenderHelpLine("  aif status                           (стан системи, модель, мова)", ConsoleColor.Green, bw);
-            RenderHelpLine("  aif models    |  aif -m              (список моделей Ollama)", ConsoleColor.Green, bw);
-            RenderHelpLine("  aif model <назва>                    (змінити активну модель)", ConsoleColor.Green, bw);
-            RenderHelpLine("  aif lang en | uk                     (перемкнути мову інтерфейсу)", ConsoleColor.Green, bw);
-            RenderHelpLine("  aif config    |  aif -c              (переглянути конфігурацію JSON)", ConsoleColor.Green, bw);
-            RenderHelpLine("", ConsoleColor.White, bw);
-            RenderHelpLine("Короткі ключі (прапорці):", ConsoleColor.Cyan, bw);
-            RenderHelpLine("  aif \"...\" -x                         (виконати команду відразу)", ConsoleColor.Yellow, bw);
-            RenderHelpLine("  aif \"...\" -c                         (скопіювати в буфер обміну)", ConsoleColor.Yellow, bw);
-            RenderHelpLine("  aif \"...\" -Explain                   (генерація з детальним розбором)", ConsoleColor.Magenta, bw);
-            RenderHelpLine("  aif \"...\" -Ask                       (пряма текстова відповідь)", ConsoleColor.Blue, bw);
-            RenderHelpLine("", ConsoleColor.White, bw);
-            Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╰" + new string('─', bw) + "╯\n");
-        }
-        else
-        {
-            Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, "    ✦ Terminal AI Fast (AOT) • Quick Reference & Shortcuts");
-            Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╭" + new string('─', bw) + "╮");
-            RenderHelpLine("", ConsoleColor.White, bw);
-            RenderHelpLine("Primary Commands & Aliases:", ConsoleColor.Cyan, bw);
-            RenderHelpLine("  aif <prompt>  or  ai-fast <prompt>   (ultra-fast C# AOT module)", ConsoleColor.White, bw);
-            RenderHelpLine("  ?? <prompt>   or  ai <prompt>        (standard PowerShell module)", ConsoleColor.White, bw);
-            RenderHelpLine("  F2                                   (inline generation in terminal)", ConsoleColor.Yellow, bw);
-            RenderHelpLine("", ConsoleColor.White, bw);
-            RenderHelpLine("Short Commands & Subcommands:", ConsoleColor.Cyan, bw);
-            RenderHelpLine("  aif status                           (system information & settings)", ConsoleColor.Green, bw);
-            RenderHelpLine("  aif models    |  aif -m              (list installed Ollama models)", ConsoleColor.Green, bw);
-            RenderHelpLine("  aif model <name>                     (switch active Ollama model)", ConsoleColor.Green, bw);
-            RenderHelpLine("  aif lang en | uk                     (switch interface language)", ConsoleColor.Green, bw);
-            RenderHelpLine("  aif config    |  aif -c              (view configuration JSON)", ConsoleColor.Green, bw);
-            RenderHelpLine("", ConsoleColor.White, bw);
-            RenderHelpLine("Short Flags & Execution:", ConsoleColor.Cyan, bw);
-            RenderHelpLine("  aif \"...\" -x                         (generate and execute directly)", ConsoleColor.Yellow, bw);
-            RenderHelpLine("  aif \"...\" -c                         (generate and copy to clipboard)", ConsoleColor.Yellow, bw);
-            RenderHelpLine("  aif \"...\" -Explain                   (generate with code explanation)", ConsoleColor.Magenta, bw);
-            RenderHelpLine("  aif \"...\" -Ask                       (direct educational answer)", ConsoleColor.Blue, bw);
-            RenderHelpLine("", ConsoleColor.White, bw);
-            Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╰" + new string('─', bw) + "╯\n");
+            case "shortcuts":
+            {
+                var title = isUk ? "Довідник аліасів, скорочень та клавіш" : "Shortcuts, Aliases & Keybindings Guide";
+                Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"    ✦ Terminal AI Fast (AOT) • {title}");
+                Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╭" + new string('─', bw) + "╮");
+                RenderHelpLine("", ConsoleColor.White, bw);
+                if (isUk)
+                {
+                    RenderHelpLine("1. ГОЛОВНІ АЛІАСИ:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("   aif <запит>    Швидкий бінарний модуль C# (нативний AOT)", ConsoleColor.White, bw);
+                    RenderHelpLine("   ai <запит>     Стандартний модуль PowerShell", ConsoleColor.White, bw);
+                    RenderHelpLine("   ?? <запит>     Короткий синонім для генерації", ConsoleColor.White, bw);
+                    RenderHelpLine("   F2             Інлайн-генерація команди прямо у рядку PSReadLine", ConsoleColor.Yellow, bw);
+                    RenderHelpLine("   ai-fix         Діагностика та автоматичне виправлення останньої помилки", ConsoleColor.White, bw);
+                    RenderHelpLine("   ai-script      Генератор комплексних багаторядкових .ps1 сценаріїв", ConsoleColor.White, bw);
+                    RenderHelpLine("   ai-chat        Інтерактивний агент зі слеш-командами та Tab", ConsoleColor.White, bw);
+                    RenderHelpLine("", ConsoleColor.White, bw);
+                    RenderHelpLine("2. КОРОТКІ ПРАПОРЦІ:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("   -x, -y         Виконати згенеровану команду відразу (-Execute)", ConsoleColor.Yellow, bw);
+                    RenderHelpLine("   -c             Скопіювати команду відразу в буфер обміну (-Copy)", ConsoleColor.Yellow, bw);
+                    RenderHelpLine("   -Explain       Згенерувати детальне структуроване пояснення коду", ConsoleColor.Magenta, bw);
+                    RenderHelpLine("   -Ask, -chat    Отримати текстову відповідь/консультацію замість коду", ConsoleColor.Blue, bw);
+                    RenderHelpLine("", ConsoleColor.White, bw);
+                    RenderHelpLine("3. КЛАВІШІ В ІНТЕРАКТИВНОМУ МЕНЮ (після генерації):", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("   [Enter]        Виконати згенеровану команду в поточній сесії", ConsoleColor.Green, bw);
+                    RenderHelpLine("   [C] / [c]      Скопіювати в буфер обміну", ConsoleColor.Yellow, bw);
+                    RenderHelpLine("   [I] / [i]      Вставити команду в рядок введення терміналу", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("   [X] / [x]      Пояснити синтаксис та безпеку команди", ConsoleColor.Magenta, bw);
+                    RenderHelpLine("   [A] / [a]      Отримати розгорнуту текстову відповідь", ConsoleColor.Blue, bw);
+                    RenderHelpLine("   [Esc]          Скасувати", ConsoleColor.DarkGray, bw);
+                }
+                else
+                {
+                    RenderHelpLine("1. PRIMARY ALIASES:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("   aif <prompt>   Ultra-fast compiled C# binary module (Native AOT)", ConsoleColor.White, bw);
+                    RenderHelpLine("   ai <prompt>    Standard PowerShell module", ConsoleColor.White, bw);
+                    RenderHelpLine("   ?? <prompt>    Short alias for instant command generation", ConsoleColor.White, bw);
+                    RenderHelpLine("   F2             Inline PSReadLine generation directly in prompt", ConsoleColor.Yellow, bw);
+                    RenderHelpLine("   ai-fix         Diagnose and fix the last failed command in session", ConsoleColor.White, bw);
+                    RenderHelpLine("   ai-script      Generate complex multi-step .ps1 automation scripts", ConsoleColor.White, bw);
+                    RenderHelpLine("   ai-chat        Interactive terminal assistant with Tab completion", ConsoleColor.White, bw);
+                    RenderHelpLine("", ConsoleColor.White, bw);
+                    RenderHelpLine("2. SHORT EXECUTION FLAGS:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("   -x, -y         Execute command immediately without confirmation", ConsoleColor.Yellow, bw);
+                    RenderHelpLine("   -c             Copy generated command directly to clipboard", ConsoleColor.Yellow, bw);
+                    RenderHelpLine("   -Explain       Generate comprehensive educational breakdown of code", ConsoleColor.Magenta, bw);
+                    RenderHelpLine("   -Ask, -chat    Get educational text response instead of script", ConsoleColor.Blue, bw);
+                    RenderHelpLine("", ConsoleColor.White, bw);
+                    RenderHelpLine("3. INTERACTIVE MENU KEYPRESSES (after generation):", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("   [Enter]        Execute command in current session", ConsoleColor.Green, bw);
+                    RenderHelpLine("   [C] / [c]      Copy command to system clipboard", ConsoleColor.Yellow, bw);
+                    RenderHelpLine("   [I] / [i]      Insert command into prompt line for manual editing", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("   [X] / [x]      Explain command syntax, flags, and safety", ConsoleColor.Magenta, bw);
+                    RenderHelpLine("   [A] / [a]      Provide full conceptual explanation", ConsoleColor.Blue, bw);
+                    RenderHelpLine("   [Esc]          Cancel and return to prompt", ConsoleColor.DarkGray, bw);
+                }
+                RenderHelpLine("", ConsoleColor.White, bw);
+                Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╰" + new string('─', bw) + "╯\n");
+                break;
+            }
+
+            case "models":
+            {
+                var title = isUk ? "Керівництво по моделях Ollama для розробки" : "Ollama Coding Models Guide";
+                Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"    ✦ Terminal AI Fast (AOT) • {title}");
+                Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╭" + new string('─', bw) + "╮");
+                RenderHelpLine("", ConsoleColor.White, bw);
+                if (isUk)
+                {
+                    RenderHelpLine("РЕКОМЕНДОВАНІ ЛОКАЛЬНІ МОДЕЛІ ДЛЯ POWERSHELL:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("  • qwen2.5-coder:7b   [~4.4GB VRAM] ТОП для PowerShell 7, скриптів і CLI", ConsoleColor.Green, bw);
+                    RenderHelpLine("  • granite4.2:8b      [~5.0GB VRAM] Модель від IBM, чудова для системних задач", ConsoleColor.White, bw);
+                    RenderHelpLine("  • deepseek-coder:6.7b[~4.0GB VRAM] Швидка кодер-модель з високою точністю", ConsoleColor.White, bw);
+                    RenderHelpLine("  • qwen2.5-coder:1.5b [~1.2GB VRAM] Надшвидка легка модель для CPU/ноутбуків", ConsoleColor.Yellow, bw);
+                    RenderHelpLine("", ConsoleColor.White, bw);
+                    RenderHelpLine("КОМАНДИ КЕРУВАННЯ МОДЕЛЯМИ:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("  aif models              Переглянути список встановлених моделей", ConsoleColor.White, bw);
+                    RenderHelpLine("  aif model <назва>       Миттєво змінити активну модель", ConsoleColor.White, bw);
+                    RenderHelpLine("  ollama pull <назва>     Завантажити нову модель (напр: ollama pull qwen2.5-coder:7b)", ConsoleColor.DarkGray, bw);
+                    RenderHelpLine("  ollama list             Системний список моделей Ollama", ConsoleColor.DarkGray, bw);
+                }
+                else
+                {
+                    RenderHelpLine("RECOMMENDED LOCAL CODING MODELS FOR POWERSHELL:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("  • qwen2.5-coder:7b   [~4.4GB VRAM] Top choice for PowerShell 7 pipelines & CLI", ConsoleColor.Green, bw);
+                    RenderHelpLine("  • granite4.2:8b      [~5.0GB VRAM] Enterprise IBM model, great for sysadmin tasks", ConsoleColor.White, bw);
+                    RenderHelpLine("  • deepseek-coder:6.7b[~4.0GB VRAM] Fast, precise code generation", ConsoleColor.White, bw);
+                    RenderHelpLine("  • qwen2.5-coder:1.5b [~1.2GB VRAM] Ultra-lightweight for CPU laptops", ConsoleColor.Yellow, bw);
+                    RenderHelpLine("", ConsoleColor.White, bw);
+                    RenderHelpLine("MODEL MANAGEMENT COMMANDS:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("  aif models              View list of installed models & active marker", ConsoleColor.White, bw);
+                    RenderHelpLine("  aif model <name>        Instantly switch active model", ConsoleColor.White, bw);
+                    RenderHelpLine("  ollama pull <name>      Download model (e.g. ollama pull qwen2.5-coder:7b)", ConsoleColor.DarkGray, bw);
+                    RenderHelpLine("  ollama list             List all models downloaded locally", ConsoleColor.DarkGray, bw);
+                }
+                RenderHelpLine("", ConsoleColor.White, bw);
+                Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╰" + new string('─', bw) + "╯\n");
+                break;
+            }
+
+            case "examples":
+            {
+                var title = isUk ? "Практичні приклади для роботи та автоматизації" : "Practical DevOps & Admin Examples";
+                Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"    ✦ Terminal AI Fast (AOT) • {title}");
+                Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╭" + new string('─', bw) + "╮");
+                RenderHelpLine("", ConsoleColor.White, bw);
+                if (isUk)
+                {
+                    RenderHelpLine("ФАЙЛИ ТА ПАПКИ:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("  aif 'знайти файли .log більше 50MB змінені за останні 2 дні'", ConsoleColor.Green, bw);
+                    RenderHelpLine("  aif 'порахувати сумарний розмір папки C:\\Temp у гігабайтах'", ConsoleColor.Green, bw);
+                    RenderHelpLine("  aif 'видалити всі порожні папки рекурсивно' -Explain", ConsoleColor.Green, bw);
+                    RenderHelpLine("", ConsoleColor.White, bw);
+                    RenderHelpLine("ПРОЦЕСИ ТА ДІАГНОСТИКА:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("  aif 'показати топ 5 процесів за пам'яттю у таблиці з MB'", ConsoleColor.Green, bw);
+                    RenderHelpLine("  aif 'знайти процес який слухає порт 8080'", ConsoleColor.Green, bw);
+                    RenderHelpLine("  aif 'зупинити всі завислі процеси node' -x", ConsoleColor.Green, bw);
+                    RenderHelpLine("", ConsoleColor.White, bw);
+                    RenderHelpLine("МЕРЕЖА ТА СИСТЕМА:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("  aif 'перевірити доступність 8.8.8.8 на порт 53 через TCP'", ConsoleColor.Green, bw);
+                    RenderHelpLine("  aif 'вивести IP адресу шлюзу та DNS сервери'", ConsoleColor.Green, bw);
+                    RenderHelpLine("  ai-fix  (якщо попередня команда впала з помилкою)", ConsoleColor.Yellow, bw);
+                }
+                else
+                {
+                    RenderHelpLine("FILES & DIRECTORIES:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("  aif 'find all .log files larger than 50MB modified in last 2 days'", ConsoleColor.Green, bw);
+                    RenderHelpLine("  aif 'calculate total size of C:\\Temp directory in gigabytes'", ConsoleColor.Green, bw);
+                    RenderHelpLine("  aif 'delete empty folders recursively' -Explain", ConsoleColor.Green, bw);
+                    RenderHelpLine("", ConsoleColor.White, bw);
+                    RenderHelpLine("PROCESSES & DIAGNOSTICS:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("  aif 'show top 5 processes by working set memory in MB'", ConsoleColor.Green, bw);
+                    RenderHelpLine("  aif 'find process listening on port 8080'", ConsoleColor.Green, bw);
+                    RenderHelpLine("  aif 'terminate all hung node processes' -x", ConsoleColor.Green, bw);
+                    RenderHelpLine("", ConsoleColor.White, bw);
+                    RenderHelpLine("NETWORKING & SYSTEMS:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("  aif 'test TCP connection to 8.8.8.8 on port 53'", ConsoleColor.Green, bw);
+                    RenderHelpLine("  aif 'display default gateway and active DNS servers'", ConsoleColor.Green, bw);
+                    RenderHelpLine("  ai-fix  (auto-diagnose and fix the last error)", ConsoleColor.Yellow, bw);
+                }
+                RenderHelpLine("", ConsoleColor.White, bw);
+                Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╰" + new string('─', bw) + "╯\n");
+                break;
+            }
+
+            case "workflow":
+            {
+                var title = isUk ? "Посібник інтерактивної роботи в Windows Terminal" : "Interactive Workflow Guide";
+                Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"    ✦ Terminal AI Fast (AOT) • {title}");
+                Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╭" + new string('─', bw) + "╮");
+                RenderHelpLine("", ConsoleColor.White, bw);
+                if (isUk)
+                {
+                    RenderHelpLine("1. ІНЛАЙН-ГЕНЕРАЦІЯ (Найшвидший спосіб):", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("   • Надрукуйте будь-яку задачу людською мовою прямо у рядку вводу", ConsoleColor.White, bw);
+                    RenderHelpLine("   • Натисніть F2 (або Ctrl+Space) -> текст миттєво заміниться на код", ConsoleColor.Yellow, bw);
+                    RenderHelpLine("", ConsoleColor.White, bw);
+                    RenderHelpLine("2. ІНТЕРАКТИВНЕ МЕНЮ (Безпечний контроль):", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("   • Виконайте: aif 'ваша задача'", ConsoleColor.White, bw);
+                    RenderHelpLine("   • Натисніть [Enter] щоб запустити, [C] щоб скопіювати,", ConsoleColor.White, bw);
+                    RenderHelpLine("     [I] щоб редагувати в консолі, [X] для розбору синтаксису,", ConsoleColor.White, bw);
+                    RenderHelpLine("     [A] для розгорнутої відповіді або [Esc] для відміни.", ConsoleColor.White, bw);
+                    RenderHelpLine("", ConsoleColor.White, bw);
+                    RenderHelpLine("3. АВТОМАТИЧНЕ ВИПРАВЛЕННЯ ПОМИЛОК:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("   • Якщо попередня команда завершилась з помилкою, введіть: ai-fix", ConsoleColor.Yellow, bw);
+                    RenderHelpLine("   • AI проаналізує стек помилки та запропонує робоче виправлення.", ConsoleColor.White, bw);
+                    RenderHelpLine("", ConsoleColor.White, bw);
+                    RenderHelpLine("4. СКРИПТИ ТА БЕСІДА:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("   • Створення .ps1 скриптів: ai-script 'архівація логів з ротацією'", ConsoleColor.White, bw);
+                    RenderHelpLine("   • Діалоговий режим розробника: ai-chat (підтримка /help, /model, /clear)", ConsoleColor.White, bw);
+                }
+                else
+                {
+                    RenderHelpLine("1. INLINE GENERATION (Fastest method):", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("   • Type any goal in plain English directly at the terminal prompt", ConsoleColor.White, bw);
+                    RenderHelpLine("   • Press F2 (or Ctrl+Space) -> prompt is replaced with valid code", ConsoleColor.Yellow, bw);
+                    RenderHelpLine("", ConsoleColor.White, bw);
+                    RenderHelpLine("2. INTERACTIVE ACTION MENU (Safe verification):", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("   • Run: aif 'your task description'", ConsoleColor.White, bw);
+                    RenderHelpLine("   • Press [Enter] to run, [C] to copy to clipboard,", ConsoleColor.White, bw);
+                    RenderHelpLine("     [I] to insert into line for editing, [X] to explain syntax,", ConsoleColor.White, bw);
+                    RenderHelpLine("     [A] for conceptual answer, or [Esc] to dismiss.", ConsoleColor.White, bw);
+                    RenderHelpLine("", ConsoleColor.White, bw);
+                    RenderHelpLine("3. AUTOMATED ERROR RECOVERY:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("   • When any terminal command fails, immediately run: ai-fix", ConsoleColor.Yellow, bw);
+                    RenderHelpLine("   • AI analyzes the error stream and offers an instant fix.", ConsoleColor.White, bw);
+                    RenderHelpLine("", ConsoleColor.White, bw);
+                    RenderHelpLine("4. PRODUCTION SCRIPTS & CHAT ASSISTANT:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("   • Multi-step scripts: ai-script 'backup IIS logs with compression'", ConsoleColor.White, bw);
+                    RenderHelpLine("   • Multi-turn assistant: ai-chat (supports /help, /model, /clear)", ConsoleColor.White, bw);
+                }
+                RenderHelpLine("", ConsoleColor.White, bw);
+                Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╰" + new string('─', bw) + "╯\n");
+                break;
+            }
+
+            case "config":
+            {
+                var title = isUk ? "Налаштування конфігурації Terminal AI" : "Configuration Settings Guide";
+                Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"    ✦ Terminal AI Fast (AOT) • {title}");
+                Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╭" + new string('─', bw) + "╮");
+                RenderHelpLine("", ConsoleColor.White, bw);
+                if (isUk)
+                {
+                    RenderHelpLine("ФАЙЛ КОНФІГУРАЦІЇ:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("  Розташування: ~/.terminalai/config.json", ConsoleColor.White, bw);
+                    RenderHelpLine("  Перегляд:     aif config   або   ai config", ConsoleColor.Green, bw);
+                    RenderHelpLine("", ConsoleColor.White, bw);
+                    RenderHelpLine("ОСНОВНІ ПАРАМЕТРИ:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("  • Model        Активна нейромережа (за замовчуванням qwen2.5-coder:7b)", ConsoleColor.White, bw);
+                    RenderHelpLine("  • OllamaUrl    Адреса сервера Ollama (http://localhost:11434)", ConsoleColor.White, bw);
+                    RenderHelpLine("  • Language     Мова інтерфейсу (en або uk)", ConsoleColor.White, bw);
+                    RenderHelpLine("  • Temperature  Креативність генерації (0.2 для точного коду)", ConsoleColor.White, bw);
+                    RenderHelpLine("  • AutoCopy     Автокопіювання коду в буфер (true/false)", ConsoleColor.White, bw);
+                    RenderHelpLine("  • Font         Шрифт Windows Terminal (напр. Cascadia Code NF)", ConsoleColor.White, bw);
+                    RenderHelpLine("  • HotkeyChord  Комбінація клавіш інлайну (F2 або Ctrl+Space)", ConsoleColor.White, bw);
+                    RenderHelpLine("", ConsoleColor.White, bw);
+                    RenderHelpLine("ШВИДКІ КОМАНДИ НАЛАШТУВАННЯ:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("  aif model <назва>        Змінити активну модель Ollama", ConsoleColor.Yellow, bw);
+                    RenderHelpLine("  aif lang en | uk         Змінити мову інтерфейсу", ConsoleColor.Yellow, bw);
+                    RenderHelpLine("  ai font <назва> [розмір] Змінити шрифт Windows Terminal", ConsoleColor.Yellow, bw);
+                }
+                else
+                {
+                    RenderHelpLine("CONFIGURATION FILE:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("  Location: ~/.terminalai/config.json", ConsoleColor.White, bw);
+                    RenderHelpLine("  View:     aif config   or   ai config", ConsoleColor.Green, bw);
+                    RenderHelpLine("", ConsoleColor.White, bw);
+                    RenderHelpLine("KEY SETTINGS:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("  • Model        Active coding model (default: qwen2.5-coder:7b)", ConsoleColor.White, bw);
+                    RenderHelpLine("  • OllamaUrl    Ollama server endpoint (http://localhost:11434)", ConsoleColor.White, bw);
+                    RenderHelpLine("  • Language     Interface language (en or uk)", ConsoleColor.White, bw);
+                    RenderHelpLine("  • Temperature  Generation determinism (0.2 for strict code)", ConsoleColor.White, bw);
+                    RenderHelpLine("  • AutoCopy     Auto-copy generated command to clipboard", ConsoleColor.White, bw);
+                    RenderHelpLine("  • Font         Windows Terminal font (e.g. Cascadia Code NF)", ConsoleColor.White, bw);
+                    RenderHelpLine("  • HotkeyChord  Inline shortcut chord (F2 or Ctrl+Space)", ConsoleColor.White, bw);
+                    RenderHelpLine("", ConsoleColor.White, bw);
+                    RenderHelpLine("QUICK CONFIGURATION COMMANDS:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("  aif model <name>        Switch active Ollama model", ConsoleColor.Yellow, bw);
+                    RenderHelpLine("  aif lang en | uk        Switch interface language", ConsoleColor.Yellow, bw);
+                    RenderHelpLine("  ai font <name> [size]   Configure Windows Terminal font", ConsoleColor.Yellow, bw);
+                }
+                RenderHelpLine("", ConsoleColor.White, bw);
+                Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╰" + new string('─', bw) + "╯\n");
+                break;
+            }
+
+            default:
+            {
+                // "all" - повна довідка
+                var title = isUk ? "Повний довідник та карта команд" : "Complete Reference & Commands Map";
+                Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"    ✦ Terminal AI Fast (AOT) • {title}");
+                Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╭" + new string('─', bw) + "╮");
+                RenderHelpLine("", ConsoleColor.White, bw);
+                if (isUk)
+                {
+                    RenderHelpLine("КОМАНДИ МОДУЛЯ:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("  aif, ai-fast      Швидкий нативний бінарний модуль C# (рекомендовано)", ConsoleColor.White, bw);
+                    RenderHelpLine("  ai, ??            Класичний модуль PowerShell з живим таймером", ConsoleColor.White, bw);
+                    RenderHelpLine("  ai-fix            Автоматичний аналіз та виправлення останньої помилки", ConsoleColor.White, bw);
+                    RenderHelpLine("  ai-script         Генератор готових .ps1 скриптів з коментарями", ConsoleColor.White, bw);
+                    RenderHelpLine("  ai-chat           Інтерактивний асистент зі слеш-командами та історією", ConsoleColor.White, bw);
+                    RenderHelpLine("  F2                Швидка генерація прямо в активному рядку вводу", ConsoleColor.Yellow, bw);
+                    RenderHelpLine("", ConsoleColor.White, bw);
+                    RenderHelpLine("ТЕМАТИЧНІ РОЗДІЛИ ДОВІДКИ:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("  aif help shortcuts Повний список гарячих клавіш, аліасів та ключів", ConsoleColor.Green, bw);
+                    RenderHelpLine("  aif help models    Вимоги до пам'яті та рекомендації моделей Ollama", ConsoleColor.Green, bw);
+                    RenderHelpLine("  aif help examples  Реальні приклади адміністрування та автоматизації", ConsoleColor.Green, bw);
+                    RenderHelpLine("  aif help workflow  Посібник по роботі з меню, інлайном та помилками", ConsoleColor.Green, bw);
+                    RenderHelpLine("  aif help config    Довідник конфігурації (~/.terminalai/config.json)", ConsoleColor.Green, bw);
+                    RenderHelpLine("", ConsoleColor.White, bw);
+                    RenderHelpLine("ОФІЦІЙНА ДОПОМОГА POWERSHELL:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("  Get-Help aif -Full        Повна man-сторінка з синтаксисом і типами", ConsoleColor.DarkGray, bw);
+                    RenderHelpLine("  Get-Help aif -Examples    Приклади використання бінарного модуля", ConsoleColor.DarkGray, bw);
+                }
+                else
+                {
+                    RenderHelpLine("AVAILABLE COMMANDS:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("  aif, ai-fast      Fast native C# binary module (recommended)", ConsoleColor.White, bw);
+                    RenderHelpLine("  ai, ??            Classic PowerShell module with latency timing", ConsoleColor.White, bw);
+                    RenderHelpLine("  ai-fix            Diagnose and fix the last failed command in session", ConsoleColor.White, bw);
+                    RenderHelpLine("  ai-script         Generate production-ready multi-line .ps1 scripts", ConsoleColor.White, bw);
+                    RenderHelpLine("  ai-chat           Interactive terminal assistant with history", ConsoleColor.White, bw);
+                    RenderHelpLine("  F2                Inline generation directly in PSReadLine prompt", ConsoleColor.Yellow, bw);
+                    RenderHelpLine("", ConsoleColor.White, bw);
+                    RenderHelpLine("DETAILED TOPICS:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("  aif help shortcuts Full cheat-sheet of keybindings, flags, and aliases", ConsoleColor.Green, bw);
+                    RenderHelpLine("  aif help models    VRAM requirements & coding LLM recommendations", ConsoleColor.Green, bw);
+                    RenderHelpLine("  aif help examples  Practical sysadmin & automation pipeline examples", ConsoleColor.Green, bw);
+                    RenderHelpLine("  aif help workflow  Workflow guide for menus, inline, and error fixing", ConsoleColor.Green, bw);
+                    RenderHelpLine("  aif help config    Configuration guide (~/.terminalai/config.json)", ConsoleColor.Green, bw);
+                    RenderHelpLine("", ConsoleColor.White, bw);
+                    RenderHelpLine("NATIVE POWERSHELL HELP:", ConsoleColor.Cyan, bw);
+                    RenderHelpLine("  Get-Help aif -Full        Full MAML manual with parameters and types", ConsoleColor.DarkGray, bw);
+                    RenderHelpLine("  Get-Help aif -Examples    Real-world usage examples", ConsoleColor.DarkGray, bw);
+                }
+                RenderHelpLine("", ConsoleColor.White, bw);
+                Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╰" + new string('─', bw) + "╯\n");
+                break;
+            }
         }
     }
 

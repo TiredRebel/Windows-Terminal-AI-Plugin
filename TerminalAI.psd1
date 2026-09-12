@@ -47,7 +47,9 @@
         'Show-TerminalAiWelcome',
         'Get-AiSystemPrompt',
         'Clear-AiInputBuffer',
-        'Get-AiMenuKeyPress'
+        'Get-AiMenuKeyPress',
+        'Show-TerminalAiHelp',
+        'Register-TerminalAiArgumentCompleters'
     )
 
     # Командлети, що експортуються
@@ -62,6 +64,7 @@
     AliasesToExport = @(
         'ai',
         '??',
+        'ai-help',
         'ai-fast',
         'aif',
         'ai-fix',

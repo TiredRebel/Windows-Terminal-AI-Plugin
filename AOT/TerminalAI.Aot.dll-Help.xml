@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<helpItems xmlns="http://msh" schema="maml">
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+    <command:details>
+      <command:name>Invoke-AiCommandFast</command:name>
+      <maml:description>
+        <maml:para>High-performance compiled C# binary cmdlet for Ollama-powered natural language PowerShell command generation, explanation, and system control.</maml:para>
+      </maml:description>
+      <maml:copyright>
+        <maml:para>(c) 2026 TerminalAI Community. All rights reserved.</maml:para>
+      </maml:copyright>
+      <command:verb>Invoke</command:verb>
+      <command:noun>AiCommandFast</command:noun>
+      <dev:version>1.0.0.0</dev:version>
+    </command:details>
+
+    <maml:description>
+      <maml:para>Invoke-AiCommandFast (aliases: ai-fast, aif) provides ultra-fast command translation using a static persistent SocketsHttpHandler and compiled native code. It generates executable PowerShell pipelines, offers interactive confirmation menus, explains code, and executes or copies commands directly.</maml:para>
+    </maml:description>
+
+    <command:syntax>
+      <command:syntaxItem>
+        <maml:name>Invoke-AiCommandFast</maml:name>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="false" position="0">
+          <maml:name>Prompt</maml:name>
+          <maml:description>
+            <maml:para>Natural language prompt describing the command you want to generate, or a subcommand like 'status', 'models', 'model &lt;name&gt;', 'lang &lt;en|uk&gt;', 'config', 'help'.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">String[]</command:parameterValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>Execute</maml:name>
+          <maml:description>
+            <maml:para>Execute the generated command immediately without displaying the action menu (aliases: -x, -y).</maml:para>
+          </maml:description>
+          <dev:type>SwitchParameter</dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>Copy</maml:name>
+          <maml:description>
+            <maml:para>Copy the generated command directly to clipboard (alias: -c).</maml:para>
+          </maml:description>
+          <dev:type>SwitchParameter</dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>Explain</maml:name>
+          <maml:description>
+            <maml:para>Request a detailed educational breakdown of the command structure, parameters, security, and performance considerations.</maml:para>
+          </maml:description>
+          <dev:type>SwitchParameter</dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>Ask</maml:name>
+          <maml:description>
+            <maml:para>Ask a direct conceptual or technical question and receive an educational text response instead of code (aliases: -chat, -question).</maml:para>
+          </maml:description>
+          <dev:type>SwitchParameter</dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>Model</maml:name>
+          <maml:description>
+            <maml:para>Override the active Ollama model for this specific invocation.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+
+    <command:parameters>
+      <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="false" position="0">
+        <maml:name>Prompt</maml:name>
+        <maml:description>
+          <maml:para>Natural language prompt describing what you want to achieve.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="false">String[]</command:parameterValue>
+        <dev:type>String[]</dev:type>
+        <dev:default></dev:default>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>Execute</maml:name>
+        <maml:description>
+          <maml:para>Executes the generated command immediately (-x, -y).</maml:para>
+        </maml:description>
+        <dev:type>SwitchParameter</dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>Copy</maml:name>
+        <maml:description>
+          <maml:para>Copies the generated command directly to clipboard (-c).</maml:para>
+        </maml:description>
+        <dev:type>SwitchParameter</dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>Explain</maml:name>
+        <maml:description>
+          <maml:para>Generates a comprehensive line-by-line explanation of the command.</maml:para>
+        </maml:description>
+        <dev:type>SwitchParameter</dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>Ask</maml:name>
+        <maml:description>
+          <maml:para>Returns a direct conversational explanation instead of a command.</maml:para>
+        </maml:description>
+        <dev:type>SwitchParameter</dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>Model</maml:name>
+        <maml:description>
+          <maml:para>Specifies an Ollama model name to override the default setting.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
+      </command:parameter>
+    </command:parameters>
+
+    <command:examples>
+      <command:example>
+        <maml:title>-------------------------- EXAMPLE 1 --------------------------</maml:title>
+        <dev:code>aif "show top 5 processes by CPU usage"</dev:code>
+        <dev:remarks>
+          <maml:para>Generates a PowerShell pipeline to display top processes and opens the interactive menu ([Enter] Execute, [C] Copy, [I] Insert, [X] Explain, [A] Text).</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>-------------------------- EXAMPLE 2 --------------------------</maml:title>
+        <dev:code>aif "find all .log files modified today" -x</dev:code>
+        <dev:remarks>
+          <maml:para>Generates the command and executes it immediately using the -x switch.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>-------------------------- EXAMPLE 3 --------------------------</maml:title>
+        <dev:code>aif "archive old logs into zip" -Explain</dev:code>
+        <dev:remarks>
+          <maml:para>Generates the command and produces a detailed structured technical breakdown of each parameter and operator.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>-------------------------- EXAMPLE 4 --------------------------</maml:title>
+        <dev:code>aif models</dev:code>
+        <dev:remarks>
+          <maml:para>Lists all installed Ollama models with their sizes, update timestamps, and active model marker.</maml:para>
+        </dev:remarks>
+      </command:example>
+    </command:examples>
+  </command:command>
+</helpItems>

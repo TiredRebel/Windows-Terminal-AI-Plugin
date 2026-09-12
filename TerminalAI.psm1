@@ -193,6 +193,325 @@ function Show-TerminalAiWelcome {
     Write-Host (Get-TerminalAiText "Welcome") -ForegroundColor Cyan
 }
 
+function Show-TerminalAiHelp {
+    <#
+    .SYNOPSIS
+        Детальна інтерактивна довідка та навчальний посібник для TerminalAI.
+    .DESCRIPTION
+        Відображає структуровані навчальні посібники для роботи та навчання:
+        - all: Загальний огляд системи та карта команд
+        - shortcuts: Повний перелік швидких аліасів, однобуквених прапорців та комбінацій клавіш
+        - models: Огляд моделей Ollama, вимоги до RAM/VRAM та рекомендовані моделі для кодингу
+        - examples: Реальні приклади щоденних задач DevOps, адміністрування та автоматизації
+        - workflow: Посібник з інтерактивної взаємодії в Windows Terminal
+    .PARAMETER Topic
+        Тема довідки: all, shortcuts, models, examples, workflow, config.
+    .EXAMPLE
+        ai-help
+    .EXAMPLE
+        ai-help shortcuts
+    .EXAMPLE
+        ai help models
+    .EXAMPLE
+        aif help examples
+    #>
+    [CmdletBinding()]
+    [Alias("ai-help")]
+    param(
+        [Parameter(Position = 0)]
+        [ValidateSet("all", "shortcuts", "models", "examples", "workflow", "config")]
+        [string]$Topic = "all"
+    )
+
+    $cfg = Get-TerminalAiConfig
+    $isUk = ($cfg.Language -ne "en")
+    $bw = 74
+
+    $renderLine = {
+        param([string]$Text, [System.ConsoleColor]$Color = [System.ConsoleColor]::White)
+        $pad = $bw - 2 - $Text.Length
+        if ($pad -lt 0) { $pad = 0 }
+        Write-Host "    │ " -NoNewline -ForegroundColor DarkCyan
+        Write-Host $Text -NoNewline -ForegroundColor $Color
+        Write-Host (" " * $pad + " │") -ForegroundColor DarkCyan
+    }
+
+    Write-Host ""
+    switch ($Topic.ToLowerInvariant()) {
+        "shortcuts" {
+            $tTitle = if ($isUk) { "Довідник аліасів, скорочень та клавіш" } else { "Shortcuts, Aliases & Keybindings Guide" }
+            Write-Host "    ✦ Terminal AI • $tTitle" -ForegroundColor Cyan
+            Write-Host ("    ╭" + ("─" * $bw) + "╮") -ForegroundColor DarkCyan
+            & $renderLine ""
+            if ($isUk) {
+                & $renderLine "1. ГОЛОВНІ АЛІАСИ:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "   aif <запит>    Швидкий бінарний модуль C# (нативний AOT)" ([System.ConsoleColor]::White)
+                & $renderLine "   ai <запит>     Стандартний модуль PowerShell" ([System.ConsoleColor]::White)
+                & $renderLine "   ?? <запит>     Короткий синонім для генерації" ([System.ConsoleColor]::White)
+                & $renderLine "   F2             Інлайн-генерація команди прямо у рядку PSReadLine" ([System.ConsoleColor]::Yellow)
+                & $renderLine "   ai-fix         Діагностика та автоматичне виправлення останньої помилки" ([System.ConsoleColor]::White)
+                & $renderLine "   ai-script      Генератор комплексних багаторядкових .ps1 сценаріїв" ([System.ConsoleColor]::White)
+                & $renderLine "   ai-chat        Інтерактивний агент зі слеш-командами та Tab" ([System.ConsoleColor]::White)
+                & $renderLine ""
+                & $renderLine "2. КОРОТКІ ПРАПОРЦІ:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "   -x, -y         Виконати згенеровану команду відразу (-Execute)" ([System.ConsoleColor]::Yellow)
+                & $renderLine "   -c             Скопіювати команду відразу в буфер обміну (-Copy)" ([System.ConsoleColor]::Yellow)
+                & $renderLine "   -Explain       Згенерувати детальне структуроване пояснення коду" ([System.ConsoleColor]::Magenta)
+                & $renderLine "   -Ask, -chat    Отримати текстову відповідь/консультацію замість коду" ([System.ConsoleColor]::Blue)
+                & $renderLine ""
+                & $renderLine "3. КЛАВІШІ В ІНТЕРАКТИВНОМУ МЕНЮ (після генерації):" ([System.ConsoleColor]::Cyan)
+                & $renderLine "   [Enter]        Виконати згенеровану команду в поточній сесії" ([System.ConsoleColor]::Green)
+                & $renderLine "   [C] / [c]      Скопіювати в буфер обміну" ([System.ConsoleColor]::Yellow)
+                & $renderLine "   [I] / [i]      Вставити команду в рядок введення терміналу" ([System.ConsoleColor]::Cyan)
+                & $renderLine "   [X] / [x]      Пояснити синтаксис та безпеку команди" ([System.ConsoleColor]::Magenta)
+                & $renderLine "   [A] / [a]      Отримати розгорнуту текстову відповідь" ([System.ConsoleColor]::Blue)
+                & $renderLine "   [Esc]          Скасувати" ([System.ConsoleColor]::DarkGray)
+            } else {
+                & $renderLine "1. PRIMARY ALIASES:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "   aif <prompt>   Ultra-fast compiled C# binary module (Native AOT)" ([System.ConsoleColor]::White)
+                & $renderLine "   ai <prompt>    Standard PowerShell module" ([System.ConsoleColor]::White)
+                & $renderLine "   ?? <prompt>    Short alias for instant command generation" ([System.ConsoleColor]::White)
+                & $renderLine "   F2             Inline PSReadLine generation directly in prompt" ([System.ConsoleColor]::Yellow)
+                & $renderLine "   ai-fix         Diagnose and fix the last failed command in session" ([System.ConsoleColor]::White)
+                & $renderLine "   ai-script      Generate complex multi-step .ps1 automation scripts" ([System.ConsoleColor]::White)
+                & $renderLine "   ai-chat        Interactive terminal assistant with Tab completion" ([System.ConsoleColor]::White)
+                & $renderLine ""
+                & $renderLine "2. SHORT EXECUTION FLAGS:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "   -x, -y         Execute command immediately without confirmation" ([System.ConsoleColor]::Yellow)
+                & $renderLine "   -c             Copy generated command directly to clipboard" ([System.ConsoleColor]::Yellow)
+                & $renderLine "   -Explain       Generate comprehensive educational breakdown of code" ([System.ConsoleColor]::Magenta)
+                & $renderLine "   -Ask, -chat    Get educational text response instead of script" ([System.ConsoleColor]::Blue)
+                & $renderLine ""
+                & $renderLine "3. INTERACTIVE MENU KEYPRESSES (after generation):" ([System.ConsoleColor]::Cyan)
+                & $renderLine "   [Enter]        Execute command in current session" ([System.ConsoleColor]::Green)
+                & $renderLine "   [C] / [c]      Copy command to system clipboard" ([System.ConsoleColor]::Yellow)
+                & $renderLine "   [I] / [i]      Insert command into prompt line for manual editing" ([System.ConsoleColor]::Cyan)
+                & $renderLine "   [X] / [x]      Explain command syntax, flags, and safety" ([System.ConsoleColor]::Magenta)
+                & $renderLine "   [A] / [a]      Provide full conceptual explanation" ([System.ConsoleColor]::Blue)
+                & $renderLine "   [Esc]          Cancel and return to prompt" ([System.ConsoleColor]::DarkGray)
+            }
+            & $renderLine ""
+            Write-Host ("    ╰" + ("─" * $bw) + "╯`n") -ForegroundColor DarkCyan
+        }
+
+        "models" {
+            $tTitle = if ($isUk) { "Керівництво по моделях Ollama для розробки" } else { "Ollama Coding Models Guide" }
+            Write-Host "    ✦ Terminal AI • $tTitle" -ForegroundColor Cyan
+            Write-Host ("    ╭" + ("─" * $bw) + "╮") -ForegroundColor DarkCyan
+            & $renderLine ""
+            if ($isUk) {
+                & $renderLine "РЕКОМЕНДОВАНІ ЛОКАЛЬНІ МОДЕЛІ ДЛЯ POWERSHELL:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "  • qwen2.5-coder:7b   [~4.4GB VRAM] ТОП для PowerShell 7, скриптів і CLI" ([System.ConsoleColor]::Green)
+                & $renderLine "  • granite4.2:8b      [~5.0GB VRAM] Модель від IBM, чудова для системних задач" ([System.ConsoleColor]::White)
+                & $renderLine "  • deepseek-coder:6.7b[~4.0GB VRAM] Швидка кодер-модель з високою точністю" ([System.ConsoleColor]::White)
+                & $renderLine "  • qwen2.5-coder:1.5b [~1.2GB VRAM] Надшвидка легка модель для CPU/ноутбуків" ([System.ConsoleColor]::Yellow)
+                & $renderLine ""
+                & $renderLine "КОМАНДИ КЕРУВАННЯ МОДЕЛЯМИ:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "  aif models              Переглянути список встановлених моделей" ([System.ConsoleColor]::White)
+                & $renderLine "  aif model <назва>       Миттєво змінити активну модель" ([System.ConsoleColor]::White)
+                & $renderLine "  ollama pull <назва>     Завантажити нову модель (напр: ollama pull qwen2.5-coder:7b)" ([System.ConsoleColor]::DarkGray)
+                & $renderLine "  ollama list             Системний список моделей Ollama" ([System.ConsoleColor]::DarkGray)
+            } else {
+                & $renderLine "RECOMMENDED LOCAL CODING MODELS FOR POWERSHELL:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "  • qwen2.5-coder:7b   [~4.4GB VRAM] Top choice for PowerShell 7 pipelines & CLI" ([System.ConsoleColor]::Green)
+                & $renderLine "  • granite4.2:8b      [~5.0GB VRAM] Enterprise IBM model, great for sysadmin tasks" ([System.ConsoleColor]::White)
+                & $renderLine "  • deepseek-coder:6.7b[~4.0GB VRAM] Fast, precise code generation" ([System.ConsoleColor]::White)
+                & $renderLine "  • qwen2.5-coder:1.5b [~1.2GB VRAM] Ultra-lightweight for CPU laptops" ([System.ConsoleColor]::Yellow)
+                & $renderLine ""
+                & $renderLine "MODEL MANAGEMENT COMMANDS:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "  aif models              View list of installed models & active marker" ([System.ConsoleColor]::White)
+                & $renderLine "  aif model <name>        Instantly switch active model" ([System.ConsoleColor]::White)
+                & $renderLine "  ollama pull <name>      Download model (e.g. ollama pull qwen2.5-coder:7b)" ([System.ConsoleColor]::DarkGray)
+                & $renderLine "  ollama list             List all models downloaded locally" ([System.ConsoleColor]::DarkGray)
+            }
+            & $renderLine ""
+            Write-Host ("    ╰" + ("─" * $bw) + "╯`n") -ForegroundColor DarkCyan
+        }
+
+        "examples" {
+            $tTitle = if ($isUk) { "Практичні приклади для роботи та автоматизації" } else { "Practical DevOps & Admin Examples" }
+            Write-Host "    ✦ Terminal AI • $tTitle" -ForegroundColor Cyan
+            Write-Host ("    ╭" + ("─" * $bw) + "╮") -ForegroundColor DarkCyan
+            & $renderLine ""
+            if ($isUk) {
+                & $renderLine "ФАЙЛИ ТА ПАПКИ:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "  aif 'знайти файли .log більше 50MB змінені за останні 2 дні'" ([System.ConsoleColor]::Green)
+                & $renderLine "  aif 'порахувати сумарний розмір папки C:\Temp у гігабайтах'" ([System.ConsoleColor]::Green)
+                & $renderLine "  aif 'видалити всі порожні папки рекурсивно' -Explain" ([System.ConsoleColor]::Green)
+                & $renderLine ""
+                & $renderLine "ПРОЦЕСИ ТА ДІАГНОСТИКА:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "  aif 'показати топ 5 процесів за пам'яттю у таблиці з MB'" ([System.ConsoleColor]::Green)
+                & $renderLine "  aif 'знайти процес який слухає порт 8080'" ([System.ConsoleColor]::Green)
+                & $renderLine "  aif 'зупинити всі завислі процеси node' -x" ([System.ConsoleColor]::Green)
+                & $renderLine ""
+                & $renderLine "МЕРЕЖА ТА СИСТЕМА:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "  aif 'перевірити доступність 8.8.8.8 на порт 53 через TCP'" ([System.ConsoleColor]::Green)
+                & $renderLine "  aif 'вивести IP адресу шлюзу та DNS сервери'" ([System.ConsoleColor]::Green)
+                & $renderLine "  ai-fix  (якщо попередня команда впала з помилкою)" ([System.ConsoleColor]::Yellow)
+            } else {
+                & $renderLine "FILES & DIRECTORIES:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "  aif 'find all .log files larger than 50MB modified in last 2 days'" ([System.ConsoleColor]::Green)
+                & $renderLine "  aif 'calculate total size of C:\Temp directory in gigabytes'" ([System.ConsoleColor]::Green)
+                & $renderLine "  aif 'delete empty folders recursively' -Explain" ([System.ConsoleColor]::Green)
+                & $renderLine ""
+                & $renderLine "PROCESSES & DIAGNOSTICS:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "  aif 'show top 5 processes by working set memory in MB'" ([System.ConsoleColor]::Green)
+                & $renderLine "  aif 'find process listening on port 8080'" ([System.ConsoleColor]::Green)
+                & $renderLine "  aif 'terminate all hung node processes' -x" ([System.ConsoleColor]::Green)
+                & $renderLine ""
+                & $renderLine "NETWORKING & SYSTEMS:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "  aif 'test TCP connection to 8.8.8.8 on port 53'" ([System.ConsoleColor]::Green)
+                & $renderLine "  aif 'display default gateway and active DNS servers'" ([System.ConsoleColor]::Green)
+                & $renderLine "  ai-fix  (auto-diagnose and fix the last error)" ([System.ConsoleColor]::Yellow)
+            }
+            & $renderLine ""
+            Write-Host ("    ╰" + ("─" * $bw) + "╯`n") -ForegroundColor DarkCyan
+        }
+
+        "workflow" {
+            $tTitle = if ($isUk) { "Посібник інтерактивної роботи в Windows Terminal" } else { "Interactive Workflow Guide" }
+            Write-Host "    ✦ Terminal AI • $tTitle" -ForegroundColor Cyan
+            Write-Host ("    ╭" + ("─" * $bw) + "╮") -ForegroundColor DarkCyan
+            & $renderLine ""
+            if ($isUk) {
+                & $renderLine "1. ІНЛАЙН-ГЕНЕРАЦІЯ (Найшвидший спосіб):" ([System.ConsoleColor]::Cyan)
+                & $renderLine "   • Надрукуйте будь-яку задачу людською мовою прямо у рядку вводу" ([System.ConsoleColor]::White)
+                & $renderLine "   • Натисніть F2 (або Ctrl+Space) -> текст миттєво заміниться на код" ([System.ConsoleColor]::Yellow)
+                & $renderLine ""
+                & $renderLine "2. ІНТЕРАКТИВНЕ МЕНЮ (Безпечний контроль):" ([System.ConsoleColor]::Cyan)
+                & $renderLine "   • Виконайте: aif 'ваша задача'" ([System.ConsoleColor]::White)
+                & $renderLine "   • Натисніть [Enter] щоб запустити, [C] щоб скопіювати," ([System.ConsoleColor]::White)
+                & $renderLine "     [I] щоб редагувати в консолі, [X] для розбору синтаксису," ([System.ConsoleColor]::White)
+                & $renderLine "     [A] для розгорнутої відповіді або [Esc] для відміни." ([System.ConsoleColor]::White)
+                & $renderLine ""
+                & $renderLine "3. АВТОМАТИЧНЕ ВИПРАВЛЕННЯ ПОМИЛОК:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "   • Якщо попередня команда завершилась з помилкою, введіть: ai-fix" ([System.ConsoleColor]::Yellow)
+                & $renderLine "   • AI проаналізує стек помилки та запропонує робоче виправлення." ([System.ConsoleColor]::White)
+                & $renderLine ""
+                & $renderLine "4. СКРИПТИ ТА БЕСІДА:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "   • Створення .ps1 скриптів: ai-script 'архівація логів з ротацією'" ([System.ConsoleColor]::White)
+                & $renderLine "   • Діалоговий режим розробника: ai-chat (підтримка /help, /model, /clear)" ([System.ConsoleColor]::White)
+            } else {
+                & $renderLine "1. INLINE GENERATION (Fastest method):" ([System.ConsoleColor]::Cyan)
+                & $renderLine "   • Type any goal in plain English directly at the terminal prompt" ([System.ConsoleColor]::White)
+                & $renderLine "   • Press F2 (or Ctrl+Space) -> prompt is replaced with valid code" ([System.ConsoleColor]::Yellow)
+                & $renderLine ""
+                & $renderLine "2. INTERACTIVE ACTION MENU (Safe verification):" ([System.ConsoleColor]::Cyan)
+                & $renderLine "   • Run: aif 'your task description'" ([System.ConsoleColor]::White)
+                & $renderLine "   • Press [Enter] to run, [C] to copy to clipboard," ([System.ConsoleColor]::White)
+                & $renderLine "     [I] to insert into line for editing, [X] to explain syntax," ([System.ConsoleColor]::White)
+                & $renderLine "     [A] for conceptual answer, or [Esc] to dismiss." ([System.ConsoleColor]::White)
+                & $renderLine ""
+                & $renderLine "3. AUTOMATED ERROR RECOVERY:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "   • When any terminal command fails, immediately run: ai-fix" ([System.ConsoleColor]::Yellow)
+                & $renderLine "   • AI analyzes the error stream and offers an instant fix." ([System.ConsoleColor]::White)
+                & $renderLine ""
+                & $renderLine "4. PRODUCTION SCRIPTS & CHAT ASSISTANT:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "   • Multi-step scripts: ai-script 'backup IIS logs with compression'" ([System.ConsoleColor]::White)
+                & $renderLine "   • Multi-turn assistant: ai-chat (supports /help, /model, /clear)" ([System.ConsoleColor]::White)
+            }
+            & $renderLine ""
+            Write-Host ("    ╰" + ("─" * $bw) + "╯`n") -ForegroundColor DarkCyan
+        }
+
+        "config" {
+            $tTitle = if ($isUk) { "Налаштування конфігурації Terminal AI" } else { "Configuration Settings Guide" }
+            Write-Host "    ✦ Terminal AI • $tTitle" -ForegroundColor Cyan
+            Write-Host ("    ╭" + ("─" * $bw) + "╮") -ForegroundColor DarkCyan
+            & $renderLine ""
+            if ($isUk) {
+                & $renderLine "ФАЙЛ КОНФІГУРАЦІЇ:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "  Розташування: ~/.terminalai/config.json" ([System.ConsoleColor]::White)
+                & $renderLine "  Перегляд:     aif config   або   ai config" ([System.ConsoleColor]::Green)
+                & $renderLine ""
+                & $renderLine "ОСНОВНІ ПАРАМЕТРИ:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "  • Model        Активна нейромережа (за замовчуванням qwen2.5-coder:7b)" ([System.ConsoleColor]::White)
+                & $renderLine "  • OllamaUrl    Адреса сервера Ollama (http://localhost:11434)" ([System.ConsoleColor]::White)
+                & $renderLine "  • Language     Мова інтерфейсу (en або uk)" ([System.ConsoleColor]::White)
+                & $renderLine "  • Temperature  Креативність генерації (0.2 для точного коду)" ([System.ConsoleColor]::White)
+                & $renderLine "  • AutoCopy     Автокопіювання коду в буфер (true/false)" ([System.ConsoleColor]::White)
+                & $renderLine "  • Font         Шрифт Windows Terminal (напр. Cascadia Code NF)" ([System.ConsoleColor]::White)
+                & $renderLine "  • HotkeyChord  Комбінація клавіш інлайну (F2 або Ctrl+Space)" ([System.ConsoleColor]::White)
+                & $renderLine ""
+                & $renderLine "ШВИДКІ КОМАНДИ НАЛАШТУВАННЯ:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "  aif model <назва>        Змінити активну модель Ollama" ([System.ConsoleColor]::Yellow)
+                & $renderLine "  aif lang en | uk         Змінити мову інтерфейсу" ([System.ConsoleColor]::Yellow)
+                & $renderLine "  ai font <назва> [розмір] Змінити шрифт Windows Terminal" ([System.ConsoleColor]::Yellow)
+            } else {
+                & $renderLine "CONFIGURATION FILE:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "  Location: ~/.terminalai/config.json" ([System.ConsoleColor]::White)
+                & $renderLine "  View:     aif config   or   ai config" ([System.ConsoleColor]::Green)
+                & $renderLine ""
+                & $renderLine "KEY SETTINGS:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "  • Model        Active coding model (default: qwen2.5-coder:7b)" ([System.ConsoleColor]::White)
+                & $renderLine "  • OllamaUrl    Ollama server endpoint (http://localhost:11434)" ([System.ConsoleColor]::White)
+                & $renderLine "  • Language     Interface language (en or uk)" ([System.ConsoleColor]::White)
+                & $renderLine "  • Temperature  Generation determinism (0.2 for strict code)" ([System.ConsoleColor]::White)
+                & $renderLine "  • AutoCopy     Auto-copy generated command to clipboard" ([System.ConsoleColor]::White)
+                & $renderLine "  • Font         Windows Terminal font (e.g. Cascadia Code NF)" ([System.ConsoleColor]::White)
+                & $renderLine "  • HotkeyChord  Inline shortcut chord (F2 or Ctrl+Space)" ([System.ConsoleColor]::White)
+                & $renderLine ""
+                & $renderLine "QUICK CONFIGURATION COMMANDS:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "  aif model <name>        Switch active Ollama model" ([System.ConsoleColor]::Yellow)
+                & $renderLine "  aif lang en | uk        Switch interface language" ([System.ConsoleColor]::Yellow)
+                & $renderLine "  ai font <name> [size]   Configure Windows Terminal font" ([System.ConsoleColor]::Yellow)
+            }
+            & $renderLine ""
+            Write-Host ("    ╰" + ("─" * $bw) + "╯`n") -ForegroundColor DarkCyan
+        }
+
+        default {
+            # "all" - повна довідка
+            $tTitle = if ($isUk) { "Повний довідник та карта команд" } else { "Complete Reference & Commands Map" }
+            Write-Host "    ✦ Terminal AI • $tTitle" -ForegroundColor Cyan
+            Write-Host ("    ╭" + ("─" * $bw) + "╮") -ForegroundColor DarkCyan
+            & $renderLine ""
+            if ($isUk) {
+                & $renderLine "КОМАНДИ МОДУЛЯ:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "  aif, ai-fast      Швидкий нативний бінарний модуль C# (рекомендовано)" ([System.ConsoleColor]::White)
+                & $renderLine "  ai, ??            Класичний модуль PowerShell з живим таймером" ([System.ConsoleColor]::White)
+                & $renderLine "  ai-fix            Автоматичний аналіз та виправлення останньої помилки" ([System.ConsoleColor]::White)
+                & $renderLine "  ai-script         Генератор готових .ps1 скриптів з коментарями" ([System.ConsoleColor]::White)
+                & $renderLine "  ai-chat           Інтерактивний асистент зі слеш-командами та історією" ([System.ConsoleColor]::White)
+                & $renderLine "  F2                Швидка генерація прямо в активному рядку вводу" ([System.ConsoleColor]::Yellow)
+                & $renderLine ""
+                & $renderLine "ТЕМАТИЧНІ РОЗДІЛИ ДОВІДКИ:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "  ai-help shortcuts Повний список гарячих клавіш, аліасів та ключів" ([System.ConsoleColor]::Green)
+                & $renderLine "  ai-help models    Вимоги до пам'яті та рекомендації моделей Ollama" ([System.ConsoleColor]::Green)
+                & $renderLine "  ai-help examples  Реальні приклади адміністрування та автоматизації" ([System.ConsoleColor]::Green)
+                & $renderLine "  ai-help workflow  Посібник по роботі з меню, інлайном та помилками" ([System.ConsoleColor]::Green)
+                & $renderLine "  ai-help config    Довідник конфігурації (~/.terminalai/config.json)" ([System.ConsoleColor]::Green)
+                & $renderLine ""
+                & $renderLine "ОФІЦІЙНА ДОПОМОГА POWERSHELL:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "  Get-Help aif -Full        Повна man-сторінка з синтаксисом і типами" ([System.ConsoleColor]::DarkGray)
+                & $renderLine "  Get-Help aif -Examples    Приклади використання бінарного модуля" ([System.ConsoleColor]::DarkGray)
+            } else {
+                & $renderLine "AVAILABLE COMMANDS:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "  aif, ai-fast      Fast native C# binary module (recommended)" ([System.ConsoleColor]::White)
+                & $renderLine "  ai, ??            Classic PowerShell module with latency timing" ([System.ConsoleColor]::White)
+                & $renderLine "  ai-fix            Diagnose and fix the last failed command in session" ([System.ConsoleColor]::White)
+                & $renderLine "  ai-script         Generate production-ready multi-line .ps1 scripts" ([System.ConsoleColor]::White)
+                & $renderLine "  ai-chat           Interactive terminal assistant with history" ([System.ConsoleColor]::White)
+                & $renderLine "  F2                Inline generation directly in PSReadLine prompt" ([System.ConsoleColor]::Yellow)
+                & $renderLine ""
+                & $renderLine "DETAILED TOPICS:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "  ai-help shortcuts Full cheat-sheet of keybindings, flags, and aliases" ([System.ConsoleColor]::Green)
+                & $renderLine "  ai-help models    VRAM requirements & coding LLM recommendations" ([System.ConsoleColor]::Green)
+                & $renderLine "  ai-help examples  Practical sysadmin & automation pipeline examples" ([System.ConsoleColor]::Green)
+                & $renderLine "  ai-help workflow  Workflow guide for menus, inline, and error fixing" ([System.ConsoleColor]::Green)
+                & $renderLine "  ai-help config    Configuration guide (~/.terminalai/config.json)" ([System.ConsoleColor]::Green)
+                & $renderLine ""
+                & $renderLine "NATIVE POWERSHELL HELP:" ([System.ConsoleColor]::Cyan)
+                & $renderLine "  Get-Help aif -Full        Full MAML manual with parameters and types" ([System.ConsoleColor]::DarkGray)
+                & $renderLine "  Get-Help aif -Examples    Real-world usage examples" ([System.ConsoleColor]::DarkGray)
+            }
+            & $renderLine ""
+            Write-Host ("    ╰" + ("─" * $bw) + "╯`n") -ForegroundColor DarkCyan
+        }
+    }
+}
+
+
 function Show-AiCodeCard {
     param(
         [Parameter(Mandatory = $true)]
@@ -564,10 +883,28 @@ function Invoke-AiCommand {
     .DESCRIPTION
         Приймає запит українською або англійською, генерує команду PowerShell,
         пропонує варіанти: виконати, скопіювати, вставити у буфер, пояснити або скасувати.
+        Підтримує навчальні підкоманди: ai help, ai help shortcuts, ai help models,
+        ai help examples, ai help workflow, ai help config, ai status, ai models.
+    .PARAMETER Prompt
+        Текстовий запит природною мовою або системна підкоманда (help, status, models, model, lang, config).
+    .PARAMETER Execute
+        Виконати згенеровану команду негайно без інтерактивного меню (аліаси: -x, -y).
+    .PARAMETER Copy
+        Скопіювати згенеровану команду безпосередньо в системний буфер обміну (аліас: -c).
+    .PARAMETER Explain
+        Згенерувати структуроване навчальне пояснення синтаксису, параметрів та безпеки.
+    .PARAMETER Ask
+        Поставити концептуальне або практичне питання та отримати пряму текстову відповідь замість коду.
+    .PARAMETER Model
+        Перевизначити активну модель Ollama для поточного виклику.
     .EXAMPLE
         ai знайти всі файли більше 100MB у поточній папці
     .EXAMPLE
-        ai which model do you use to autocomplete?
+        ai help shortcuts
+    .EXAMPLE
+        ai "знайти процес на порті 8080" -Explain
+    .EXAMPLE
+        ai "перевірити DNS резолв google.com" -x
     .EXAMPLE
         ?? порахуй кількість рядків у всіх ps1 файлах
     #>
@@ -607,6 +944,7 @@ function Invoke-AiCommand {
             Write-Host "    │     F2                                    (інлайн-генерація в консолі) │" -ForegroundColor Yellow
             Write-Host "    │                                                                        │" -ForegroundColor DarkCyan
             Write-Host "    │   Швидкі підкоманди та скорочення:                                     │" -ForegroundColor Cyan
+            Write-Host "    │     ai help [тема]або  aif help [тема]    (навчальна довідка й поради) │" -ForegroundColor Green
             Write-Host "    │     ai status     або  aif status         (стан системи, модель, мова) │" -ForegroundColor Green
             Write-Host "    │     ai models     |  aif -m               (список моделей Ollama)      │" -ForegroundColor Green
             Write-Host "    │     ai model <назва>                      (змінити активну модель)     │" -ForegroundColor Green
@@ -630,6 +968,7 @@ function Invoke-AiCommand {
             Write-Host "    │     F2                                    (inline generation in term)  │" -ForegroundColor Yellow
             Write-Host "    │                                                                        │" -ForegroundColor DarkCyan
             Write-Host "    │   Short Commands & Subcommands:                                        │" -ForegroundColor Cyan
+            Write-Host "    │     ai help [top] or  aif help [topic]    (learning guide & cheatsheet)│" -ForegroundColor Green
             Write-Host "    │     ai status     or  aif status          (system information & model) │" -ForegroundColor Green
             Write-Host "    │     ai models     |  aif -m               (list installed models)      │" -ForegroundColor Green
             Write-Host "    │     ai model <name>                       (switch active Ollama model) │" -ForegroundColor Green
@@ -650,6 +989,28 @@ function Invoke-AiCommand {
     }
 
     $activeModel = if ($Model) { $Model } else { $cfg.Model }
+
+    # 0. Довідка та навчальні посібники: ai help [topic]
+    if ($fullPrompt -match '^(?:help|довідка|допомога)(?:\s+(all|shortcuts|models|examples|workflow|config))?\s*$') {
+        $topic = if ($Matches[1]) { $Matches[1].Trim().ToLowerInvariant() } else { "all" }
+        Show-TerminalAiHelp -Topic $topic
+        return
+    }
+
+    if ($fullPrompt -in @("shortcuts", "гарячі клавіші", "клавіші")) {
+        Show-TerminalAiHelp -Topic "shortcuts"
+        return
+    }
+
+    if ($fullPrompt -in @("examples", "приклади")) {
+        Show-TerminalAiHelp -Topic "examples"
+        return
+    }
+
+    if ($fullPrompt -in @("workflow", "робота")) {
+        Show-TerminalAiHelp -Topic "workflow"
+        return
+    }
 
     # 1. Шрифти: виведення списку та зміна
     if ($fullPrompt -in @("fonts", "font", "--fonts", "--font", "-f", "шрифти", "шрифт")) {
@@ -1299,7 +1660,141 @@ function Register-TerminalAiKeyHandler {
     }
 }
 
+$script:TerminalAiCachedModels = $null
+$script:TerminalAiCacheTime = [datetime]::MinValue
+
+$script:TerminalAiGetModels = {
+    param([string]$word = "")
+    $now = [datetime]::UtcNow
+    if ($script:TerminalAiCachedModels -and ($now - $script:TerminalAiCacheTime).TotalSeconds -lt 20) {
+        return ($script:TerminalAiCachedModels | Where-Object { $_.CompletionText -like "$word*" })
+    }
+
+    $results = [System.Collections.Generic.List[System.Management.Automation.CompletionResult]]::new()
+    try {
+        $cfg = Get-TerminalAiConfig
+        $url = if ($cfg.OllamaUrl) { $cfg.OllamaUrl } else { "http://127.0.0.1:11434" }
+        $url = $url -replace 'localhost', '127.0.0.1'
+        $res = Invoke-RestMethod -Uri "$url/api/tags" -Method Get -TimeoutSec 1 -ErrorAction Stop
+        if ($res.models) {
+            foreach ($m in $res.models) {
+                $sizeGb = [math]::Round($m.size / 1GB, 1)
+                $tooltip = "$($m.name) ($sizeGb GB)"
+                $results.Add([System.Management.Automation.CompletionResult]::new($m.name, $m.name, 'ParameterValue', $tooltip))
+            }
+        }
+    }
+    catch { }
+
+    if ($results.Count -eq 0) {
+        $defaults = @('qwen2.5-coder:7b', 'granite4.2:8b', 'deepseek-coder:6.7b', 'qwen2.5-coder:1.5b')
+        foreach ($d in $defaults) {
+            $results.Add([System.Management.Automation.CompletionResult]::new($d, $d, 'ParameterValue', $d))
+        }
+    }
+    $script:TerminalAiCachedModels = $results
+    $script:TerminalAiCacheTime = $now
+    return ($results | Where-Object { $_.CompletionText -like "$word*" })
+}
+
+function Register-TerminalAiArgumentCompleters {
+    <#
+    .SYNOPSIS
+        Реєструє динамічні обробники автодоповнення (Tab completion) для TerminalAI.
+    .DESCRIPTION
+        Забезпечує автодоповнення по Tab для підкоманд (help, status, models, model, lang, config),
+        тем довідки (all, shortcuts, models, examples, workflow, config), мов інтерфейсу (en, uk)
+        та встановлених моделей Ollama.
+    #>
+    [CmdletBinding()]
+    param()
+
+    $commands = @('Invoke-AiCommand', 'ai', '??', 'Invoke-AiCommandFast', 'ai-fast', 'aif')
+
+    # 1. Автодоповнення параметрів -Topic для Show-TerminalAiHelp / ai-help
+    $topicCompleter = {
+        param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+        $topics = @(
+            [System.Management.Automation.CompletionResult]::new('all', 'all', 'ParameterValue', 'Complete overview & command map'),
+            [System.Management.Automation.CompletionResult]::new('shortcuts', 'shortcuts', 'ParameterValue', 'Keybindings, flags, and aliases cheat-sheet'),
+            [System.Management.Automation.CompletionResult]::new('models', 'models', 'ParameterValue', 'Ollama coding models & VRAM requirements'),
+            [System.Management.Automation.CompletionResult]::new('examples', 'examples', 'ParameterValue', 'Practical DevOps & sysadmin examples'),
+            [System.Management.Automation.CompletionResult]::new('workflow', 'workflow', 'ParameterValue', 'Windows Terminal interactive workflow guide'),
+            [System.Management.Automation.CompletionResult]::new('config', 'config', 'ParameterValue', 'Configuration parameters & options')
+        )
+        $topics | Where-Object { $_.CompletionText -like "$wordToComplete*" }
+    }
+    Register-ArgumentCompleter -CommandName @('Show-TerminalAiHelp', 'ai-help') -ParameterName 'Topic' -ScriptBlock $topicCompleter -ErrorAction SilentlyContinue
+
+    # 2. Динамічне автодоповнення моделей Ollama для параметра -Model
+    $modelCompleter = {
+        param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+        & $script:TerminalAiGetModels $wordToComplete
+    }
+    Register-ArgumentCompleter -CommandName $commands -ParameterName 'Model' -ScriptBlock $modelCompleter -ErrorAction SilentlyContinue
+
+    # 3. Контекстне автодоповнення для Prompt (підкоманди, теми, мови, моделі)
+    $promptCompleter = {
+        param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+
+        $elements = $commandAst.CommandElements
+        $tokens = @()
+        foreach ($el in $elements) {
+            $t = $el.Extent.Text.Trim().Trim('"').Trim("'")
+            if (-not [string]::IsNullOrWhiteSpace($t)) { $tokens += $t }
+        }
+
+        # Перший аргумент після самої команди (напр. "aif <tab>" або "ai <tab>")
+        if ($tokens.Count -le 1 -or ($tokens.Count -eq 2 -and -not [string]::IsNullOrWhiteSpace($wordToComplete))) {
+            $subcommands = @(
+                [System.Management.Automation.CompletionResult]::new('help', 'help', 'ParameterValue', 'Educational guides & cheat-sheets'),
+                [System.Management.Automation.CompletionResult]::new('shortcuts', 'shortcuts', 'ParameterValue', 'Keybindings, flags, and aliases guide'),
+                [System.Management.Automation.CompletionResult]::new('status', 'status', 'ParameterValue', 'System information, active model and language'),
+                [System.Management.Automation.CompletionResult]::new('models', 'models', 'ParameterValue', 'List installed Ollama models'),
+                [System.Management.Automation.CompletionResult]::new('model', 'model', 'ParameterValue', 'Switch active Ollama model'),
+                [System.Management.Automation.CompletionResult]::new('lang', 'lang', 'ParameterValue', 'Switch interface language (en | uk)'),
+                [System.Management.Automation.CompletionResult]::new('examples', 'examples', 'ParameterValue', 'Practical command examples'),
+                [System.Management.Automation.CompletionResult]::new('workflow', 'workflow', 'ParameterValue', 'Interactive terminal workflow guide'),
+                [System.Management.Automation.CompletionResult]::new('config', 'config', 'ParameterValue', 'View configuration JSON'),
+                [System.Management.Automation.CompletionResult]::new('fonts', 'fonts', 'ParameterValue', 'List available terminal fonts')
+            )
+            return ($subcommands | Where-Object { $_.CompletionText -like "$wordToComplete*" })
+        }
+
+        # Другий аргумент: перевіряємо перший токен
+        $firstArg = $tokens[1].ToLowerInvariant()
+
+        if ($firstArg -in @('help', 'довідка', 'допомога')) {
+            $topics = @(
+                [System.Management.Automation.CompletionResult]::new('all', 'all', 'ParameterValue', 'Complete overview & command map'),
+                [System.Management.Automation.CompletionResult]::new('shortcuts', 'shortcuts', 'ParameterValue', 'Keybindings, flags, and aliases guide'),
+                [System.Management.Automation.CompletionResult]::new('models', 'models', 'ParameterValue', 'Ollama coding models & VRAM requirements'),
+                [System.Management.Automation.CompletionResult]::new('examples', 'examples', 'ParameterValue', 'Practical DevOps & sysadmin examples'),
+                [System.Management.Automation.CompletionResult]::new('workflow', 'workflow', 'ParameterValue', 'Windows Terminal interactive workflow guide'),
+                [System.Management.Automation.CompletionResult]::new('config', 'config', 'ParameterValue', 'Configuration parameters & options')
+            )
+            return ($topics | Where-Object { $_.CompletionText -like "$wordToComplete*" })
+        }
+
+        if ($firstArg -in @('model', 'set-model', 'use-model')) {
+            return (& $script:TerminalAiGetModels $wordToComplete)
+        }
+
+        if ($firstArg -in @('lang', 'language', 'set-lang', 'мова')) {
+            $langs = @(
+                [System.Management.Automation.CompletionResult]::new('en', 'en', 'ParameterValue', 'English language'),
+                [System.Management.Automation.CompletionResult]::new('uk', 'uk', 'ParameterValue', 'Ukrainian language (Українська)')
+            )
+            return ($langs | Where-Object { $_.CompletionText -like "$wordToComplete*" })
+        }
+
+        return @()
+    }
+    Register-ArgumentCompleter -CommandName $commands -ParameterName 'Prompt' -ScriptBlock $promptCompleter -ErrorAction SilentlyContinue
+}
+
 # --- АЛІАСИ ТА АВТОЗАВАНТАЖЕННЯ МОДУЛЯ ---
+Set-Alias -Name ai-help -Value Show-TerminalAiHelp
 Set-Alias -Name ai-font -Value Set-TerminalAiFont
 Set-Alias -Name ai-fonts -Value Show-TerminalAiFonts
 Set-Alias -Name ai-lang -Value Set-TerminalAiLanguage
@@ -1309,6 +1804,7 @@ Set-Alias -Name ai-chat -Value Invoke-AiAssistant
 Set-Alias -Name ai-assistant -Value Invoke-AiAssistant
 
 Register-TerminalAiKeyHandler
+Register-TerminalAiArgumentCompleters
 
 # Експорт функцій та аліасів
 Export-ModuleMember -Function @(
@@ -1316,6 +1812,8 @@ Export-ModuleMember -Function @(
     "Invoke-AiFix",
     "New-AiScript",
     "Invoke-AiAssistant",
+    "Show-TerminalAiHelp",
+    "Register-TerminalAiArgumentCompleters",
     "Get-TerminalAiConfig",
     "Set-TerminalAiConfig",
     "Get-TerminalAiModels",
@@ -1340,6 +1838,7 @@ Export-ModuleMember -Function @(
 ) -Alias @(
     "ai",
     "??",
+    "ai-help",
     "ai-fix",
     "fix-error",
     "ai-script",
