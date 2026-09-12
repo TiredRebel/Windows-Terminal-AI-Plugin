@@ -99,6 +99,70 @@ function Format-AiCodeOutput {
 }
 Set-Alias -Name Clean-AiCodeOutput -Value Format-AiCodeOutput
 
+$script:TerminalAiAliasPairs = @(
+    @{ Full = "Get-Process"; Short = "gps" },
+    @{ Full = "Get-ChildItem"; Short = "gci" },
+    @{ Full = "Where-Object"; Short = "?" },
+    @{ Full = "ForEach-Object"; Short = "%" },
+    @{ Full = "Select-Object"; Short = "select" },
+    @{ Full = "Sort-Object"; Short = "sort" },
+    @{ Full = "Measure-Object"; Short = "measure" },
+    @{ Full = "Get-Content"; Short = "gc" },
+    @{ Full = "Set-Content"; Short = "sc" },
+    @{ Full = "Select-String"; Short = "sls" },
+    @{ Full = "Get-Service"; Short = "gsv" },
+    @{ Full = "Stop-Process"; Short = "kill" },
+    @{ Full = "Format-Table"; Short = "ft" },
+    @{ Full = "Format-List"; Short = "fl" },
+    @{ Full = "Export-Csv"; Short = "epcsv" },
+    @{ Full = "Import-Csv"; Short = "ipcsv" },
+    @{ Full = "Get-Help"; Short = "help" },
+    @{ Full = "Clear-Host"; Short = "cls" },
+    @{ Full = "Copy-Item"; Short = "cpi" },
+    @{ Full = "Move-Item"; Short = "mi" },
+    @{ Full = "Remove-Item"; Short = "ri" },
+    @{ Full = "New-Item"; Short = "ni" },
+    @{ Full = "Get-Item"; Short = "gi" },
+    @{ Full = "Set-Item"; Short = "si" },
+    @{ Full = "Get-Location"; Short = "gl" },
+    @{ Full = "Set-Location"; Short = "sl" }
+)
+
+function ConvertTo-AiShortAliases {
+    param([string]$Code)
+    if ([string]::IsNullOrWhiteSpace($Code)) { return $Code }
+
+    $Code = [regex]::Replace($Code, '\b(?:gci|Get-ChildItem)\s+tcpconn\b', 'Get-NetTCPConnection', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+
+    foreach ($p in $script:TerminalAiAliasPairs) {
+        $pattern = "(?<![\w\-])\b" + [regex]::Escape($p.Full) + "\b(?![\w\-])"
+        $Code = [regex]::Replace($Code, $pattern, $p.Short, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    }
+    $Code = [regex]::Replace($Code, "(?<![\w\-])-ErrorAction\s+(?:SilentlyContinue|0)\b", "-ea 0", [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    return $Code
+}
+
+function ConvertTo-AiFullCmdlets {
+    param([string]$Code)
+    if ([string]::IsNullOrWhiteSpace($Code)) { return $Code }
+
+    $Code = [regex]::Replace($Code, '\b(?:gci|Get-ChildItem)\s+tcpconn\b', 'Get-NetTCPConnection', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+
+    foreach ($p in $script:TerminalAiAliasPairs) {
+        $sh = $p.Short
+        $full = $p.Full
+        if ($sh -in @("?", "%")) {
+            $pattern = "(?<=[|\(\{{;\s]|^)\" + [regex]::Escape($sh) + "(?=\s|[\{{])"
+            $Code = [regex]::Replace($Code, $pattern, $full)
+        } else {
+            $pattern = "(?<![\w\-])\b" + [regex]::Escape($sh) + "\b(?![\w\-])"
+            $Code = [regex]::Replace($Code, $pattern, $full, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        }
+    }
+    $Code = [regex]::Replace($Code, "(?<![\w\-])-ea\s+0\b", "-ErrorAction SilentlyContinue", [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    return $Code
+}
+
 function Get-TerminalAiText {
     param([string]$Key)
     $cfg = Get-TerminalAiConfig
@@ -876,43 +940,25 @@ Provide a concise, direct, helpful explanation to the user's question.
         foreach ($line in ($answer -split "`r?`n")) {
             Write-Host "    $line" -ForegroundColor White
         }
-        Write-Host ("    " + ("─" * 66)) + "`n" -ForegroundColor DarkCyan
+        Write-Host ("    " + ("─" * 66)) -ForegroundColor DarkCyan
+        Write-Host ""
     }
 }
 
 function Get-AiSystemPrompt {
     param([bool]$UseAliases = $false)
 
-    if ($UseAliases) {
-        return @"
-You are an elite PowerShell 7 and Windows Systems engineer.
-Target Environment: PowerShell $($PSVersionTable.PSVersion.Major).$($PSVersionTable.PSVersion.Minor) on Windows.
-Goal: Translate the user's natural language request into a single, efficient, idiomatic, compact PowerShell command or pipeline using standard aliases.
-Rules:
-1. Output ONLY the raw executable PowerShell code without markdown or explanations.
-2. STRICT ALIAS RULE: You MUST replace standard PowerShell cmdlets with their short aliases and compact forms wherever available:
-   - 'gps' instead of 'Get-Process'
-   - 'gci' or 'ls' instead of 'Get-ChildItem'
-   - 'select' instead of 'Select-Object'
-   - '?' or 'where' instead of 'Where-Object'
-   - '%' or 'foreach' instead of 'ForEach-Object'
-   - 'sort' instead of 'Sort-Object'
-   - 'measure' instead of 'Measure-Object'
-   - 'gc' or 'cat' instead of 'Get-Content'
-   - 'sc' instead of 'Set-Content'
-   - 'sls' instead of 'Select-String'
-   - 'help' instead of 'Get-Help'
-   - 'gsv' instead of 'Get-Service'
-   - 'kill' instead of 'Stop-Process'
-   - 'ft' instead of 'Format-Table'
-   - 'fl' instead of 'Format-List'
-   - 'epcsv' instead of 'Export-Csv'
-   - 'ipcsv' instead of 'Import-Csv'
-3. NEVER use fragile performance counter paths like Get-Counter '\Process(*)\% Processor Time' unless specifically asked for counter samples.
-4. NEVER hallucinate or invent fake cmdlets. Only use genuine PowerShell 7 cmdlets/aliases or installed tools.
-5. If the user asks about the active model, settings, or configuration, return: Get-TerminalAiConfig
-6. If the user asks to list installed models, return: Show-TerminalAiModels
-7. If the action is potentially destructive, include safe filtering and never use -Force or -Recurse recklessly.
+    $aliasGuide = if ($UseAliases) {
+@"
+3. Standard Cmdlet Aliases:
+   - Use standard short aliases: Get-Process->gps, Where-Object->?, ForEach-Object->%, Select-Object->select, Sort-Object->sort, Measure-Object->measure, Get-ChildItem->gci, Get-Content->gc, Set-Content->sc, Select-String->sls, Get-Service->gsv, Stop-Process->kill, Get-Help->help.
+   - NEVER invent aliases for specialized cmdlets: Get-NetTCPConnection, Test-NetConnection, Get-CimInstance, Get-ItemProperty have NO aliases and MUST be written in full.
+"@
+    } else {
+@"
+3. Cmdlet Integrity:
+   - NEVER hallucinate or invent fake cmdlets.
+   - Specialized cmdlets like Get-NetTCPConnection, Test-NetConnection, Get-CimInstance, Get-ItemProperty MUST be written in full.
 "@
     }
 
@@ -920,14 +966,18 @@ Rules:
 You are an elite PowerShell 7 and Windows Systems engineer.
 Target Environment: PowerShell $($PSVersionTable.PSVersion.Major).$($PSVersionTable.PSVersion.Minor) on Windows.
 Goal: Translate the user's natural language request into a single, efficient, idiomatic, robust PowerShell command or pipeline.
+
 Rules:
-1. Output ONLY the raw executable PowerShell code without markdown or explanations.
-2. Always prefer standard, robust PowerShell cmdlets: Get-Process (prefer over Get-Counter for process inspection), Get-ChildItem, Where-Object, Select-Object, Measure-Object, Sort-Object.
-3. NEVER use fragile performance counter paths like Get-Counter '\Process(*)\% Processor Time' unless specifically asked for counter samples.
-4. NEVER hallucinate or invent fake cmdlets. Only use genuine PowerShell 7 cmdlets or installed tools.
+1. Output ONLY the raw executable PowerShell code without markdown, backticks, or explanations.
+2. Robustness & Safety: Never write commands that fail or throw errors when target objects are not present:
+   - To find processes listening on ports or active connections, ALWAYS use safe pipeline filtering:
+     Get-NetTCPConnection -LocalPort <Port> -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Get-Process -Id `$_.OwningProcess -ErrorAction SilentlyContinue }
+     (or with aliases: Get-NetTCPConnection -LocalPort <Port> -State Listen -ea 0 | % { gps -Id `$_.OwningProcess -ea 0 })
+   - NEVER write 'Get-Process -Id (Get-NetTCPConnection ...).OwningProcess' because if no process listens on that port, -Id receives null and crashes with 'Cannot bind argument to parameter Id because it is null'!
+$aliasGuide
+4. Error Handling: Always use -ErrorAction SilentlyContinue (-ea 0) when inspecting dynamic resources like network ports, services, or files that might not exist.
 5. If the user asks about the active model, settings, or configuration, return: Get-TerminalAiConfig
 6. If the user asks to list installed models, return: Show-TerminalAiModels
-7. If the action is potentially destructive, include safe filtering and never use -Force or -Recurse recklessly.
 "@
 }
 
@@ -1267,10 +1317,25 @@ function Invoke-AiCommand {
     Clear-AiInputBuffer
 
     $command = Format-AiCodeOutput -Text $rawResponse
+    $command = [regex]::Replace($command, '\b(?:gci|Get-ChildItem)\s+tcpconn\b', 'Get-NetTCPConnection', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
 
-    # 6. Перевірка на неіснуючий командлет (запобігання галюцинаціям)
-    $firstWord = ($command.Trim() -split '[\s|\(]')[0].TrimStart('(').Trim()
+    if ($preferAliases) {
+        $command = ConvertTo-AiShortAliases $command
+    }
+
+    # 6. Перевірка на синтаксичні помилки та неіснуючі командлети
+    $ast = $null
+    $parseErrors = $null
+    $tokens = $null
+    try {
+        $ast = [System.Management.Automation.Language.Parser]::ParseInput($command, [ref]$tokens, [ref]$parseErrors)
+        if ($parseErrors -and $parseErrors.Count -gt 0) {
+            Write-Host "    ⚠ [$(Get-TerminalAiText 'Warning')] $($parseErrors[0].Message)" -ForegroundColor DarkYellow
+        }
+    } catch { }
+
     $isUnknownCmdlet = $false
+    $firstWord = ($command.Trim() -split '[\s|\(]')[0].TrimStart('(').Trim()
     if ($firstWord -match '^[A-Za-z]+-[A-Za-z0-9]+$') {
         if (-not (Get-Command -Name $firstWord -ErrorAction SilentlyContinue)) {
             $isUnknownCmdlet = $true
@@ -1354,24 +1419,12 @@ function Invoke-AiCommand {
             }
             'ShortAlias' {
                 $preferAliases = -not $preferAliases
-                $modeText = if ($preferAliases) {
-                    if ($isUk) { "Перетворюю з використанням аліасів..." } else { "Converting using short aliases..." }
+                $command = if ($preferAliases) {
+                    ConvertTo-AiShortAliases $command
                 } else {
-                    if ($isUk) { "Перетворюю на повні командлети..." } else { "Converting to full cmdlets..." }
+                    ConvertTo-AiFullCmdlets $command
                 }
-                Write-Host "`n  ✦ $modeText" -ForegroundColor Cyan
-
-                $togglePrompt = if ($preferAliases) {
-                    "Rewrite this PowerShell command strictly using standard short aliases (gps, gci, select, ?, %, sort, gc, sc, sls, help):`n$command"
-                } else {
-                    "Rewrite this PowerShell command strictly using full official cmdlet names (Get-Process, Get-ChildItem, Select-Object, Where-Object, ForEach-Object):`n$command"
-                }
-                $toggleSysPrompt = "You are an expert PowerShell engineer. Output strictly the rewritten raw PowerShell command with no markdown or explanation."
-                $newCmd = Invoke-OllamaApi -Prompt $togglePrompt -SystemPrompt $toggleSysPrompt -Model $activeModel -Temperature 0.0
-                if (-not [string]::IsNullOrWhiteSpace($newCmd)) {
-                    $command = Format-AiCodeOutput -Text $newCmd
-                    Show-AiCodeCard -Code $command -Title (Get-TerminalAiText "CardTitle") -Model $activeModel -CodeColor Green
-                }
+                Show-AiCodeCard -Code $command -Title (Get-TerminalAiText "CardTitle") -Model $activeModel -CodeColor Green
                 continue
             }
         }
@@ -1464,7 +1517,19 @@ FIXED_COMMAND:
 ```
 '@ -f $failedCommand, $errMessage, $failedScript, $langInstruction
 
-    $response = Invoke-OllamaApi -Prompt $fixPrompt -Model $activeModel -Temperature 0.2
+    $fixSystemPrompt = @"
+You are an elite PowerShell 7 debugging engineer.
+Rules:
+1. Provide a precise 1-2 sentence diagnosis.
+2. Provide a 100% correct, runnable PowerShell fix.
+3. If the command failed because of hallucinated or invalid cmdlets (such as 'gci tcpconn' or 'Get-ChildItem tcpconn'), replace them with standard cmdlets:
+   - For ports/connections, use:
+     Get-NetTCPConnection -LocalPort <port> -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Get-Process -Id `$_.OwningProcess -ErrorAction SilentlyContinue }
+4. Never bind null to mandatory parameters like -Id.
+5. Output code ONLY in the FIXED_COMMAND block.
+"@
+
+    $response = Invoke-OllamaApi -Prompt $fixPrompt -SystemPrompt $fixSystemPrompt -Model $activeModel -Temperature 0.1
     if (-not $response) { return }
 
     # Очищаємо залишки буфера перед виведенням результату та меню дій
@@ -1490,6 +1555,8 @@ FIXED_COMMAND:
     }
 
     if ($fixedCode) {
+        $fixedCode = [regex]::Replace($fixedCode, '\b(?:gci|Get-ChildItem)\s+tcpconn\b', 'Get-NetTCPConnection', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+
         Show-AiCodeCard -Code $fixedCode -Title (Get-TerminalAiText "CardTitleFixed") -Model $activeModel -CodeColor Green
 
         Write-Host "    [Enter] " -NoNewline -ForegroundColor Green
@@ -1499,7 +1566,8 @@ FIXED_COMMAND:
         Write-Host "[I] " -NoNewline -ForegroundColor Cyan
         Write-Host (Get-TerminalAiText "MenuInsert") -ForegroundColor White
         Write-Host "    [Esc]   " -NoNewline -ForegroundColor Gray
-        Write-Host (Get-TerminalAiText "MenuCancel") + "`n" -ForegroundColor White
+        Write-Host (Get-TerminalAiText "MenuCancel") -ForegroundColor White
+        Write-Host ""
 
         $fixAction = Get-AiMenuKeyPress -AllowedActions @('Execute', 'Copy', 'Insert', 'Cancel')
         switch ($fixAction) {

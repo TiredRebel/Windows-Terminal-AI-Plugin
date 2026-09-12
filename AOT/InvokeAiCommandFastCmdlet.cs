@@ -187,9 +187,20 @@ public class InvokeAiCommandFastCmdlet : PSCmdlet
         Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"\n  ✦ {connectingText}");
 
         var sw = Stopwatch.StartNew();
-        var systemPrompt = preferAliases
-            ? "You are an elite PowerShell engineer. Generate strictly the raw PowerShell command with no markdown, backticks, or explanation. STRICT ALIAS RULE: You MUST replace standard PowerShell cmdlets with their short aliases and compact forms wherever available: use 'gps' for Get-Process, 'gci' or 'ls' for Get-ChildItem, 'select' for Select-Object, '?' or 'where' for Where-Object, '%' or 'foreach' for ForEach-Object, 'sort' for Sort-Object, 'measure' for Measure-Object, 'gc' or 'cat' for Get-Content, 'sc' for Set-Content, 'sls' for Select-String, 'help' for Get-Help, 'gsv' for Get-Service, 'kill' for Stop-Process, 'ft' for Format-Table, 'fl' for Format-List, 'epcsv' for Export-Csv, 'ipcsv' for Import-Csv. Keep the command as compact and concise as possible."
-            : "You are an expert PowerShell engineer. Generate strictly the raw PowerShell command with no markdown, backticks, or explanation.";
+        var systemPrompt = @"You are an elite PowerShell 7 and Windows Systems engineer.
+Target Environment: PowerShell 7 on Windows.
+Goal: Translate the user's natural language request into a single, efficient, idiomatic, robust PowerShell command or pipeline.
+
+Rules:
+1. Output ONLY the raw executable PowerShell code without markdown, backticks, or explanations.
+2. Robustness & Safety:
+   - For inspecting listening ports or active connections, ALWAYS use safe pipeline filtering:
+     Get-NetTCPConnection -LocalPort <port> -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue }
+   - NEVER write 'Get-Process -Id (Get-NetTCPConnection ...).OwningProcess' because if no process listens on that port, -Id receives null and crashes with 'Cannot bind argument to parameter Id because it is null'!
+3. Cmdlet Integrity:
+   - NEVER hallucinate or invent fake cmdlets or fake aliases (e.g. NEVER use 'gci tcpconn', 'gci-tcpconn', 'netconn').
+   - Specialized cmdlets like Get-NetTCPConnection, Test-NetConnection, Get-CimInstance, Get-ItemProperty have NO aliases and MUST be written in full.
+4. Error Handling: Always use -ErrorAction SilentlyContinue when inspecting dynamic resources that might be missing.";
 
         string command;
         try
@@ -204,6 +215,14 @@ public class InvokeAiCommandFastCmdlet : PSCmdlet
 
         sw.Stop();
         if (string.IsNullOrWhiteSpace(command)) return;
+
+        // Auto-correct any hallucinated patterns
+        command = Regex.Replace(command, @"\b(?:gci|Get-ChildItem)\s+tcpconn\b", "Get-NetTCPConnection", RegexOptions.IgnoreCase);
+
+        if (preferAliases)
+        {
+            command = PowerShellAliasConverter.ToShortAliases(command);
+        }
 
         // Попередження про невідомий командлет
         CheckUnknownCmdlet(command, isUk);
@@ -266,23 +285,11 @@ public class InvokeAiCommandFastCmdlet : PSCmdlet
             if (action == MenuAction.ShortAlias)
             {
                 preferAliases = !preferAliases;
-                var modeText = preferAliases ? (isUk ? "Перетворюю з використанням аліасів..." : "Converting using short aliases...") : (isUk ? "Перетворюю на повні командлети..." : "Converting to full cmdlets...");
-                Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"\n  ✦ {modeText}");
+                command = preferAliases
+                    ? PowerShellAliasConverter.ToShortAliases(command)
+                    : PowerShellAliasConverter.ToFullCmdlets(command);
 
-                var togglePrompt = preferAliases
-                    ? $"Rewrite this PowerShell command strictly using standard short aliases (gps, gci, select, ?, %, sort, gc, sc, sls, help):\n{command}"
-                    : $"Rewrite this PowerShell command strictly using full official cmdlet names (Get-Process, Get-ChildItem, Select-Object, Where-Object, ForEach-Object):\n{command}";
-                var toggleSysPrompt = "You are an expert PowerShell engineer. Output strictly the rewritten raw PowerShell command with no markdown or explanation.";
-                try
-                {
-                    var newCmd = OllamaClient.GenerateAsync(cfg.OllamaUrl, activeModel, togglePrompt, toggleSysPrompt, cfg.Temperature).GetAwaiter().GetResult();
-                    if (!string.IsNullOrWhiteSpace(newCmd))
-                    {
-                        command = newCmd;
-                        RenderCard(command, activeModel, 0, isUk);
-                    }
-                }
-                catch { }
+                RenderCard(command, activeModel, 0, isUk);
                 continue;
             }
             if (action == MenuAction.Cancel)
@@ -363,22 +370,31 @@ public class InvokeAiCommandFastCmdlet : PSCmdlet
     {
         try
         {
-            var parts = command.Trim().Split(new[] { ' ', '|', '(', ')' }, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length > 0)
+            var ast = System.Management.Automation.Language.Parser.ParseInput(command, out _, out var errors);
+            if (errors != null && errors.Length > 0)
             {
-                var firstWord = parts[0].TrimStart('(').Trim();
-                if (Regex.IsMatch(firstWord, @"^[A-Za-z]+-[A-Za-z0-9]+$"))
-                {
-                    var cmd = SessionState.InvokeCommand.GetCommand(firstWord, CommandTypes.All);
-                    if (cmd == null)
-                    {
-                        var warnTitle = isUk ? "Попередження" : "Warning";
-                        var warnMsg = isUk ? $"Команду не знайдено в сесії PowerShell: '{firstWord}'" : $"Command not found in PowerShell session: '{firstWord}'";
-                        var warnHint = isUk ? "(Ймовірно, ваше питання мало інформаційний характер або модель вигадала команду)" : "(Likely your query was informational or model hallucinated a cmdlet)";
+                var warnTitle = isUk ? "Синтаксична помилка" : "Syntax Warning";
+                var warnMsg = isUk ? $"У згенерованій команді виявлено синтаксичну помилку: {errors[0].Message}" : $"Syntax error detected in generated command: {errors[0].Message}";
+                Host.UI.WriteLine(ConsoleColor.DarkYellow, Host.UI.RawUI.BackgroundColor, $"    ⚠ [{warnTitle}] {warnMsg}\n");
+                return;
+            }
 
-                        Host.UI.WriteLine(ConsoleColor.DarkYellow, Host.UI.RawUI.BackgroundColor, $"    ⚠ [{warnTitle}] {warnMsg}");
-                        Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, $"      {warnHint}\n");
-                    }
+            var cmdAsts = ast.FindAll(x => x is System.Management.Automation.Language.CommandAst, true);
+            foreach (System.Management.Automation.Language.CommandAst c in cmdAsts)
+            {
+                var name = c.GetCommandName();
+                if (string.IsNullOrWhiteSpace(name)) continue;
+                if (name is "?" or "%" or "{" or "}") continue;
+
+                var cmdInfo = SessionState.InvokeCommand.GetCommand(name, CommandTypes.All);
+                if (cmdInfo == null && Regex.IsMatch(name, @"^[A-Za-z]+-[A-Za-z0-9]+$"))
+                {
+                    var warnTitle = isUk ? "Попередження" : "Warning";
+                    var warnMsg = isUk ? $"Команду не знайдено в сесії PowerShell: '{name}'" : $"Command not found in PowerShell session: '{name}'";
+                    var warnHint = isUk ? "(Ймовірно, модель вигадала неіснуючий командлет)" : "(Likely model hallucinated a cmdlet)";
+
+                    Host.UI.WriteLine(ConsoleColor.DarkYellow, Host.UI.RawUI.BackgroundColor, $"    ⚠ [{warnTitle}] {warnMsg}");
+                    Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, $"      {warnHint}\n");
                 }
             }
         }

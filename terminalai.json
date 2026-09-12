@@ -19,28 +19,28 @@
   ],
   "actions": [
     {
-      "name": "AI: Ask Ollama (ai)",
+      "name": "AI: Запитати Ollama (ai)",
       "command": {
         "action": "sendInput",
         "input": "ai \""
       }
     },
     {
-      "name": "AI: Fix last error (ai-fix)",
+      "name": "AI: Виправити останню помилку (ai-fix)",
       "command": {
         "action": "sendInput",
         "input": "ai-fix\r"
       }
     },
     {
-      "name": "AI: Generate script (ai-script)",
+      "name": "AI: Згенерувати сценарій (ai-script)",
       "command": {
         "action": "sendInput",
         "input": "ai-script \""
       }
     },
     {
-      "name": "AI: Open assistant in split pane",
+      "name": "AI: Відкрити асистента у спліт-панелі",
       "command": {
         "action": "splitPane",
         "split": "vertical",
