@@ -9,8 +9,8 @@
     CompanyName = 'Community'
     Copyright = '(c) 2026. All rights reserved.'
 
-    # Опис модуля
-    Description = 'Розширення для Windows Terminal та PowerShell: генерація команд, багаторядкових сценаріїв, автовиправлення помилок та інлайн-гарячі клавіші на базі локальної Ollama.'
+    # Module Description
+    Description = 'Windows Terminal and PowerShell AI assistant: command generation, multi-line scripts, automated error fixing, and inline hotkeys powered by local Ollama.'
 
     # Мінімальна версія PowerShell
     PowerShellVersion = '5.1'
@@ -58,8 +58,8 @@
         'Test-TerminalAiInstallation'
     )
 
-    # Командлети, що експортуються
-    CmdletsToExport = @()
+    # Cmdlets to export
+    CmdletsToExport = @('Invoke-AiCommandFast')
 
     # Змінні, що експортуються
     VariablesToExport = @()

@@ -115,7 +115,7 @@ function Get-AssistantDict {
             "HelpTitle"       = "✦ Terminal AI Assistant • Quick Reference"
         }
     }
-    $targetLang = if ($Lang -eq "en") { "en" } else { "uk" }
+    $targetLang = if ($Lang -in @("uk", "ua")) { "uk" } else { "en" }
     return $dict[$targetLang]
 }
 
@@ -141,7 +141,7 @@ function Show-AssistantHeader {
     Write-Host " $($txt.EndpointLabel) " -NoNewline -ForegroundColor Gray
     Write-Host "$($cfg.OllamaUrl)" -ForegroundColor DarkGray
     Write-Host " $($txt.LangLabel)     " -NoNewline -ForegroundColor Gray
-    $langDisplay = if ($Lang -eq "en") { "en (English)" } else { "uk (Українська)" }
+    $langDisplay = if ($Lang -in @("uk", "ua")) { "uk (Українська)" } else { "en (English)" }
     Write-Host "$langDisplay" -ForegroundColor Yellow
     Write-Host " $($txt.CommandsHeader)" -ForegroundColor Gray
     Write-Host "   /help         - $($txt.DescHelp)" -ForegroundColor DarkCyan
@@ -165,7 +165,7 @@ function Show-AssistantHeader {
 function Show-AssistantHelpCard {
     param([string]$Lang)
     $txt = Get-AssistantDict -Lang $Lang
-    $isUk = ($Lang -ne "en")
+    $isUk = ($Lang -in @("uk", "ua"))
 
     Write-Host ""
     Write-Host "    $($txt.HelpTitle)" -ForegroundColor Cyan
@@ -594,7 +594,7 @@ while ($true) {
     elseif ($inputQuery -match '^/read(?:\s+(.+))?$') {
         $rawTarget = $Matches[1]
         if ([string]::IsNullOrWhiteSpace($rawTarget)) {
-            $msg = if ($currentLang -eq "uk") { "Вкажіть файл для читання: /read <файл>" } else { "Specify file path: /read <file>" }
+            $msg = if ($currentLang -in @("uk", "ua")) { "Вкажіть файл для читання: /read <файл>" } else { "Specify file path: /read <file>" }
             Write-Host "$msg`n" -ForegroundColor Yellow
             continue
         }
@@ -622,7 +622,7 @@ while ($true) {
         }
 
         if (-not $resolvedPath -or -not (Test-Path $resolvedPath)) {
-            if ($currentLang -eq "uk") {
+            if ($currentLang -in @("uk", "ua")) {
                 Write-Host "Файл не знайдено: $rawTarget" -ForegroundColor Red
                 Write-Host "  Перевірені розташування:" -ForegroundColor DarkGray
                 Write-Host "    • Поточна папка: $((Get-Location).Path)" -ForegroundColor DarkGray
@@ -645,27 +645,28 @@ while ($true) {
         }
 
         $lines = @(Get-Content -Path $resolvedPath -TotalCount 100 -ErrorAction SilentlyContinue)
-        Write-Host "`n✦ Вміст $resolvedPath (перші 100 рядків):" -ForegroundColor Cyan
+        $contentHeader = if ($currentLang -in @("uk", "ua")) { "✦ Вміст $resolvedPath (перші 100 рядків):" } else { "✦ Content of $resolvedPath (first 100 lines):" }
+        Write-Host "`n$contentHeader" -ForegroundColor Cyan
         Write-Host ("─" * 68) -ForegroundColor DarkGray
         $lines | Out-Host
         Write-Host ("─" * 68) -ForegroundColor DarkGray
 
-        $askPrompt = if ($currentLang -eq "uk") { "Додати вміст цього файлу до контексту діалогу? [Y/n]: " } else { "Add this file content to conversation context? [Y/n]: " }
+        $askPrompt = if ($currentLang -in @("uk", "ua")) { "Додати вміст цього файлу до контексту діалогу? [Y/n]: " } else { "Add this file content to conversation context? [Y/n]: " }
         $injectConfirm = Read-AssistantLine -Prompt $askPrompt
         if ($injectConfirm -notmatch '^(n|no|ні)$') {
             $bt3 = '```'
             $fileNote = "Local file inspected: $resolvedPath`n$bt3`n" + ($lines -join "`n") + "`n$bt3"
             Add-AssistantHistoryMessage -Role "user" -Content $fileNote
-            $okMsg = if ($currentLang -eq "uk") { "✔ Вміст файлу додано до контексту діалогу!`n" } else { "✔ File content added to conversation context!`n" }
+            $okMsg = if ($currentLang -in @("uk", "ua")) { "✔ Вміст файлу додано до контексту діалогу!`n" } else { "✔ File content added to conversation context!`n" }
             Write-Host $okMsg -ForegroundColor Green
         }
         continue
     }
 
-    $langInstruction = if ($currentLang -eq "uk") {
+    $langInstruction = if ($currentLang -in @("uk", "ua")) {
         "LANGUAGE ENFORCEMENT: You MUST respond strictly in Ukrainian (Українська мова). Under NO circumstances should you respond in Russian (Русский язык)."
     } else {
-        "LANGUAGE ENFORCEMENT: If the user communicates in Ukrainian, reply strictly in Ukrainian. If the user communicates in English, reply in English. NEVER respond in Russian (Русский язык) under any circumstances."
+        "LANGUAGE ENFORCEMENT: Respond primarily in English. If the user explicitly asks in Ukrainian, you may respond in Ukrainian. Under NO circumstances should you respond in Russian (Русский язык)."
     }
     $systemPrompt = @"
 You are Terminal AI Assistant, an interactive engineering companion built for PowerShell and Windows Terminal.

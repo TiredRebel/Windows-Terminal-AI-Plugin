@@ -322,6 +322,22 @@
   - Verified portability of `terminalai.json` using `%USERPROFILE%` with zero absolute user-bound paths.
 - **Independent Verdict**: **PASS (100% ACCEPTED)**
 
+### Cycle 11: Internationalization Hardening (English Primary by Default, Ukrainian On-Demand)
+- **Date**: 2026-09-12
+- **Objective**: Standardize English as the 100% primary default language across all components, scripts, installers, uninstallers, diagnostics, error messages, and assistant prompt templates, while retaining full Ukrainian localization on-demand (`-Language uk`, `ai lang uk`, or `$env:TERMINAL_AI_LANG = 'uk'`).
+- **Changed Files**:
+  - `Install-TerminalAi.ps1`: Default `-Language "en"`; bilingual step banners, hardware diagnostics, installation prompts, and completion guide in English with Ukrainian on demand.
+  - `Uninstall-TerminalAi.ps1`: Default `-Language "en"`; bilingual removal logs and confirmation prompts.
+  - `TerminalAiConfig.ps1`: Default language to `"en"`; corrected inequality checks (`-in @("uk", "ua")`); localized font settings and error outputs; fixed colon variable scope ambiguity (`$($curLabel):`).
+  - `TerminalAI.psm1`: `Get-TerminalAiText` prioritizes `"en"` dictionary; subcommands `help`, `status`, `models`, `model`, `alias`, `lang`, `fonts` display in English by default; localized `PSReadLine` missing warning; exported `CmdletsToExport = @('Invoke-AiCommandFast')` and aliases `aif`, `ai-fast`.
+  - `TerminalAI.psd1`: Module description updated to English; exported `Invoke-AiCommandFast` and aliases `aif`, `ai-fast`.
+  - `TerminalAiAssistant.ps1`: Default interface to English; system prompt enforces English unless user prompts in Ukrainian; `/read` and slash commands localized.
+  - `AOT/InvokeAiCommandFastCmdlet.cs`: Updated `isUk` logic from `cfg.Language != "en"` to `cfg.Language is "uk" or "ua"`; recompiled release binary `TerminalAI.Aot.dll`.
+- **Tests Executed**:
+  - All test suites (`P0`, `P1`, `P2`, `Test-TerminalAi.ps1`) executed with 100% PASS in both `pwsh` (PS 7) and `powershell.exe` (PS 5.1).
+  - Diagnostic verification: `ai-doctor` tested and confirmed operational with 100% clean English diagnostics across both engines.
+  - Deployed to user profile modules via `Install-TerminalAi.ps1 -AutoConfirm`.
+
 ---
 
 ## 9. Deferred Tasks

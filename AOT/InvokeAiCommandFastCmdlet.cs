@@ -38,7 +38,7 @@ public class InvokeAiCommandFastCmdlet : PSCmdlet
     protected override void ProcessRecord()
     {
         var cfg = AiConfig.Load();
-        var isUk = cfg.Language != "en";
+        var isUk = cfg.Language is "uk" or "ua";
         var activeModel = string.IsNullOrWhiteSpace(Model) ? cfg.Model : Model;
         var fullPrompt = string.Join(" ", Prompt).Trim();
 

@@ -44,26 +44,24 @@ function Get-TerminalAiConfig {
                     $json | Add-Member -MemberType NoteProperty -Name $key -Value $defaultConfig[$key]
                 }
             }
-            # Якщо встановлено системну змінну TERMINAL_AI_LANG, вона має найвищий пріоритет
+            # System variable TERMINAL_AI_LANG takes precedence if set, otherwise config, otherwise 'en'
             if ($env:TERMINAL_AI_LANG -in @("uk", "en", "ua")) {
                 $json.Language = if ($env:TERMINAL_AI_LANG -in @("ua", "uk")) { "uk" } else { "en" }
+            } elseif ($json.Language -notin @("uk", "ua")) {
+                $json.Language = "en"
             }
             return $json
         }
         catch {
-            Write-Warning "Помилка читання конфігурації ($configPath). Використовуються параметри за замовчуванням."
+            Write-Warning "Failed to read configuration ($configPath). Using default settings."
             $fallback = [PSCustomObject]$defaultConfig
-            if ($env:TERMINAL_AI_LANG -in @("uk", "en", "ua")) {
-                $fallback.Language = if ($env:TERMINAL_AI_LANG -in @("ua", "uk")) { "uk" } else { "en" }
-            }
+            $fallback.Language = if ($env:TERMINAL_AI_LANG -in @("ua", "uk")) { "uk" } else { "en" }
             return $fallback
         }
     }
     else {
         $cfgObj = [PSCustomObject]$defaultConfig
-        if ($env:TERMINAL_AI_LANG -in @("uk", "en", "ua")) {
-            $cfgObj.Language = if ($env:TERMINAL_AI_LANG -in @("ua", "uk")) { "uk" } else { "en" }
-        }
+        $cfgObj.Language = if ($env:TERMINAL_AI_LANG -in @("ua", "uk")) { "uk" } else { "en" }
         Save-TerminalAiConfig -Config $cfgObj
         return $cfgObj
     }
@@ -114,10 +112,10 @@ function Set-TerminalAiConfig {
     if ($PSBoundParameters.ContainsKey('UseAliases')) { $cfg.UseAliases = $UseAliases }
 
     Save-TerminalAiConfig -Config $cfg
-    $msg = if ($cfg.Language -eq "en") {
-        "✔ [TerminalAI] Configuration successfully saved to $(Get-TerminalAiConfigPath)"
-    } else {
+    $msg = if ($cfg.Language -in @("uk", "ua")) {
         "✔ [TerminalAI] Конфігурацію успішно збережено в $(Get-TerminalAiConfigPath)"
+    } else {
+        "✔ [TerminalAI] Configuration successfully saved to $(Get-TerminalAiConfigPath)"
     }
     Write-Host $msg -ForegroundColor Green
     return $cfg
@@ -196,15 +194,16 @@ function Show-TerminalAiFonts {
 
     $fontInfo = Get-TerminalAiFonts
     $cfg = Get-TerminalAiConfig
-    $isUk = ($cfg.Language -ne "en")
+    $isUk = ($cfg.Language -in @("uk", "ua"))
 
     $title = if ($isUk) { "Встановлені моноширинні шрифти терміналу" } else { "Installed Monospace Terminal Fonts" }
     $activeLabel = if ($isUk) { "Активний" } else { "Active" }
+    $curLabel = if ($isUk) { "Поточний" } else { "Current" }
     $changeHint = if ($isUk) { "Змінити шрифт:" } else { "Change font:" }
     $orHint = if ($isUk) { "Або з розміром (pt):" } else { "Or with font size:" }
 
     Write-Host ""
-    Write-Host "    ✦ Terminal AI • $title (Поточний: $($fontInfo.ActiveFont))" -ForegroundColor Cyan
+    Write-Host "    ✦ Terminal AI • $title ($($curLabel): $($fontInfo.ActiveFont))" -ForegroundColor Cyan
     Write-Host "    ╭──────────────────────────────────────────────────────────────────╮" -ForegroundColor DarkCyan
     Write-Host "    │                                                                  │" -ForegroundColor DarkCyan
 
@@ -236,9 +235,13 @@ function Set-TerminalAiFont {
         [int]$Size
     )
 
+    $cfg = Get-TerminalAiConfig
+    $isUk = ($cfg.Language -in @("uk", "ua"))
+
     $wtPath = Get-WindowsTerminalSettingsPath
     if (-not $wtPath) {
-        Write-Error " [TerminalAI] Файл налаштувань Windows Terminal (settings.json) не знайдено."
+        $msgNotFound = if ($isUk) { "Файл налаштувань Windows Terminal (settings.json) не знайдено." } else { "Windows Terminal settings file (settings.json) not found." }
+        Write-Error " [TerminalAI] $msgNotFound"
         return
     }
 
@@ -267,20 +270,27 @@ function Set-TerminalAiFont {
         Set-TerminalAiConfig -Font $Font | Out-Null
 
         $cfg = Get-TerminalAiConfig
-        $msg = if ($cfg.Language -eq "en") {
-            "✔ [TerminalAI] Terminal font successfully changed to '$Font'!"
-        } else {
+        $isUk = ($cfg.Language -in @("uk", "ua"))
+        $msg = if ($isUk) {
             "✔ [TerminalAI] Шрифт терміналу успішно змінено на '$Font'!"
+        } else {
+            "✔ [TerminalAI] Terminal font successfully changed to '$Font'!"
         }
         Write-Host "`n    $msg" -ForegroundColor Green
         if ($Size -gt 0) {
-            Write-Host "    Розмір шрифту: $Size pt`n" -ForegroundColor DarkCyan
+            $lblSize = if ($isUk) { "Розмір шрифту:" } else { "Font size:" }
+            Write-Host "    $lblSize $Size pt`n" -ForegroundColor DarkCyan
         } else {
             Write-Host ""
         }
     }
     catch {
-        Write-Error " [TerminalAI] Не вдалося оновити шрифт у $wtPath : $($_.Exception.Message)"
+        $msgErr = if ($isUk) {
+            " [TerminalAI] Не вдалося оновити шрифт у $($wtPath): $($_.Exception.Message)"
+        } else {
+            " [TerminalAI] Failed to update font in $($wtPath): $($_.Exception.Message)"
+        }
+        Write-Error $msgErr
     }
 }
 
@@ -362,7 +372,7 @@ function Update-TerminalAiFragment {
     [CmdletBinding()]
     param([string]$Language)
 
-    $isEn = ($Language -eq "en")
+    $isEn = ($Language -ne "uk" -and $Language -ne "ua")
     $assistantCommand = "pwsh.exe -NoExit -Command `"Import-Module TerminalAI -ErrorAction SilentlyContinue; Invoke-AiAssistant`""
 
     $actionAsk = if ($isEn) { "AI: Ask Ollama (ai)" } else { "AI: Запитати Ollama (ai)" }

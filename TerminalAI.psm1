@@ -173,7 +173,7 @@ function ConvertTo-AiFullCmdlets {
 function Get-TerminalAiText {
     param([string]$Key)
     $cfg = Get-TerminalAiConfig
-    $lang = if ($cfg.Language -eq "en") { "en" } else { "uk" }
+    $lang = if ($cfg.Language -in @("uk", "ua")) { "uk" } else { "en" }
 
     $dict = @{
         "uk" = @{
@@ -252,6 +252,8 @@ function Get-TerminalAiText {
 
     if ($dict[$lang] -and $dict[$lang][$Key]) {
         return $dict[$lang][$Key]
+    } elseif ($dict["en"][$Key]) {
+        return $dict["en"][$Key]
     } elseif ($dict["uk"][$Key]) {
         return $dict["uk"][$Key]
     } else {
@@ -301,7 +303,7 @@ function Show-TerminalAiHelp {
     )
 
     $cfg = Get-TerminalAiConfig
-    $isUk = ($cfg.Language -ne "en")
+    $isUk = ($cfg.Language -in @("uk", "ua"))
     $conWidth = 80
     try {
         if ($Host.UI.RawUI.WindowSize.Width -gt 20) {
@@ -991,7 +993,8 @@ function Invoke-OllamaApi {
         }
         catch {
             $msg = $_.Exception.Message
-            Write-Error " [TerminalAI] Не вдалося з'єднатися з Ollama за адресою '$targetUrl'. Переконайтеся, що Ollama запущена ('ollama serve'). Помилка: $msg"
+            $errPrefix = if ($cfg.Language -in @("uk", "ua")) { "Не вдалося з'єднатися з Ollama за адресою '$targetUrl'. Переконайтеся, що Ollama запущена ('ollama serve'). Помилка:" } else { "Failed to connect to Ollama at '$targetUrl'. Make sure Ollama is running ('ollama serve'). Error:" }
+            Write-Error " [TerminalAI] $errPrefix $msg"
             return $null
         }
     }
@@ -1009,7 +1012,8 @@ function Get-TerminalAiModels {
         return $res.models
     }
     catch {
-        Write-Error " [TerminalAI] Не вдалося отримати список моделей з Ollama ($url): $($_.Exception.Message)"
+        $errPrefix = if ($cfg.Language -in @("uk", "ua")) { "Не вдалося отримати список моделей з Ollama ($url):" } else { "Failed to retrieve models list from Ollama ($url):" }
+        Write-Error " [TerminalAI] $errPrefix $($_.Exception.Message)"
         return @()
     }
 }
@@ -1020,7 +1024,7 @@ function Show-TerminalAiModels {
 
     $models = Get-TerminalAiModels
     $cfg = Get-TerminalAiConfig
-    $isUk = ($cfg.Language -ne "en")
+    $isUk = ($cfg.Language -in @("uk", "ua"))
 
     if ($models.Count -eq 0) {
         $noModelsMsg = if ($isUk) { " [TerminalAI] Моделей не знайдено або Ollama не запущена." } else { " [TerminalAI] No models found or Ollama is not running." }
@@ -1051,7 +1055,7 @@ function Show-AiAnswer {
 
     $cfg = Get-TerminalAiConfig
     $activeModel = if ($Model) { $Model } else { $cfg.Model }
-    $langInstruction = if ($cfg.Language -eq "uk") { "Respond strictly in Ukrainian language." } else { "Respond in English." }
+    $langInstruction = if ($cfg.Language -in @("uk", "ua")) { "Respond strictly in Ukrainian language." } else { "Respond in English." }
 
     $statusMsg = "$(Get-TerminalAiText 'Answering') $activeModel..."
     Write-Host "`n  ✦ $statusMsg" -ForegroundColor Cyan
@@ -1392,10 +1396,12 @@ function Test-AiCommandAst {
     $previewReason = if ($canPreview) {
         $null
     } else {
+        $cfg = try { Get-TerminalAiConfig } catch { $null }
+        $isUk = ($cfg -and $cfg.Language -in @("uk", "ua"))
         if ($analyzedCommands | Where-Object { $_.CommandType -eq "ExternalProgram" }) {
-            "Безпечний попередній перегляд (-WhatIf) недоступний для зовнішніх бінарних програм"
+            if ($isUk) { "Безпечний попередній перегляд (-WhatIf) недоступний для зовнішніх бінарних програм" } else { "Safe preview (-WhatIf) is unavailable for external binary programs" }
         } else {
-            "Безпечний попередній перегляд (-WhatIf) не підтримується однією або кількома командами"
+            if ($isUk) { "Безпечний попередній перегляд (-WhatIf) не підтримується однією або кількома командами" } else { "Safe preview (-WhatIf) is not supported by one or more commands" }
         }
     }
 
@@ -1820,7 +1826,7 @@ function Invoke-AiCommand {
 
     $cfg = Get-TerminalAiConfig
     $fullPrompt = if ($Prompt) { ($Prompt -join " ").Trim() } else { "" }
-    $isUk = ($cfg.Language -ne "en")
+    $isUk = ($cfg.Language -in @("uk", "ua"))
 
     if ([string]::IsNullOrWhiteSpace($fullPrompt)) {
         Write-Host ""
@@ -1928,14 +1934,14 @@ function Invoke-AiCommand {
     # 2. Мова: статус та перемикання
     if ($fullPrompt -in @("lang", "language", "--lang", "-l", "мова")) {
         Write-Host ""
-        if ($cfg.Language -eq "en") {
-            Write-Host "    ✦ Current language: en (English)" -ForegroundColor Cyan
-            Write-Host "    💡 Switch language:  ai lang uk  |  ai lang en" -ForegroundColor DarkGray
-            Write-Host "    💡 Set permanent:    ai lang permanent uk  |  ai lang permanent en`n" -ForegroundColor DarkGray
-        } else {
+        if ($cfg.Language -in @("uk", "ua")) {
             Write-Host "    ✦ Поточна мова: uk (Українська)" -ForegroundColor Cyan
             Write-Host "    💡 Змінити мову:     ai lang en  |  ai lang uk" -ForegroundColor DarkGray
             Write-Host "    💡 Зробити постійною: ai lang permanent en  |  ai lang permanent uk`n" -ForegroundColor DarkGray
+        } else {
+            Write-Host "    ✦ Current language: en (English)" -ForegroundColor Cyan
+            Write-Host "    💡 Switch language:  ai lang uk  |  ai lang en" -ForegroundColor DarkGray
+            Write-Host "    💡 Set permanent:    ai lang permanent uk  |  ai lang permanent en`n" -ForegroundColor DarkGray
         }
         return
     }
@@ -1965,7 +1971,7 @@ function Invoke-AiCommand {
         $lblFont = if ($isUk) { "Шрифт терміналу:" } else { "Terminal Font:" }
         $lblServer = if ($isUk) { "Локальний сервер:" } else { "Local Server:" }
         $lblHotkey = if ($isUk) { "Швидке доповнення:" } else { "Quick Inline:" }
-        $lblLang = if ($isUk) { "Основна мова:" } else { "Language:" }
+        $lblLang = if ($isUk) { "Основна мова:" } else { "Primary Language:" }
         $hintModel = if ($isUk) { "Змінити модель:  ai model <назва>" } else { "Change model:  ai model <name>" }
         $hintFont = if ($isUk) { "Змінити шрифт:   ai font <назва>" } else { "Change font:   ai font <name>" }
         $hintLang = if ($isUk) { "Змінити мову:    ai lang uk | en" } else { "Change lang:   ai lang en | uk" }
@@ -1990,7 +1996,7 @@ function Invoke-AiCommand {
         & $renderRow $lblServer $cfg.OllamaUrl ([System.ConsoleColor]::White)
         $hkText = if ($isUk) { "$($cfg.HotkeyChord) / F2 (інлайн)" } else { "$($cfg.HotkeyChord) / F2 (inline)" }
         & $renderRow $lblHotkey $hkText ([System.ConsoleColor]::Yellow)
-        $langDisplay = if ($cfg.Language -eq "en") { "en (English)" } else { "uk (Українська)" }
+        $langDisplay = if ($cfg.Language -in @("uk", "ua")) { "uk (Ukrainian)" } else { "en (English)" }
         & $renderRow $lblLang $langDisplay ([System.ConsoleColor]::White)
         $lblAlias = if ($isUk) { "Короткі аліаси:" } else { "Command Aliases:" }
         $aliasDisplay = if ($cfg.UseAliases) {
@@ -2015,7 +2021,7 @@ function Invoke-AiCommand {
     if ($fullPrompt -match '^(?:set-model|use-model|use|model)\s+([A-Za-z0-9.:_\-\/]+)$') {
         $newModel = $Matches[1].Trim()
         Set-TerminalAiConfig -Model $newModel | Out-Null
-        $msg = if ($cfg.Language -eq "en") { "Active model successfully changed to '$newModel'!" } else { "Активну модель успішно змінено на '$newModel'!" }
+        $msg = if ($isUk) { "Активну модель успішно змінено на '$newModel'!" } else { "Active model successfully changed to '$newModel'!" }
         Write-Host "`n    ✔ $msg`n" -ForegroundColor Green
         return
     }
@@ -2034,7 +2040,7 @@ function Invoke-AiCommand {
     if ($fullPrompt -match '^(?:alias|aliases|аліас|аліаси)\s+(?:on|1|true|enable|увімк|увімкнути)$' -or
         $fullPrompt -in @("use-aliases", "use aliases", "використовувати аліаси", "увімкнути аліаси")) {
         Set-TerminalAiConfig -UseAliases $true | Out-Null
-        $msg = if ($cfg.Language -eq "en") { "PowerShell short aliases mode successfully ENABLED (defaulting to: gps, gci, select, ?, %)" } else { "Режим коротких аліасів PowerShell успішно УВІМКНЕНО (за замовчуванням: gps, gci, select, ?, %)" }
+        $msg = if ($isUk) { "Режим коротких аліасів PowerShell успішно УВІМКНЕНО (за замовчуванням: gps, gci, select, ?, %)" } else { "PowerShell short aliases mode successfully ENABLED (defaulting to: gps, gci, select, ?, %)" }
         Write-Host "`n    ✔ $msg`n" -ForegroundColor Green
         return
     }
@@ -2042,7 +2048,7 @@ function Invoke-AiCommand {
     if ($fullPrompt -match '^(?:alias|aliases|аліас|аліаси)\s+(?:off|0|false|disable|вимк|вимкнути)$' -or
         $fullPrompt -in @("no-aliases", "no aliases", "не використовувати аліаси", "вимкнути аліаси")) {
         Set-TerminalAiConfig -UseAliases $false | Out-Null
-        $msg = if ($cfg.Language -eq "en") { "PowerShell short aliases mode DISABLED (using full cmdlet names)" } else { "Режим коротких аліасів PowerShell ВИМКНЕНО (використовуються повні імена командлетів)" }
+        $msg = if ($isUk) { "Режим коротких аліасів PowerShell ВИМКНЕНО (використовуються повні імена командлетів)" } else { "PowerShell short aliases mode DISABLED (using full cmdlet names)" }
         Write-Host "`n    ✔ $msg`n" -ForegroundColor Green
         return
     }
@@ -2233,7 +2239,7 @@ function Show-AiExplanation {
     )
 
     $cfg = Get-TerminalAiConfig
-    $langInstruction = if ($cfg.Language -eq "uk") { "Respond strictly in Ukrainian language." } else { "Respond in English." }
+    $langInstruction = if ($cfg.Language -in @("uk", "ua")) { "Respond strictly in Ukrainian language." } else { "Respond in English." }
 
     Write-Host "`n  ✦ $(Get-TerminalAiText 'Explaining')" -ForegroundColor Cyan
 
@@ -2284,7 +2290,7 @@ function Invoke-AiFix {
     $failedScript = $lastErr.InvocationInfo.ScriptName
 
     $activeModel = if ($Model) { $Model } else { $cfg.Model }
-    $langInstruction = if ($cfg.Language -eq "uk") { "Respond in Ukrainian for the diagnosis, but output the fixed PowerShell command clearly." } else { "Respond in English." }
+    $langInstruction = if ($cfg.Language -in @("uk", "ua")) { "Respond in Ukrainian for the diagnosis, but output the fixed PowerShell command clearly." } else { "Respond in English." }
 
     Write-Host "`n  ✦ [AI-Fix] $(Get-TerminalAiText 'Fixing') ($activeModel)..." -ForegroundColor Cyan
     Write-Host "    $(Get-TerminalAiText 'ErrorLabel') " -NoNewline -ForegroundColor DarkYellow
@@ -2684,7 +2690,7 @@ function New-AiScript {
     $fullDesc = ($Description -join " ").Trim()
     $cfg = Get-TerminalAiConfig
     $activeModel = if ($Model) { $Model } else { $cfg.Model }
-    $isUk = ($cfg.Language -ne "en")
+    $isUk = ($cfg.Language -in @("uk", "ua"))
 
     Write-Host "`n  [AI-Script] $(Get-TerminalAiText 'Scripting')" -ForegroundColor Cyan
     $taskLabel = if ($isUk) { "Завдання:" } else { "Task:" }
@@ -2764,7 +2770,9 @@ function Invoke-AiAssistant {
         if ($Model) { $params["Model"] = $Model }
         & $assistantScript @params
     } else {
-        Write-Error "[TerminalAI] TerminalAiAssistant.ps1 не знайдено у '$PSScriptRoot'."
+        $cfg = try { Get-TerminalAiConfig } catch { $null }
+        $errNotFound = if ($cfg -and $cfg.Language -in @("uk", "ua")) { "TerminalAiAssistant.ps1 не знайдено у '$PSScriptRoot'." } else { "TerminalAiAssistant.ps1 not found in '$PSScriptRoot'." }
+        Write-Error "[TerminalAI] $errNotFound"
     }
 }
 
@@ -3009,7 +3017,13 @@ function Register-TerminalAiKeyHandler {
         try {
             Import-Module PSReadLine -ErrorAction Stop
         } catch {
-            Write-Warning " [TerminalAI] PSReadLine не знайдено. Інлайн-гарячі клавіші недоступні."
+            $cfg = try { Get-TerminalAiConfig } catch { $null }
+            $warnPsr = if ($cfg -and $cfg.Language -in @("uk", "ua")) {
+                " [TerminalAI] PSReadLine не знайдено. Інлайн-гарячі клавіші недоступні."
+            } else {
+                " [TerminalAI] PSReadLine module not found. Inline hotkeys are unavailable."
+            }
+            Write-Warning $warnPsr
             return
         }
     }
@@ -3056,7 +3070,7 @@ function Register-TerminalAiKeyHandler {
 
         if ([string]::IsNullOrWhiteSpace($query)) {
             # Якщо рядок порожній або містить лише префікс, вставляємо шаблон для запиту
-            $promptPlaceholder = if ($cfg.Language -eq "en") { "# [AI Prompt]: " } else { "# [AI Запит]: " }
+            $promptPlaceholder = if ($cfg.Language -in @("uk", "ua")) { "# [AI Запит]: " } else { "# [AI Prompt]: " }
             $currLine = ""
             $currCursor = 0
             [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$currLine, [ref]$currCursor)
@@ -3136,7 +3150,7 @@ function Register-TerminalAiKeyHandler {
                 [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, $currLine.Length, $cleanCode)
             } else {
                 # Інформуємо про помилку або відсутність результату та відновлюємо рядок
-                $msg = if ($cfg.Language -eq "uk") { "# [AI: Ollama offline / помилка відповіді]" } else { "# [AI: Ollama offline / error response]" }
+                $msg = if ($cfg.Language -in @("uk", "ua")) { "# [AI: Ollama offline / помилка відповіді]" } else { "# [AI: Ollama offline / error response]" }
                 [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, $currLine.Length, "$msg $displayQuery")
                 Start-Sleep -Milliseconds 900
                 [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, "$msg $displayQuery".Length, $line)
@@ -3148,7 +3162,7 @@ function Register-TerminalAiKeyHandler {
                 $errLine = ""
                 $errCursor = 0
                 [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$errLine, [ref]$errCursor)
-                $errMsg = if ($cfg.Language -eq "uk") { "# [AI: Ollama offline / помилка з'єднання]" } else { "# [AI: Ollama offline / connection error]" }
+                $errMsg = if ($cfg.Language -in @("uk", "ua")) { "# [AI: Ollama offline / помилка з'єднання]" } else { "# [AI: Ollama offline / connection error]" }
                 [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, $errLine.Length, "$errMsg $displayQuery")
                 Start-Sleep -Milliseconds 900
                 [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, "$errMsg $displayQuery".Length, $line)
@@ -3317,8 +3331,21 @@ Set-Alias -Name ai-lang-default -Value Set-TerminalAiDefaultLanguage
 Set-Alias -Name ai-chat -Value Invoke-AiAssistant
 Set-Alias -Name ai-assistant -Value Invoke-AiAssistant
 
+if (Get-Command Invoke-AiCommandFast -ErrorAction SilentlyContinue) {
+    Set-Alias -Name aif -Value Invoke-AiCommandFast
+    Set-Alias -Name ai-fast -Value Invoke-AiCommandFast
+} else {
+    Set-Alias -Name aif -Value Invoke-AiCommand
+    Set-Alias -Name ai-fast -Value Invoke-AiCommand
+}
+
 Register-TerminalAiKeyHandler
 Register-TerminalAiArgumentCompleters
+
+$exportCmdlets = @()
+if (Get-Command -Name "Invoke-AiCommandFast" -CommandType Cmdlet -ErrorAction SilentlyContinue) {
+    $exportCmdlets = @("Invoke-AiCommandFast")
+}
 
 # Експорт функцій та аліасів
 Export-ModuleMember -Function @(
@@ -3355,10 +3382,12 @@ Export-ModuleMember -Function @(
     "Format-AiScriptDiff",
     "Save-AiScriptFile",
     "Test-TerminalAiInstallation"
-) -Alias @(
+) -Cmdlet $exportCmdlets -Alias @(
     "ai",
     "??",
     "ai-help",
+    "ai-fast",
+    "aif",
     "ai-fix",
     "fix-error",
     "ai-script",
