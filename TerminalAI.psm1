@@ -598,50 +598,53 @@ function Invoke-AiCommand {
     if ([string]::IsNullOrWhiteSpace($fullPrompt)) {
         Write-Host ""
         if ($isUk) {
-            Write-Host "    ✦ Terminal AI • Швидка довідка" -ForegroundColor Cyan
-            Write-Host "    ╭──────────────────────────────────────────────────────────────────╮" -ForegroundColor DarkCyan
-            Write-Host "    │                                                                  │" -ForegroundColor DarkCyan
-            Write-Host "    │   Використання:  ai <опис команди природною мовою>               │" -ForegroundColor White
-            Write-Host "    │                  ?? <опис команди>                               │" -ForegroundColor White
-            Write-Host "    │                  F2 (інлайн-генерація з живим таймером)          │" -ForegroundColor Yellow
-            Write-Host "    │                                                                  │" -ForegroundColor DarkCyan
-            Write-Host "    │   Приклади:                                                      │" -ForegroundColor DarkCyan
-            Write-Host "    │     ai показати 5 процесів з найбільшим CPU                      │" -ForegroundColor Green
-            Write-Host "    │     ai знайти всі файли .log більше 50MB                         │" -ForegroundColor Green
-            Write-Host "    │     ai model <модель>   (змінити модель Ollama)                  │" -ForegroundColor Green
-            Write-Host "    │     ai models           (список встановлених моделей)            │" -ForegroundColor Green
-            Write-Host "    │     ai font <шрифт>     (обрати шрифт Windows Terminal)          │" -ForegroundColor Green
-            Write-Host "    │     ai fonts            (список моноширинних шрифтів)            │" -ForegroundColor Green
-            Write-Host "    │     ai lang uk | en     (перемкнути мову інтерфейсу)             │" -ForegroundColor Green
-            Write-Host "    │     ai lang permanent uk|en (встановити постійну мову)           │" -ForegroundColor Green
-            Write-Host "    │     ai-chat             (інтерактивний агент з Tab-доповненням)  │" -ForegroundColor Green
-            Write-Host "    │     ai-fix              (аналіз та виправлення помилки)          │" -ForegroundColor Green
-            Write-Host "    │     ai-script `"бекграундний бекап`" (генератор .ps1)              │" -ForegroundColor Green
-            Write-Host "    │                                                                  │" -ForegroundColor DarkCyan
-            Write-Host "    ╰──────────────────────────────────────────────────────────────────╯" -ForegroundColor DarkCyan
+            Write-Host "    ✦ Terminal AI • Швидка довідка та аліаси" -ForegroundColor Cyan
+            Write-Host "    ╭────────────────────────────────────────────────────────────────────────╮" -ForegroundColor DarkCyan
+            Write-Host "    │                                                                        │" -ForegroundColor DarkCyan
+            Write-Host "    │   Основні команди та аліаси:                                           │" -ForegroundColor Cyan
+            Write-Host "    │     aif <запит>   або  ai-fast <запит>    (швидкий бінарний модуль C#) │" -ForegroundColor White
+            Write-Host "    │     ?? <запит>    або  ai <запит>         (стандартний модуль)         │" -ForegroundColor White
+            Write-Host "    │     F2                                    (інлайн-генерація в консолі) │" -ForegroundColor Yellow
+            Write-Host "    │                                                                        │" -ForegroundColor DarkCyan
+            Write-Host "    │   Швидкі підкоманди та скорочення:                                     │" -ForegroundColor Cyan
+            Write-Host "    │     ai status     або  aif status         (стан системи, модель, мова) │" -ForegroundColor Green
+            Write-Host "    │     ai models     |  aif -m               (список моделей Ollama)      │" -ForegroundColor Green
+            Write-Host "    │     ai model <назва>                      (змінити активну модель)     │" -ForegroundColor Green
+            Write-Host "    │     ai lang en | uk                       (перемкнути мову інтерфейсу) │" -ForegroundColor Green
+            Write-Host "    │     ai config     |  aif -c               (переглянути config.json)    │" -ForegroundColor Green
+            Write-Host "    │                                                                        │" -ForegroundColor DarkCyan
+            Write-Host "    │   Короткі ключі (прапорці):                                            │" -ForegroundColor Cyan
+            Write-Host "    │     ai `"cmd`" -x   або  aif `"cmd`" -x       (виконати команду відразу)   │" -ForegroundColor Yellow
+            Write-Host "    │     ai `"cmd`" -c   або  aif `"cmd`" -c       (скопіювати в буфер обміну)  │" -ForegroundColor Yellow
+            Write-Host "    │     ai `"cmd`" -Explain                   (генерація з розбором коду)  │" -ForegroundColor Magenta
+            Write-Host "    │     ai `"cmd`" -Ask                       (пряма текстова відповідь)   │" -ForegroundColor Blue
+            Write-Host "    │                                                                        │" -ForegroundColor DarkCyan
+            Write-Host "    ╰────────────────────────────────────────────────────────────────────────╯" -ForegroundColor DarkCyan
         } else {
-            Write-Host "    ✦ Terminal AI • Quick Reference" -ForegroundColor Cyan
-            Write-Host "    ╭──────────────────────────────────────────────────────────────────╮" -ForegroundColor DarkCyan
-            Write-Host "    │                                                                  │" -ForegroundColor DarkCyan
-            Write-Host "    │   Usage:         ai <natural language prompt>                    │" -ForegroundColor White
-            Write-Host "    │                  ?? <prompt>                                     │" -ForegroundColor White
-            Write-Host "    │                  F2 (inline generation with live timer)          │" -ForegroundColor Yellow
-            Write-Host "    │                                                                  │" -ForegroundColor DarkCyan
-            Write-Host "    │   Examples:                                                      │" -ForegroundColor DarkCyan
-            Write-Host "    │     ai show top 5 processes by CPU usage                         │" -ForegroundColor Green
-            Write-Host "    │     ai find all .log files larger than 50MB                      │" -ForegroundColor Green
-            Write-Host "    │     ai model <name>     (change active Ollama model)             │" -ForegroundColor Green
-            Write-Host "    │     ai models           (view installed models)                  │" -ForegroundColor Green
-            Write-Host "    │     ai font <name>      (change Windows Terminal font)           │" -ForegroundColor Green
-            Write-Host "    │     ai fonts            (list monospace fonts)                   │" -ForegroundColor Green
-            Write-Host "    │     ai lang en | uk     (switch interface language)              │" -ForegroundColor Green
-            Write-Host "    │     ai lang permanent en|uk (set permanent default language)     │" -ForegroundColor Green
-            Write-Host "    │     ai-chat             (interactive agent with Tab complete)    │" -ForegroundColor Green
-            Write-Host "    │     ai-fix              (diagnose and fix last error)            │" -ForegroundColor Green
-            Write-Host "    │     ai-script `"backup logs`" (generate .ps1 script)               │" -ForegroundColor Green
-            Write-Host "    │                                                                  │" -ForegroundColor DarkCyan
-            Write-Host "    ╰──────────────────────────────────────────────────────────────────╯" -ForegroundColor DarkCyan
+            Write-Host "    ✦ Terminal AI • Quick Reference & Shortcuts" -ForegroundColor Cyan
+            Write-Host "    ╭────────────────────────────────────────────────────────────────────────╮" -ForegroundColor DarkCyan
+            Write-Host "    │                                                                        │" -ForegroundColor DarkCyan
+            Write-Host "    │   Primary Commands & Aliases:                                          │" -ForegroundColor Cyan
+            Write-Host "    │     aif <prompt>  or  ai-fast <prompt>    (ultra-fast C# AOT module)   │" -ForegroundColor White
+            Write-Host "    │     ?? <prompt>   or  ai <prompt>         (standard PowerShell module) │" -ForegroundColor White
+            Write-Host "    │     F2                                    (inline generation in term)  │" -ForegroundColor Yellow
+            Write-Host "    │                                                                        │" -ForegroundColor DarkCyan
+            Write-Host "    │   Short Commands & Subcommands:                                        │" -ForegroundColor Cyan
+            Write-Host "    │     ai status     or  aif status          (system information & model) │" -ForegroundColor Green
+            Write-Host "    │     ai models     |  aif -m               (list installed models)      │" -ForegroundColor Green
+            Write-Host "    │     ai model <name>                       (switch active Ollama model) │" -ForegroundColor Green
+            Write-Host "    │     ai lang en | uk                       (switch interface language)  │" -ForegroundColor Green
+            Write-Host "    │     ai config     |  aif -c               (view configuration JSON)    │" -ForegroundColor Green
+            Write-Host "    │                                                                        │" -ForegroundColor DarkCyan
+            Write-Host "    │   Short Flags & Execution:                                             │" -ForegroundColor Cyan
+            Write-Host "    │     ai `"cmd`" -x   or  aif `"cmd`" -x        (execute immediately)        │" -ForegroundColor Yellow
+            Write-Host "    │     ai `"cmd`" -c   or  aif `"cmd`" -c        (copy to clipboard)          │" -ForegroundColor Yellow
+            Write-Host "    │     ai `"cmd`" -Explain                   (generate with explanation)  │" -ForegroundColor Magenta
+            Write-Host "    │     ai `"cmd`" -Ask                       (direct educational answer)  │" -ForegroundColor Blue
+            Write-Host "    │                                                                        │" -ForegroundColor DarkCyan
+            Write-Host "    ╰────────────────────────────────────────────────────────────────────────╯" -ForegroundColor DarkCyan
         }
+
         Write-Host ""
         return
     }

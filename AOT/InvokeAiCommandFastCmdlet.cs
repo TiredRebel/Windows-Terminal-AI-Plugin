@@ -287,54 +287,71 @@ public class InvokeAiCommandFastCmdlet : PSCmdlet
         catch { }
     }
 
+    private void RenderHelpLine(string text, ConsoleColor color, int boxWidth = 70)
+    {
+        var pad = boxWidth - 2 - text.Length;
+        if (pad < 0) pad = 0;
+        Host.UI.Write(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    │ ");
+        Host.UI.Write(color, Host.UI.RawUI.BackgroundColor, text);
+        Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, new string(' ', pad) + " │");
+    }
+
     private void ShowQuickReference(bool isUk)
     {
+        const int bw = 70;
         Host.UI.WriteLine("");
         if (isUk)
         {
-            Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, "    ✦ Terminal AI Fast (AOT) • Швидка довідка");
-            Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╭──────────────────────────────────────────────────────────────────╮");
-            Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    │                                                                  │");
-            Host.UI.WriteLine(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, "    │   Використання:  ai-fast <опис команди природною мовою>          │");
-            Host.UI.WriteLine(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, "    │                  aif <опис команди>                              │");
-            Host.UI.WriteLine(ConsoleColor.Yellow, Host.UI.RawUI.BackgroundColor, "    │                  F2 (інлайн-генерація в терміналі)               │");
-            Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    │                                                                  │");
-            Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    │   Приклади:                                                      │");
-            Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, "    │     ai-fast показати 5 процесів з найбільшим CPU                 │");
-            Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, "    │     ai-fast знайти всі файли .log більше 50MB                    │");
-            Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, "    │     ai-fast status      (інформація про систему та налаштування) │");
-            Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, "    │     ai-fast model <модель>   (змінити модель Ollama)             │");
-            Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, "    │     ai-fast models           (список встановлених моделей)       │");
-            Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, "    │     ai-fast lang uk | en     (перемкнути мову інтерфейсу)        │");
-            Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, "    │     ai-fast config           (переглянути конфігурацію JSON)     │");
-            Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, "    │     ai-fast \"архівувати log\" -Explain  (з поясненням)            │");
-            Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, "    │     ai-fast \"як працює WSL?\" -Ask      (текстова відповідь)      │");
-            Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    │                                                                  │");
-            Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╰──────────────────────────────────────────────────────────────────╯\n");
+            Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, "    ✦ Terminal AI Fast (AOT) • Швидка довідка та аліаси");
+            Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╭" + new string('─', bw) + "╮");
+            RenderHelpLine("", ConsoleColor.White, bw);
+            RenderHelpLine("Основні команди та аліаси:", ConsoleColor.Cyan, bw);
+            RenderHelpLine("  aif <запит>  або  ai-fast <запит>    (швидкий бінарний модуль C#)", ConsoleColor.White, bw);
+            RenderHelpLine("  ?? <запит>   або  ai <запит>         (стандартний модуль)", ConsoleColor.White, bw);
+            RenderHelpLine("  F2                                   (інлайн-генерація в консолі)", ConsoleColor.Yellow, bw);
+            RenderHelpLine("", ConsoleColor.White, bw);
+            RenderHelpLine("Швидкі підкоманди та скорочення:", ConsoleColor.Cyan, bw);
+            RenderHelpLine("  aif status                           (стан системи, модель, мова)", ConsoleColor.Green, bw);
+            RenderHelpLine("  aif models    |  aif -m              (список моделей Ollama)", ConsoleColor.Green, bw);
+            RenderHelpLine("  aif model <назва>                    (змінити активну модель)", ConsoleColor.Green, bw);
+            RenderHelpLine("  aif lang en | uk                     (перемкнути мову інтерфейсу)", ConsoleColor.Green, bw);
+            RenderHelpLine("  aif config    |  aif -c              (переглянути конфігурацію JSON)", ConsoleColor.Green, bw);
+            RenderHelpLine("", ConsoleColor.White, bw);
+            RenderHelpLine("Короткі ключі (прапорці):", ConsoleColor.Cyan, bw);
+            RenderHelpLine("  aif \"...\" -x                         (виконати команду відразу)", ConsoleColor.Yellow, bw);
+            RenderHelpLine("  aif \"...\" -c                         (скопіювати в буфер обміну)", ConsoleColor.Yellow, bw);
+            RenderHelpLine("  aif \"...\" -Explain                   (генерація з детальним розбором)", ConsoleColor.Magenta, bw);
+            RenderHelpLine("  aif \"...\" -Ask                       (пряма текстова відповідь)", ConsoleColor.Blue, bw);
+            RenderHelpLine("", ConsoleColor.White, bw);
+            Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╰" + new string('─', bw) + "╯\n");
         }
         else
         {
-            Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, "    ✦ Terminal AI Fast (AOT) • Quick Reference");
-            Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╭──────────────────────────────────────────────────────────────────╮");
-            Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    │                                                                  │");
-            Host.UI.WriteLine(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, "    │   Usage:         ai-fast <natural language prompt>               │");
-            Host.UI.WriteLine(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, "    │                  aif <natural language prompt>                   │");
-            Host.UI.WriteLine(ConsoleColor.Yellow, Host.UI.RawUI.BackgroundColor, "    │                  F2 (inline generation in terminal)              │");
-            Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    │                                                                  │");
-            Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    │   Examples:                                                      │");
-            Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, "    │     ai-fast show top 5 processes by CPU usage                    │");
-            Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, "    │     ai-fast find all .log files larger than 50MB                 │");
-            Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, "    │     ai-fast status      (system information & settings)          │");
-            Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, "    │     ai-fast model <name>     (change active Ollama model)        │");
-            Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, "    │     ai-fast models           (view installed models)             │");
-            Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, "    │     ai-fast lang en | uk     (switch interface language)         │");
-            Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, "    │     ai-fast config           (view configuration JSON)           │");
-            Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, "    │     ai-fast \"archive logs\" -Explain  (with explanation)          │");
-            Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, "    │     ai-fast \"how does WSL work?\" -Ask (text explanation)         │");
-            Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    │                                                                  │");
-            Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╰──────────────────────────────────────────────────────────────────╯\n");
+            Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, "    ✦ Terminal AI Fast (AOT) • Quick Reference & Shortcuts");
+            Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╭" + new string('─', bw) + "╮");
+            RenderHelpLine("", ConsoleColor.White, bw);
+            RenderHelpLine("Primary Commands & Aliases:", ConsoleColor.Cyan, bw);
+            RenderHelpLine("  aif <prompt>  or  ai-fast <prompt>   (ultra-fast C# AOT module)", ConsoleColor.White, bw);
+            RenderHelpLine("  ?? <prompt>   or  ai <prompt>        (standard PowerShell module)", ConsoleColor.White, bw);
+            RenderHelpLine("  F2                                   (inline generation in terminal)", ConsoleColor.Yellow, bw);
+            RenderHelpLine("", ConsoleColor.White, bw);
+            RenderHelpLine("Short Commands & Subcommands:", ConsoleColor.Cyan, bw);
+            RenderHelpLine("  aif status                           (system information & settings)", ConsoleColor.Green, bw);
+            RenderHelpLine("  aif models    |  aif -m              (list installed Ollama models)", ConsoleColor.Green, bw);
+            RenderHelpLine("  aif model <name>                     (switch active Ollama model)", ConsoleColor.Green, bw);
+            RenderHelpLine("  aif lang en | uk                     (switch interface language)", ConsoleColor.Green, bw);
+            RenderHelpLine("  aif config    |  aif -c              (view configuration JSON)", ConsoleColor.Green, bw);
+            RenderHelpLine("", ConsoleColor.White, bw);
+            RenderHelpLine("Short Flags & Execution:", ConsoleColor.Cyan, bw);
+            RenderHelpLine("  aif \"...\" -x                         (generate and execute directly)", ConsoleColor.Yellow, bw);
+            RenderHelpLine("  aif \"...\" -c                         (generate and copy to clipboard)", ConsoleColor.Yellow, bw);
+            RenderHelpLine("  aif \"...\" -Explain                   (generate with code explanation)", ConsoleColor.Magenta, bw);
+            RenderHelpLine("  aif \"...\" -Ask                       (direct educational answer)", ConsoleColor.Blue, bw);
+            RenderHelpLine("", ConsoleColor.White, bw);
+            Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╰" + new string('─', bw) + "╯\n");
         }
     }
+
 
     private void ShowStatus(AiConfig cfg, bool isUk)
     {
