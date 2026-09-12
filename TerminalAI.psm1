@@ -293,10 +293,21 @@ function Show-TerminalAiHelp {
 
     $cfg = Get-TerminalAiConfig
     $isUk = ($cfg.Language -ne "en")
-    $bw = 74
+    $conWidth = 80
+    try {
+        if ($Host.UI.RawUI.WindowSize.Width -gt 20) {
+            $conWidth = $Host.UI.RawUI.WindowSize.Width
+        } elseif ([Console]::WindowWidth -gt 20) {
+            $conWidth = [Console]::WindowWidth
+        }
+    } catch { }
+
+    $bw = [Math]::Min(68, [Math]::Max(40, $conWidth - 8))
 
     $renderLine = {
         param([string]$Text, [System.ConsoleColor]$Color = [System.ConsoleColor]::White)
+        $maxLen = [Math]::Max(0, $bw - 2)
+        if ($Text.Length -gt $maxLen) { $Text = $Text.Substring(0, $maxLen) }
         $pad = $bw - 2 - $Text.Length
         if ($pad -lt 0) { $pad = 0 }
         Write-Host "    │ " -NoNewline -ForegroundColor DarkCyan
@@ -596,21 +607,52 @@ function Show-AiCodeCard {
 
     if (-not $Title) { $Title = Get-TerminalAiText "CardTitle" }
 
-    $lines = $Code -split "\r?\n"
-    $maxCodeLen = 0
-    foreach ($l in $lines) {
-        if ($l.Length -gt $maxCodeLen) { $maxCodeLen = $l.Length }
-    }
-
     $conWidth = 80
     try {
         if ($Host.UI.RawUI.WindowSize.Width -gt 20) {
             $conWidth = $Host.UI.RawUI.WindowSize.Width
+        } elseif ([Console]::WindowWidth -gt 20) {
+            $conWidth = [Console]::WindowWidth
         }
     } catch { }
 
-    $maxAllowed = [Math]::Max(66, $conWidth - 6)
-    $boxInnerWidth = [Math]::Min($maxAllowed, [Math]::Max(64, $maxCodeLen + 4))
+    $maxAllowedInner = [Math]::Max(30, $conWidth - 8)
+    $maxLineLen = $maxAllowedInner - 4
+
+    $lines = $Code -split "\r?\n"
+    $wrappedLines = @()
+    foreach ($l in $lines) {
+        if ($l.Length -le $maxLineLen) {
+            $wrappedLines += $l
+        } else {
+            $rem = $l
+            while ($rem.Length -gt $maxLineLen) {
+                $breakIdx = -1
+                $searchStart = [Math]::Max(0, $maxLineLen - 24)
+                for ($i = $maxLineLen; $i -ge $searchStart; $i--) {
+                    $ch = $rem[$i]
+                    if ($ch -eq ' ' -or $ch -eq '|') {
+                        $breakIdx = if ($ch -eq '|') { $i } else { $i + 1 }
+                        break
+                    }
+                }
+                if ($breakIdx -le 0 -or $breakIdx -gt $maxLineLen) {
+                    $breakIdx = $maxLineLen
+                }
+                $wrappedLines += $rem.Substring(0, $breakIdx).TrimEnd()
+                $rem = $rem.Substring($breakIdx).TrimStart()
+            }
+            if ($rem.Length -gt 0) { $wrappedLines += $rem }
+        }
+    }
+
+    $maxCodeLen = 0
+    foreach ($wl in $wrappedLines) {
+        if ($wl.Length -gt $maxCodeLen) { $maxCodeLen = $wl.Length }
+    }
+
+    $minBoxInner = [Math]::Min(54, $maxAllowedInner)
+    $boxInnerWidth = [Math]::Min($maxAllowedInner, [Math]::Max($minBoxInner, $maxCodeLen + 4))
 
     $headerLabel = " ✦ $Title"
     if ($Model) { $headerLabel += " • $Model" }
@@ -620,27 +662,12 @@ function Show-AiCodeCard {
     Write-Host ("    ╭" + ("─" * $boxInnerWidth) + "╮") -ForegroundColor $BorderColor
     Write-Host ("    │" + (" " * $boxInnerWidth) + "│") -ForegroundColor $BorderColor
 
-    foreach ($l in $lines) {
-        $chunks = @()
-        $maxLineLen = $boxInnerWidth - 4
-        if ($l.Length -le $maxLineLen) {
-            $chunks = @($l)
-        } else {
-            $rem = $l
-            while ($rem.Length -gt $maxLineLen) {
-                $chunks += $rem.Substring(0, $maxLineLen)
-                $rem = $rem.Substring($maxLineLen)
-            }
-            if ($rem.Length -gt 0) { $chunks += $rem }
-        }
-
-        foreach ($chunk in $chunks) {
-            $padRight = $boxInnerWidth - 4 - $chunk.Length
-            if ($padRight -lt 0) { $padRight = 0 }
-            Write-Host "    │  " -NoNewline -ForegroundColor $BorderColor
-            Write-Host $chunk -NoNewline -ForegroundColor $CodeColor
-            Write-Host ((" " * $padRight) + "  │") -ForegroundColor $BorderColor
-        }
+    foreach ($chunk in $wrappedLines) {
+        $padRight = $boxInnerWidth - 4 - $chunk.Length
+        if ($padRight -lt 0) { $padRight = 0 }
+        Write-Host "    │  " -NoNewline -ForegroundColor $BorderColor
+        Write-Host $chunk -NoNewline -ForegroundColor $CodeColor
+        Write-Host ((" " * $padRight) + "  │") -ForegroundColor $BorderColor
     }
 
     Write-Host ("    │" + (" " * $boxInnerWidth) + "│") -ForegroundColor $BorderColor
@@ -659,21 +686,47 @@ function Show-AiActionMenu {
     $tAsk = Get-TerminalAiText "MenuAsk"
     $tCancel = Get-TerminalAiText "MenuCancel"
 
-    Write-Host "    [Enter] " -NoNewline -ForegroundColor Green
-    Write-Host ("{0,-18}" -f $tEnter) -NoNewline -ForegroundColor White
-    Write-Host "[C] " -NoNewline -ForegroundColor Yellow
-    Write-Host ("{0,-18}" -f $tCopy) -NoNewline -ForegroundColor White
-    Write-Host "[I] " -NoNewline -ForegroundColor Cyan
-    Write-Host $tInsert -ForegroundColor White
+    $conWidth = 80
+    try {
+        if ($Host.UI.RawUI.WindowSize.Width -gt 20) {
+            $conWidth = $Host.UI.RawUI.WindowSize.Width
+        } elseif ([Console]::WindowWidth -gt 20) {
+            $conWidth = [Console]::WindowWidth
+        }
+    } catch { }
 
-    Write-Host "    [S]     " -NoNewline -ForegroundColor DarkYellow
-    Write-Host ("{0,-18}" -f $tAlias) -NoNewline -ForegroundColor White
-    Write-Host "[X] " -NoNewline -ForegroundColor Magenta
-    Write-Host ("{0,-18}" -f $tExplain) -NoNewline -ForegroundColor White
-    Write-Host "[A] " -NoNewline -ForegroundColor Blue
-    Write-Host ("{0,-18}" -f $tAsk) -NoNewline -ForegroundColor White
-    Write-Host " [Esc] " -NoNewline -ForegroundColor Gray
-    Write-Host "$tCancel`n" -ForegroundColor White
+    if ($conWidth -ge 110) {
+        Write-Host "    [Enter] " -NoNewline -ForegroundColor Green
+        Write-Host "$tEnter   " -NoNewline -ForegroundColor White
+        Write-Host "[C] " -NoNewline -ForegroundColor Yellow
+        Write-Host "$tCopy   " -NoNewline -ForegroundColor White
+        Write-Host "[I] " -NoNewline -ForegroundColor Cyan
+        Write-Host "$tInsert   " -NoNewline -ForegroundColor White
+        Write-Host "[S] " -NoNewline -ForegroundColor DarkYellow
+        Write-Host "$tAlias   " -NoNewline -ForegroundColor White
+        Write-Host "[X] " -NoNewline -ForegroundColor Magenta
+        Write-Host "$tExplain   " -NoNewline -ForegroundColor White
+        Write-Host "[A] " -NoNewline -ForegroundColor Blue
+        Write-Host "$tAsk   " -NoNewline -ForegroundColor White
+        Write-Host "[Esc] " -NoNewline -ForegroundColor Gray
+        Write-Host "$tCancel`n" -ForegroundColor White
+    } else {
+        Write-Host "    [Enter] " -NoNewline -ForegroundColor Green
+        Write-Host ("{0,-14} " -f $tEnter) -NoNewline -ForegroundColor White
+        Write-Host "[C] " -NoNewline -ForegroundColor Yellow
+        Write-Host ("{0,-14} " -f $tCopy) -NoNewline -ForegroundColor White
+        Write-Host "[I] " -NoNewline -ForegroundColor Cyan
+        Write-Host $tInsert -ForegroundColor White
+
+        Write-Host "    [S]     " -NoNewline -ForegroundColor DarkYellow
+        Write-Host ("{0,-14} " -f $tAlias) -NoNewline -ForegroundColor White
+        Write-Host "[X] " -NoNewline -ForegroundColor Magenta
+        Write-Host ("{0,-14} " -f $tExplain) -NoNewline -ForegroundColor White
+        Write-Host "[A] " -NoNewline -ForegroundColor Blue
+        Write-Host ("{0,-8} " -f $tAsk) -NoNewline -ForegroundColor White
+        Write-Host "[Esc] " -NoNewline -ForegroundColor Gray
+        Write-Host "$tCancel`n" -ForegroundColor White
+    }
 }
 
 function Clear-AiInputBuffer {
@@ -1359,7 +1412,7 @@ function Invoke-AiCommand {
     # Якщо вказано -Execute (-x або -y)
     if ($Execute) {
         Write-Host "    ▶ $(Get-TerminalAiText 'Executing') $command" -ForegroundColor Yellow
-        Invoke-Expression $command
+        Invoke-Expression $command | Out-Default
         return
     }
 
@@ -1377,7 +1430,7 @@ function Invoke-AiCommand {
         switch ($action) {
             'Execute' {
                 Write-Host "    ▶ $(Get-TerminalAiText 'Executing')`n" -ForegroundColor Yellow
-                Invoke-Expression $command
+                Invoke-Expression $command | Out-Default
                 return
             }
             'Cancel' {
@@ -1573,7 +1626,7 @@ Rules:
         switch ($fixAction) {
             'Execute' {
                 Write-Host "    ▶ $(Get-TerminalAiText 'ExecutingFixed')`n" -ForegroundColor Yellow
-                Invoke-Expression $fixedCode
+                Invoke-Expression $fixedCode | Out-Default
             }
             'Copy' {
                 Set-Clipboard -Value $fixedCode

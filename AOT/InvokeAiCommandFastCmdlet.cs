@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Management.Automation;
 using System.Text.RegularExpressions;
@@ -303,8 +304,16 @@ Rules:
     private void ExecuteCommand(string command, bool isUk)
     {
         Host.UI.WriteLine(ConsoleColor.Yellow, Host.UI.RawUI.BackgroundColor, isUk ? "    ▶ Виконання команди:\n" : "    ▶ Executing command:\n");
-        var scriptBlock = ScriptBlock.Create(command);
-        scriptBlock.Invoke();
+        try
+        {
+            var script = $". {{ {command} }} | Out-Default";
+            var scriptBlock = ScriptBlock.Create(script);
+            scriptBlock.Invoke();
+        }
+        catch (Exception ex)
+        {
+            Host.UI.WriteLine(ConsoleColor.Red, Host.UI.RawUI.BackgroundColor, $"    ✖ {ex.Message}\n");
+        }
     }
 
     private void ShowExplanation(AiConfig cfg, string model, string command, bool isUk)
@@ -401,8 +410,13 @@ Rules:
         catch { }
     }
 
-    private void RenderHelpLine(string text, ConsoleColor color, int boxWidth = 70)
+    private void RenderHelpLine(string text, ConsoleColor color, int boxWidth = 68)
     {
+        int maxTextLen = Math.Max(0, boxWidth - 2);
+        if (text.Length > maxTextLen)
+        {
+            text = text.Substring(0, maxTextLen);
+        }
         var pad = boxWidth - 2 - text.Length;
         if (pad < 0) pad = 0;
         Host.UI.Write(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    │ ");
@@ -412,7 +426,7 @@ Rules:
 
     private void ShowHelpTopic(string topic, bool isUk)
     {
-        const int bw = 74;
+        int bw = Math.Min(68, Math.Max(40, GetTerminalWidth() - 8));
         Host.UI.WriteLine("");
         switch (topic.ToLowerInvariant())
         {
@@ -837,24 +851,105 @@ Rules:
         catch { }
     }
 
+    private int GetTerminalWidth()
+    {
+        try
+        {
+            if (Host?.UI?.RawUI?.WindowSize.Width > 20)
+                return Host.UI.RawUI.WindowSize.Width;
+            if (Console.WindowWidth > 20)
+                return Console.WindowWidth;
+        }
+        catch { }
+        return 80;
+    }
+
+    private static List<string> WrapCode(string code, int maxWidth)
+    {
+        var result = new List<string>();
+        if (string.IsNullOrEmpty(code))
+        {
+            result.Add(string.Empty);
+            return result;
+        }
+
+        if (maxWidth < 20) maxWidth = 20;
+
+        var rawLines = code.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+        foreach (var rawLine in rawLines)
+        {
+            if (rawLine.Length <= maxWidth)
+            {
+                result.Add(rawLine);
+                continue;
+            }
+
+            var rem = rawLine;
+            while (rem.Length > maxWidth)
+            {
+                int breakIdx = -1;
+                int searchStart = Math.Max(0, maxWidth - 24);
+                for (int i = maxWidth; i >= searchStart; i--)
+                {
+                    if (rem[i] == ' ' || rem[i] == '|')
+                    {
+                        breakIdx = (rem[i] == '|') ? i : i + 1;
+                        break;
+                    }
+                }
+
+                if (breakIdx <= 0 || breakIdx > maxWidth)
+                {
+                    breakIdx = maxWidth;
+                }
+
+                result.Add(rem.Substring(0, breakIdx).TrimEnd());
+                rem = rem.Substring(breakIdx).TrimStart();
+            }
+
+            if (rem.Length > 0)
+            {
+                result.Add(rem);
+            }
+        }
+
+        return result;
+    }
+
     private void RenderCard(string code, string model, long elapsedMs, bool isUk)
     {
         var latency = $"{elapsedMs}ms";
         var title = isUk ? $"AI Команда (AOT • {latency})" : $"AI Command (AOT • {latency})";
-        var boxWidth = Math.Max(66, code.Length + 6);
+
+        int termWidth = GetTerminalWidth();
+        int maxAllowedInner = Math.Max(30, termWidth - 8);
+        int maxCodeWidth = maxAllowedInner - 4;
+
+        var wrappedLines = WrapCode(code, maxCodeWidth);
+        int maxLineLen = 0;
+        foreach (var l in wrappedLines)
+        {
+            if (l.Length > maxLineLen) maxLineLen = l.Length;
+        }
+
+        int minBoxInner = Math.Min(54, maxAllowedInner);
+        int boxInnerWidth = Math.Min(maxAllowedInner, Math.Max(minBoxInner, maxLineLen + 4));
 
         Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"\n    ✦ {title} • {model}");
-        Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╭" + new string('─', boxWidth) + "╮");
-        Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    │" + new string(' ', boxWidth) + "│");
+        Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╭" + new string('─', boxInnerWidth) + "╮");
+        Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    │" + new string(' ', boxInnerWidth) + "│");
 
-        var pad = boxWidth - 4 - code.Length;
-        if (pad < 0) pad = 0;
-        Host.UI.Write(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    │  ");
-        Host.UI.Write(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, code);
-        Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, new string(' ', pad) + "  │");
+        foreach (var line in wrappedLines)
+        {
+            var pad = boxInnerWidth - 4 - line.Length;
+            if (pad < 0) pad = 0;
+            Host.UI.Write(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    │  ");
+            Host.UI.Write(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, line);
+            Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, new string(' ', pad) + "  │");
+        }
 
-        Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    │" + new string(' ', boxWidth) + "│");
-        Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╰" + new string('─', boxWidth) + "╯\n");
+        Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    │" + new string(' ', boxInnerWidth) + "│");
+        Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╰" + new string('─', boxInnerWidth) + "╯\n");
     }
 
     private void RenderMenu(bool isUk, bool preferAliases)
@@ -867,20 +962,42 @@ Rules:
         var tAsk = isUk ? "Текст" : "Text";
         var tCancel = isUk ? "Скасувати" : "Cancel";
 
-        Host.UI.Write(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, "    [Enter] ");
-        Host.UI.Write(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, $"{tEnter}   ");
-        Host.UI.Write(ConsoleColor.Yellow, Host.UI.RawUI.BackgroundColor, "[C] ");
-        Host.UI.Write(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, $"{tCopy}   ");
-        Host.UI.Write(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, "[I] ");
-        Host.UI.Write(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, $"{tInsert}   ");
-        Host.UI.Write(ConsoleColor.DarkYellow, Host.UI.RawUI.BackgroundColor, "[S] ");
-        Host.UI.Write(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, $"{tAlias}   ");
-        Host.UI.Write(ConsoleColor.Magenta, Host.UI.RawUI.BackgroundColor, "[X] ");
-        Host.UI.Write(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, $"{tExplain}   ");
-        Host.UI.Write(ConsoleColor.Blue, Host.UI.RawUI.BackgroundColor, "[A] ");
-        Host.UI.Write(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, $"{tAsk}   ");
-        Host.UI.Write(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, "[Esc] ");
-        Host.UI.WriteLine(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, $"{tCancel}\n");
+        int termWidth = GetTerminalWidth();
+        if (termWidth >= 110)
+        {
+            Host.UI.Write(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, "    [Enter] ");
+            Host.UI.Write(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, $"{tEnter}   ");
+            Host.UI.Write(ConsoleColor.Yellow, Host.UI.RawUI.BackgroundColor, "[C] ");
+            Host.UI.Write(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, $"{tCopy}   ");
+            Host.UI.Write(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, "[I] ");
+            Host.UI.Write(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, $"{tInsert}   ");
+            Host.UI.Write(ConsoleColor.DarkYellow, Host.UI.RawUI.BackgroundColor, "[S] ");
+            Host.UI.Write(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, $"{tAlias}   ");
+            Host.UI.Write(ConsoleColor.Magenta, Host.UI.RawUI.BackgroundColor, "[X] ");
+            Host.UI.Write(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, $"{tExplain}   ");
+            Host.UI.Write(ConsoleColor.Blue, Host.UI.RawUI.BackgroundColor, "[A] ");
+            Host.UI.Write(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, $"{tAsk}   ");
+            Host.UI.Write(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, "[Esc] ");
+            Host.UI.WriteLine(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, $"{tCancel}\n");
+        }
+        else
+        {
+            Host.UI.Write(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, "    [Enter] ");
+            Host.UI.Write(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, $"{tEnter,-14} ");
+            Host.UI.Write(ConsoleColor.Yellow, Host.UI.RawUI.BackgroundColor, "[C] ");
+            Host.UI.Write(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, $"{tCopy,-14} ");
+            Host.UI.Write(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, "[I] ");
+            Host.UI.WriteLine(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, tInsert);
+
+            Host.UI.Write(ConsoleColor.DarkYellow, Host.UI.RawUI.BackgroundColor, "    [S]     ");
+            Host.UI.Write(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, $"{tAlias,-14} ");
+            Host.UI.Write(ConsoleColor.Magenta, Host.UI.RawUI.BackgroundColor, "[X] ");
+            Host.UI.Write(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, $"{tExplain,-14} ");
+            Host.UI.Write(ConsoleColor.Blue, Host.UI.RawUI.BackgroundColor, "[A] ");
+            Host.UI.Write(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, $"{tAsk,-8} ");
+            Host.UI.Write(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, "[Esc] ");
+            Host.UI.WriteLine(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, $"{tCancel}\n");
+        }
     }
 
     private void CopyToClipboard(string text)
