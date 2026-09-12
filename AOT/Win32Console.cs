@@ -36,8 +36,21 @@ public static class Win32Console
         });
     }
 
+    public static void FlushInputBuffer()
+    {
+        try
+        {
+            while (Console.KeyAvailable)
+            {
+                Console.ReadKey(true);
+            }
+        }
+        catch { }
+    }
+
     public static MenuAction ReadMenuAction()
     {
+        FlushInputBuffer();
         while (true)
         {
             var keyInfo = Console.ReadKey(true);
