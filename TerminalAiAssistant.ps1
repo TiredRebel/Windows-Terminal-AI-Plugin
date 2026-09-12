@@ -419,6 +419,11 @@ while ($true) {
     }
     elseif ($inputQuery -match '^/inspect(?:\s+(.+))?$') {
         $inspectSub = $Matches[1]
+        if ($inspectSub -match '^(?:clear|reset)$') {
+            $global:Error.Clear()
+            Write-Host "  ✔ Session system error log cleared." -ForegroundColor Green
+            continue
+        }
         Write-Host "`n$($txt.EnvTitle)" -ForegroundColor Cyan
         Write-Host "  • PowerShell: $($PSVersionTable.PSVersion) ($($PSVersionTable.PSEdition))" -ForegroundColor Gray
         Write-Host "  • OS: $([System.Environment]::OSVersion.VersionString)" -ForegroundColor Gray

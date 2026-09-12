@@ -10,7 +10,7 @@ try {
 
 # Завантажуємо збірку System.Net.Http для надійної роботи в Windows PowerShell 5.1
 try {
-    Add-Type -AssemblyName System.Net.Http -ErrorAction SilentlyContinue
+    Add-Type -AssemblyName System.Net.Http -ErrorAction Ignore
 } catch { }
 
 # Завантажуємо допоміжний модуль конфігурації
@@ -34,7 +34,7 @@ if ($PSVersionTable.PSVersion.Major -ge 7) {
     foreach ($cand in $aotCandidates) {
         if (Test-Path $cand) {
             try {
-                Import-Module $cand -Global -ErrorAction SilentlyContinue
+                Import-Module $cand -Global -ErrorAction Ignore
                 break
             } catch { }
         }

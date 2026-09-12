@@ -315,30 +315,80 @@ foreach ($userModuleBase in $candidateRoots) {
         New-Item -ItemType Directory -Path $destModuleDir -Force | Out-Null
     }
 
-    # Copy module files
-    Copy-Item -Path (Join-Path $projectDir "TerminalAI.psd1") -Destination $destModuleDir -Force
-    Copy-Item -Path (Join-Path $projectDir "TerminalAI.psm1") -Destination $destModuleDir -Force
-    Copy-Item -Path (Join-Path $projectDir "TerminalAiConfig.ps1") -Destination $destModuleDir -Force
-    Copy-Item -Path (Join-Path $projectDir "TerminalAiAssistant.ps1") -Destination $destModuleDir -Force
-    Copy-Item -Path (Join-Path $projectDir "TerminalAiAgent.ps1") -Destination $destModuleDir -Force
+    # Copy core module files
+    $coreFiles = @("TerminalAI.psd1", "TerminalAI.psm1", "TerminalAiConfig.ps1", "TerminalAiAssistant.ps1", "TerminalAiAgent.ps1")
+    foreach ($file in $coreFiles) {
+        $srcPath = Join-Path $projectDir $file
+        if (Test-Path $srcPath) {
+            Copy-Item -Path $srcPath -Destination $destModuleDir -Force -ErrorAction Ignore
+        }
+    }
 
-    $aotDllPath = Join-Path $projectDir "TerminalAI.Aot.dll"
-    if (-not (Test-Path $aotDllPath)) {
-        $aotDllPath = Join-Path $projectDir "AOT\bin\Release\net10.0\TerminalAI.Aot.dll"
-    }
-    if (Test-Path $aotDllPath) {
-        try {
-            Copy-Item -Path $aotDllPath -Destination $destModuleDir -Force -ErrorAction Stop
-        } catch { }
-    }
-    $aotHelpPath = Join-Path $projectDir "TerminalAI.Aot.dll-Help.xml"
-    if (-not (Test-Path $aotHelpPath)) {
-        $aotHelpPath = Join-Path $projectDir "AOT\TerminalAI.Aot.dll-Help.xml"
-    }
-    if (Test-Path $aotHelpPath) {
-        try {
-            Copy-Item -Path $aotHelpPath -Destination $destModuleDir -Force -ErrorAction Stop
-        } catch { }
+    # Only deploy AOT binary to PowerShell 7+ locations (WindowsPowerShell 5.1 runs on .NET Framework 4.8 and cannot load .NET 10 AOT binaries)
+    $isWindowsPowerShellPath = $destModuleDir -like "*WindowsPowerShell*"
+    if ($isWindowsPowerShellPath) {
+        $staleAot = Join-Path $destModuleDir "TerminalAI.Aot.dll"
+        if (Test-Path $staleAot) {
+            Remove-Item -Path $staleAot -Force -ErrorAction Ignore
+        }
+        $staleHelp = Join-Path $destModuleDir "TerminalAI.Aot.dll-Help.xml"
+        if (Test-Path $staleHelp) {
+            Remove-Item -Path $staleHelp -Force -ErrorAction Ignore
+        }
+    } else {
+        $aotDllPath = Join-Path $projectDir "TerminalAI.Aot.dll"
+        if (-not (Test-Path $aotDllPath)) {
+            $aotDllPath = Join-Path $projectDir "AOT\bin\Release\net10.0\TerminalAI.Aot.dll"
+        }
+        if (Test-Path $aotDllPath) {
+            $destAot = Join-Path $destModuleDir (Split-Path -Leaf $aotDllPath)
+            $needsCopy = $true
+            if (Test-Path $destAot) {
+                try {
+                    $srcItem = Get-Item $aotDllPath -ErrorAction Ignore
+                    $dstItem = Get-Item $destAot -ErrorAction Ignore
+                    if ($srcItem -and $dstItem -and $srcItem.Length -eq $dstItem.Length -and $srcItem.LastWriteTimeUtc -eq $dstItem.LastWriteTimeUtc) {
+                        $needsCopy = $false
+                    }
+                } catch { }
+            }
+            if ($needsCopy) {
+                $errCountBefore = $global:Error.Count
+                try {
+                    [System.IO.File]::Copy($aotDllPath, $destAot, $true)
+                } catch [System.IO.IOException] {
+                    while ($global:Error.Count -gt $errCountBefore) {
+                        $global:Error.RemoveAt(0)
+                    }
+                    $msgLocked = if ($isUk) { 
+                        "   ℹ TerminalAI.Aot.dll використовується активним процесом; збережено поточну збірку." 
+                    } else { 
+                        "   ℹ TerminalAI.Aot.dll is in use by an active session; retained existing binary." 
+                    }
+                    Write-Host $msgLocked -ForegroundColor DarkGray
+                } catch {
+                    while ($global:Error.Count -gt $errCountBefore) {
+                        $global:Error.RemoveAt(0)
+                    }
+                }
+            }
+        }
+
+        $aotHelpPath = Join-Path $projectDir "TerminalAI.Aot.dll-Help.xml"
+        if (-not (Test-Path $aotHelpPath)) {
+            $aotHelpPath = Join-Path $projectDir "AOT\TerminalAI.Aot.dll-Help.xml"
+        }
+        if (Test-Path $aotHelpPath) {
+            $destHelp = Join-Path $destModuleDir (Split-Path -Leaf $aotHelpPath)
+            $errCountBefore = $global:Error.Count
+            try {
+                [System.IO.File]::Copy($aotHelpPath, $destHelp, $true)
+            } catch {
+                while ($global:Error.Count -gt $errCountBefore) {
+                    $global:Error.RemoveAt(0)
+                }
+            }
+        }
     }
 
     $msgSynced = if ($isUk) { "   ✔ Модуль успішно синхронізовано з: $destModuleDir" } else { "   ✔ Module successfully synchronized to: $destModuleDir" }

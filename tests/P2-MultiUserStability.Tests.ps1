@@ -240,6 +240,17 @@ Set-Alias -Name np -Value notepad.exe
         $LASTEXITCODE -eq 0
     }
 
+    # FIX-P2-15: Installer runs cleanly without polluting $global:Error
+    Assert-P2Fixture "FIX-P2-15" "Installer runs cleanly without polluting `$global:Error even when files exist" {
+        $instCmd = "`$global:Error.Clear(); & '$moduleRoot\Install-TerminalAi.ps1' -AutoConfirm -SkipOllamaCheck -CustomModulePath '$testRoot\TestModules' -CustomProfilePath '$testRoot\TestProfile.ps1' | Out-Null; exit `$global:Error.Count"
+        $instRun = if ($PSVersionTable.PSVersion.Major -ge 7) {
+            pwsh -NoProfile -Command $instCmd
+        } else {
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -Command $instCmd
+        }
+        $LASTEXITCODE -eq 0
+    }
+
 } finally {
     if (Test-Path $testRoot) {
         Remove-Item -Path $testRoot -Recurse -Force -ErrorAction SilentlyContinue
