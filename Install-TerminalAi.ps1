@@ -88,7 +88,7 @@ if (-not (Test-Path $manifestPath)) {
 # 2. Ollama availability & installation
 $step1 = if ($isUk) { "1. Перевірка Ollama в системі..." } else { "1. Checking Ollama in system..." }
 Write-Host $step1 -ForegroundColor Yellow
-$ollamaCmd = Get-Command ollama -ErrorAction SilentlyContinue
+$ollamaCmd = Get-Command ollama -ErrorAction Ignore
 $ollamaExeCandidates = @(
     "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe",
     "${env:ProgramFiles}\Ollama\ollama.exe"
@@ -99,7 +99,7 @@ if (-not $ollamaCmd) {
         if (Test-Path $candidate) {
             $ollamaDir = Split-Path -Parent $candidate
             $env:Path = "$ollamaDir;" + $env:Path
-            $ollamaCmd = Get-Command ollama -ErrorAction SilentlyContinue
+            $ollamaCmd = Get-Command ollama -ErrorAction Ignore
             break
         }
     }
@@ -121,7 +121,7 @@ if (-not $ollamaCmd) {
         $msgStartInstall = if ($isUk) { "   ▶ Початок встановлення Ollama..." } else { "   ▶ Starting Ollama installation..." }
         Write-Host $msgStartInstall -ForegroundColor Cyan
         $installedViaWinget = $false
-        if (Get-Command winget -ErrorAction SilentlyContinue) {
+        if (Get-Command winget -ErrorAction Ignore) {
             $msgWinget = if ($isUk) { "   • Встановлення через winget з таймером та прогресом..." } else { "   • Installing via winget..." }
             Write-Host $msgWinget -ForegroundColor DarkGray
             try {
@@ -149,7 +149,7 @@ if (-not $ollamaCmd) {
                 break
             }
         }
-        $ollamaCmd = Get-Command ollama -ErrorAction SilentlyContinue
+        $ollamaCmd = Get-Command ollama -ErrorAction Ignore
         if ($ollamaCmd) {
             $msgInstalled = if ($isUk) { "   ✔ Ollama успішно встановлена!" } else { "   ✔ Ollama installed successfully!" }
             Write-Host $msgInstalled -ForegroundColor Green
@@ -182,7 +182,7 @@ if (-not $SkipOllamaCheck) {
         } catch { }
     }
 
-    if (-not $isApiReady -and (Get-Command ollama -ErrorAction SilentlyContinue)) {
+    if (-not $isApiReady -and (Get-Command ollama -ErrorAction Ignore)) {
         $msgServeStart = if ($isUk) { "   • Служба Ollama не активна. Запуск фонового процесу..." } else { "   • Ollama service is inactive. Starting background process..." }
         Write-Host $msgServeStart -ForegroundColor DarkYellow
         Start-Process "ollama" -ArgumentList "serve" -WindowStyle Hidden -ErrorAction SilentlyContinue
@@ -253,7 +253,7 @@ if ($PreferredModel) {
 }
 
 # Pull model if missing
-if (-not $SkipOllamaCheck -and $installedModels -notcontains $selectedModel -and (Get-Command ollama -ErrorAction SilentlyContinue)) {
+if (-not $SkipOllamaCheck -and $installedModels -notcontains $selectedModel -and (Get-Command ollama -ErrorAction Ignore)) {
     $msgMissing = if ($isUk) { "`n   ⚠ Модель '$selectedModel' ще не завантажена в Ollama." } else { "`n   ⚠ Model '$selectedModel' is not yet downloaded in Ollama." }
     Write-Host $msgMissing -ForegroundColor DarkYellow
     $shouldPull = $false

@@ -21,7 +21,7 @@ function Find-ClaudeCodeExecutable {
 
     # 2. Check PATH via Get-Command
     try {
-        $cmd = Get-Command "claude" -ErrorAction SilentlyContinue
+        $cmd = Get-Command "claude" -ErrorAction Ignore
         if ($cmd) {
             $src = if ($cmd.Source) { $cmd.Source } else { $cmd.Path }
             if ($src -and (Test-Path $src)) {

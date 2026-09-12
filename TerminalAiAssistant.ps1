@@ -350,7 +350,7 @@ function Add-AssistantHistoryMessage {
     }
 
     # Детерміноване маскування секретних даних перед збереженням у контекст
-    $sanitized = if (Get-Command Protect-AiSecretData -ErrorAction SilentlyContinue) {
+    $sanitized = if (Get-Command Protect-AiSecretData -ErrorAction Ignore) {
         Protect-AiSecretData -Text $Content
     } else {
         $Content
@@ -426,12 +426,20 @@ while ($true) {
         Write-Host "  • Active Model: $activeModel" -ForegroundColor Gray
         Write-Host "  • Active Language: $currentLang" -ForegroundColor Gray
         if ($global:Error.Count -gt 0) {
-            Write-Host "  • Last System Error: $($global:Error[0].Exception.Message)" -ForegroundColor Red
+            $lastErr = $global:Error[0]
+            $errText = if ($lastErr.Exception -and $lastErr.Exception.Message) { $lastErr.Exception.Message } else { $lastErr.ToString() }
+            Write-Host "  • Last System Error: $errText" -ForegroundColor Red
         } else {
             Write-Host "  • Last System Error: None" -ForegroundColor Gray
         }
         if ($inspectSub -match 'add|inject|context') {
-            $envNote = "Environment Context: PS $($PSVersionTable.PSVersion), Path: $((Get-Location).Path), LastError: $(if ($global:Error.Count -gt 0) { $global:Error[0].Exception.Message } else { 'None' })"
+            $errSnippet = if ($global:Error.Count -gt 0) {
+                $lastErr = $global:Error[0]
+                if ($lastErr.Exception -and $lastErr.Exception.Message) { $lastErr.Exception.Message } else { $lastErr.ToString() }
+            } else {
+                'None'
+            }
+            $envNote = "Environment Context: PS $($PSVersionTable.PSVersion), Path: $((Get-Location).Path), LastError: $errSnippet"
             Add-AssistantHistoryMessage -Role "user" -Content $envNote
             Write-Host "  ✔ Environment snapshot added to conversation context!" -ForegroundColor Green
         }

@@ -62,7 +62,7 @@
         "action": "splitPane",
         "split": "vertical",
         "size": 0.4,
-        "commandline": "powershell.exe -NoExit -Command \"if (Get-Command pwsh -ErrorAction SilentlyContinue) { & pwsh -NoExit -Command 'Import-Module TerminalAI -ErrorAction SilentlyContinue; Invoke-AiAssistant' } else { Import-Module TerminalAI -ErrorAction SilentlyContinue; Invoke-AiAssistant }\""
+        "commandline": "powershell.exe -NoExit -Command \"if (Get-Command pwsh -ErrorAction Ignore) { & pwsh -NoExit -Command 'Import-Module TerminalAI -ErrorAction Ignore; Invoke-AiAssistant' } else { Import-Module TerminalAI -ErrorAction Ignore; Invoke-AiAssistant }\""
       }
     }
   ]

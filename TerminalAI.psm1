@@ -2725,7 +2725,7 @@ Requirements:
     if ($OutputPath) {
         $saved = Save-AiScriptFile -Path $OutputPath -Content $scriptContent
         if ($saved -and $Edit) {
-            if (Get-Command code -ErrorAction SilentlyContinue) {
+            if (Get-Command code -ErrorAction Ignore) {
                 code $OutputPath
             } else {
                 notepad $OutputPath
@@ -2976,7 +2976,7 @@ function Test-TerminalAiInstallation {
     # 9. Claude Code Agent Mode (Optional)
     $agentReadiness = $null
     try {
-        if (Get-Command Test-AiAgentReadiness -ErrorAction SilentlyContinue) {
+        if (Get-Command Test-AiAgentReadiness -ErrorAction Ignore) {
             $agentReadiness = Test-AiAgentReadiness -PassThru
         }
     } catch { }
@@ -3273,14 +3273,14 @@ function Register-TerminalAiArgumentCompleters {
         )
         $topics | Where-Object { $_.CompletionText -like "$wordToComplete*" }
     }
-    Register-ArgumentCompleter -CommandName @('Show-TerminalAiHelp', 'ai-help') -ParameterName 'Topic' -ScriptBlock $topicCompleter -ErrorAction SilentlyContinue
+    Register-ArgumentCompleter -CommandName @('Show-TerminalAiHelp', 'ai-help') -ParameterName 'Topic' -ScriptBlock $topicCompleter -ErrorAction Ignore
 
     # 2. Динамічне автодоповнення моделей Ollama для параметра -Model
     $modelCompleter = {
         param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
         & $script:TerminalAiGetModels $wordToComplete
     }
-    Register-ArgumentCompleter -CommandName $commands -ParameterName 'Model' -ScriptBlock $modelCompleter -ErrorAction SilentlyContinue
+    Register-ArgumentCompleter -CommandName $commands -ParameterName 'Model' -ScriptBlock $modelCompleter -ErrorAction Ignore
 
     # 3. Контекстне автодоповнення для Prompt (підкоманди, теми, мови, моделі)
     $promptCompleter = {
@@ -3349,7 +3349,7 @@ function Register-TerminalAiArgumentCompleters {
 
         return @()
     }
-    Register-ArgumentCompleter -CommandName $commands -ParameterName 'Prompt' -ScriptBlock $promptCompleter -ErrorAction SilentlyContinue
+    Register-ArgumentCompleter -CommandName $commands -ParameterName 'Prompt' -ScriptBlock $promptCompleter -ErrorAction Ignore
 }
 
 # --- АЛІАСИ ТА АВТОЗАВАНТАЖЕННЯ МОДУЛЯ ---
@@ -3362,7 +3362,12 @@ Set-Alias -Name ai-lang-default -Value Set-TerminalAiDefaultLanguage
 Set-Alias -Name ai-chat -Value Invoke-AiAssistant
 Set-Alias -Name ai-assistant -Value Invoke-AiAssistant
 
-if (Get-Command Invoke-AiCommandFast -ErrorAction SilentlyContinue) {
+$hasFastCmdlet = $false
+if ($PSVersionTable.PSVersion.Major -ge 7) {
+    $hasFastCmdlet = $null -ne ($ExecutionContext.SessionState.InvokeCommand.GetCmdlet("Invoke-AiCommandFast"))
+}
+
+if ($hasFastCmdlet) {
     Set-Alias -Name aif -Value Invoke-AiCommandFast
     Set-Alias -Name ai-fast -Value Invoke-AiCommandFast
 } else {
@@ -3374,7 +3379,7 @@ Register-TerminalAiKeyHandler
 Register-TerminalAiArgumentCompleters
 
 $exportCmdlets = @()
-if (Get-Command -Name "Invoke-AiCommandFast" -CommandType Cmdlet -ErrorAction SilentlyContinue) {
+if ($hasFastCmdlet) {
     $exportCmdlets = @("Invoke-AiCommandFast")
 }
 

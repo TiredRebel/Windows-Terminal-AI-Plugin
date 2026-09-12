@@ -226,8 +226,18 @@ Set-Alias -Name np -Value notepad.exe
 
     # FIX-P2-13: ai-doctor alias execution
     Assert-P2Fixture "FIX-P2-13" "ai-doctor alias invokes diagnostic health engine" {
-        $aliasCmd = Get-Command ai-doctor -ErrorAction SilentlyContinue
+        $aliasCmd = Get-Command ai-doctor -ErrorAction Ignore
         ($null -ne $aliasCmd) -and ($aliasCmd.ResolvedCommandName -eq "Test-TerminalAiInstallation")
+    }
+
+    # FIX-P2-14: Clean session state and zero $global:Error pollution on import
+    Assert-P2Fixture "FIX-P2-14" "Module import produces zero errors in `$global:Error without autoload recursion" {
+        $cleanRun = if ($PSVersionTable.PSVersion.Major -ge 7) {
+            pwsh -NoProfile -Command "`$global:Error.Clear(); Import-Module '$moduleRoot\TerminalAI.psd1' -Force; exit `$global:Error.Count"
+        } else {
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "`$global:Error.Clear(); Import-Module '$moduleRoot\TerminalAI.psd1' -Force; exit `$global:Error.Count"
+        }
+        $LASTEXITCODE -eq 0
     }
 
 } finally {
