@@ -1,4 +1,4 @@
-# TerminalAiConfig.ps1 - Конфігурація TerminalAI, керування мовами та шрифтами
+﻿# TerminalAiConfig.ps1 - Конфігурація TerminalAI, керування мовами та шрифтами
 
 function Get-TerminalAiConfigPath {
     $configDir = Join-Path $HOME ".terminal-ai"
@@ -355,8 +355,7 @@ function Update-TerminalAiFragment {
     param([string]$Language)
 
     $isEn = ($Language -eq "en")
-    $userModuleBase = ($env:PSModulePath -split ';')[0]
-    $assistantScriptPath = (Join-Path (Join-Path $userModuleBase "TerminalAI") "TerminalAiAssistant.ps1") -replace '\\', '\\'
+    $assistantCommand = "pwsh.exe -NoExit -Command `"Import-Module TerminalAI -ErrorAction SilentlyContinue; Invoke-AiAssistant`""
 
     $actionAsk = if ($isEn) { "AI: Ask Ollama (ai)" } else { "AI: Запитати Ollama (ai)" }
     $actionFix = if ($isEn) { "AI: Fix last error (ai-fix)" } else { "AI: Виправити останню помилку (ai-fix)" }
@@ -368,7 +367,7 @@ function Update-TerminalAiFragment {
             [ordered]@{
                 name = "Terminal AI Assistant"
                 guid = "{62068dd4-52e9-41f7-9feb-987581e2e117}"
-                commandline = "pwsh.exe -NoExit -File `"$assistantScriptPath`""
+                commandline = $assistantCommand
                 icon = "🤖"
                 tabTitle = "AI Assistant (Ollama)"
                 startingDirectory = "%USERPROFILE%"
@@ -410,7 +409,7 @@ function Update-TerminalAiFragment {
                     action = "splitPane"
                     split = "vertical"
                     size = 0.4
-                    commandline = "pwsh.exe -NoExit -File `"$assistantScriptPath`""
+                    commandline = $assistantCommand
                 }
             }
         )

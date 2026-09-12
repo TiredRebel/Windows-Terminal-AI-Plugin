@@ -1,4 +1,4 @@
-# TerminalAI.psm1 - PowerShell AI Розширення на базі локальної Ollama
+﻿# TerminalAI.psm1 - PowerShell AI Розширення на базі локальної Ollama
 # Requires -Version 5.1
 
 # Забезпечуємо повну підтримку UTF-8 для коректного відображення кирилиці в консолі
@@ -6,6 +6,11 @@ try {
     [Console]::InputEncoding = [System.Text.Encoding]::UTF8
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     $OutputEncoding = [System.Text.Encoding]::UTF8
+} catch { }
+
+# Завантажуємо збірку System.Net.Http для надійної роботи в Windows PowerShell 5.1
+try {
+    Add-Type -AssemblyName System.Net.Http -ErrorAction SilentlyContinue
 } catch { }
 
 # Завантажуємо допоміжний модуль конфігурації
@@ -86,9 +91,11 @@ function Format-AiCodeOutput {
         $clean = $Matches[1].Trim()
     }
 
-    # Видаляємо блок markdown (```powershell ... ``` або ``` ... ```)
+    # Видаляємо блок markdown (```powershell ... ``` або ``` ... ```, включаючи незакриті блоки)
     if ($clean -match '(?si)```(?:powershell|pwsh)?\r?\n?(.*?)\r?\n?```') {
         $clean = $Matches[1].Trim()
+    } elseif ($clean -match '(?si)```(?:powershell|pwsh)?\r?\n?(.*)') {
+        $clean = ($Matches[1] -replace '(?s)```$', '').Trim()
     }
     # Видаляємо одинарні зворотні лапки якщо рядок ними обгорнутий
     if ($clean.StartsWith('`') -and $clean.EndsWith('`') -and $clean.Length -gt 2) {
@@ -152,7 +159,7 @@ function ConvertTo-AiFullCmdlets {
         $sh = $p.Short
         $full = $p.Full
         if ($sh -in @("?", "%")) {
-            $pattern = "(?<=[|\(\{{;\s]|^)\" + [regex]::Escape($sh) + "(?=\s|[\{{])"
+            $pattern = "(?<=[|\({;\s]|^)" + [regex]::Escape($sh) + "(?=\s|[{])"
             $Code = [regex]::Replace($Code, $pattern, $full)
         } else {
             $pattern = "(?<![\w\-])\b" + [regex]::Escape($sh) + "\b(?![\w\-])"
@@ -504,7 +511,7 @@ function Show-TerminalAiHelp {
             & $renderLine ""
             if ($isUk) {
                 & $renderLine "ФАЙЛ КОНФІГУРАЦІЇ:" ([System.ConsoleColor]::Cyan)
-                & $renderLine "  Розташування: ~/.terminalai/config.json" ([System.ConsoleColor]::White)
+                & $renderLine "  Розташування: ~/.terminal-ai/config.json" ([System.ConsoleColor]::White)
                 & $renderLine "  Перегляд:     aif config   або   ai config" ([System.ConsoleColor]::Green)
                 & $renderLine ""
                 & $renderLine "ОСНОВНІ ПАРАМЕТРИ:" ([System.ConsoleColor]::Cyan)
@@ -522,7 +529,7 @@ function Show-TerminalAiHelp {
                 & $renderLine "  ai font <назва> [розмір] Змінити шрифт Windows Terminal" ([System.ConsoleColor]::Yellow)
             } else {
                 & $renderLine "CONFIGURATION FILE:" ([System.ConsoleColor]::Cyan)
-                & $renderLine "  Location: ~/.terminalai/config.json" ([System.ConsoleColor]::White)
+                & $renderLine "  Location: ~/.terminal-ai/config.json" ([System.ConsoleColor]::White)
                 & $renderLine "  View:     aif config   or   ai config" ([System.ConsoleColor]::Green)
                 & $renderLine ""
                 & $renderLine "KEY SETTINGS:" ([System.ConsoleColor]::Cyan)
@@ -563,7 +570,7 @@ function Show-TerminalAiHelp {
                 & $renderLine "  ai-help models    Вимоги до пам'яті та рекомендації моделей Ollama" ([System.ConsoleColor]::Green)
                 & $renderLine "  ai-help examples  Реальні приклади адміністрування та автоматизації" ([System.ConsoleColor]::Green)
                 & $renderLine "  ai-help workflow  Посібник по роботі з меню, інлайном та помилками" ([System.ConsoleColor]::Green)
-                & $renderLine "  ai-help config    Довідник конфігурації (~/.terminalai/config.json)" ([System.ConsoleColor]::Green)
+                & $renderLine "  ai-help config    Довідник конфігурації (~/.terminal-ai/config.json)" ([System.ConsoleColor]::Green)
                 & $renderLine ""
                 & $renderLine "ОФІЦІЙНА ДОПОМОГА POWERSHELL:" ([System.ConsoleColor]::Cyan)
                 & $renderLine "  Get-Help aif -Full        Повна man-сторінка з синтаксисом і типами" ([System.ConsoleColor]::DarkGray)
@@ -582,7 +589,7 @@ function Show-TerminalAiHelp {
                 & $renderLine "  ai-help models    VRAM requirements & coding LLM recommendations" ([System.ConsoleColor]::Green)
                 & $renderLine "  ai-help examples  Practical sysadmin & automation pipeline examples" ([System.ConsoleColor]::Green)
                 & $renderLine "  ai-help workflow  Workflow guide for menus, inline, and error fixing" ([System.ConsoleColor]::Green)
-                & $renderLine "  ai-help config    Configuration guide (~/.terminalai/config.json)" ([System.ConsoleColor]::Green)
+                & $renderLine "  ai-help config    Configuration guide (~/.terminal-ai/config.json)" ([System.ConsoleColor]::Green)
                 & $renderLine ""
                 & $renderLine "NATIVE POWERSHELL HELP:" ([System.ConsoleColor]::Cyan)
                 & $renderLine "  Get-Help aif -Full        Full MAML manual with parameters and types" ([System.ConsoleColor]::DarkGray)
@@ -863,10 +870,13 @@ function Get-AiMenuKeyPress {
 }
 
 function Invoke-OllamaApi {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'Prompt')]
     param(
-        [Parameter(Mandatory = $true)]
+        [Parameter(ParameterSetName = 'Prompt', Position = 0)]
         [string]$Prompt,
+
+        [Parameter(ParameterSetName = 'Chat', Mandatory = $true)]
+        [object[]]$Messages,
 
         [string]$SystemPrompt = "",
         [string]$Model,
@@ -876,40 +886,93 @@ function Invoke-OllamaApi {
 
     $cfg = Get-TerminalAiConfig
     $targetModel = if ($Model) { $Model } else { $cfg.Model }
-    $targetUrl = "$($cfg.OllamaUrl.TrimEnd('/'))/api/generate"
     $targetTemp = if ($PSBoundParameters.ContainsKey('Temperature')) { $Temperature } else { $cfg.Temperature }
 
-    $payload = @{
-        model      = $targetModel
-        prompt     = $Prompt
-        stream     = [bool]$Stream
-        keep_alive = "1h"
-        options    = @{
-            temperature = $targetTemp
-            num_ctx     = 2048
+    # Визначаємо режим: Chat (/api/chat) або Generate (/api/generate)
+    $isChat = ($PSCmdlet.ParameterSetName -eq 'Chat' -or ($Messages -and $Messages.Count -gt 0))
+
+    if ($isChat) {
+        $targetUrl = "$($cfg.OllamaUrl.TrimEnd('/'))/api/chat"
+        $chatList = [System.Collections.Generic.List[object]]::new()
+
+        if (-not [string]::IsNullOrWhiteSpace($SystemPrompt)) {
+            $hasSystem = $false
+            if ($Messages.Count -gt 0 -and $Messages[0] -is [hashtable] -and $Messages[0].role -eq 'system') {
+                $hasSystem = $true
+            }
+            if (-not $hasSystem) {
+                $chatList.Add(@{ role = "system"; content = $SystemPrompt })
+            }
+        }
+
+        foreach ($m in $Messages) {
+            $chatList.Add($m)
+        }
+
+        $payload = @{
+            model      = $targetModel
+            messages   = $chatList
+            stream     = [bool]$Stream
+            keep_alive = "1h"
+            options    = @{
+                temperature = $targetTemp
+                num_ctx     = 4096
+            }
+        }
+
+        $bodyJson = $payload | ConvertTo-Json -Depth 6
+
+        try {
+            $response = Invoke-RestMethod -Uri $targetUrl `
+                -Method Post `
+                -Body ([System.Text.Encoding]::UTF8.GetBytes($bodyJson)) `
+                -ContentType "application/json; charset=utf-8" `
+                -TimeoutSec $cfg.TimeoutSeconds `
+                -ErrorAction Stop
+
+            return $response.message.content
+        }
+        catch {
+            $msg = $_.Exception.Message
+            Write-Error " [TerminalAI] Не вдалося з'єднатися з Ollama за адресою '$targetUrl'. Переконайтеся, що Ollama запущена ('ollama serve'). Помилка: $msg"
+            return $null
         }
     }
+    else {
+        $targetUrl = "$($cfg.OllamaUrl.TrimEnd('/'))/api/generate"
 
-    if (-not [string]::IsNullOrWhiteSpace($SystemPrompt)) {
-        $payload["system"] = $SystemPrompt
-    }
+        $payload = @{
+            model      = $targetModel
+            prompt     = $Prompt
+            stream     = [bool]$Stream
+            keep_alive = "1h"
+            options    = @{
+                temperature = $targetTemp
+                num_ctx     = 2048
+            }
+        }
 
-    $bodyJson = $payload | ConvertTo-Json -Depth 6
+        if (-not [string]::IsNullOrWhiteSpace($SystemPrompt)) {
+            $payload["system"] = $SystemPrompt
+        }
 
-    try {
-        $response = Invoke-RestMethod -Uri $targetUrl `
-            -Method Post `
-            -Body ([System.Text.Encoding]::UTF8.GetBytes($bodyJson)) `
-            -ContentType "application/json; charset=utf-8" `
-            -TimeoutSec $cfg.TimeoutSeconds `
-            -ErrorAction Stop
+        $bodyJson = $payload | ConvertTo-Json -Depth 6
 
-        return $response.response
-    }
-    catch {
-        $msg = $_.Exception.Message
-        Write-Error " [TerminalAI] Не вдалося з'єднатися з Ollama за адресою '$targetUrl'. Переконайтеся, що Ollama запущена ('ollama serve'). Помилка: $msg"
-        return $null
+        try {
+            $response = Invoke-RestMethod -Uri $targetUrl `
+                -Method Post `
+                -Body ([System.Text.Encoding]::UTF8.GetBytes($bodyJson)) `
+                -ContentType "application/json; charset=utf-8" `
+                -TimeoutSec $cfg.TimeoutSeconds `
+                -ErrorAction Stop
+
+            return $response.response
+        }
+        catch {
+            $msg = $_.Exception.Message
+            Write-Error " [TerminalAI] Не вдалося з'єднатися з Ollama за адресою '$targetUrl'. Переконайтеся, що Ollama запущена ('ollama serve'). Помилка: $msg"
+            return $null
+        }
     }
 }
 
@@ -1769,6 +1832,33 @@ function Invoke-AiAssistant {
     }
 }
 
+function Send-OllamaHttpAsync {
+    [CmdletBinding()]
+    param(
+        [string]$Endpoint = "api/generate",
+        [hashtable]$Payload
+    )
+
+    $cfg = Get-TerminalAiConfig
+    $targetUrl = "$($cfg.OllamaUrl.TrimEnd('/'))/$($Endpoint.TrimStart('/'))"
+    $bodyJson = $Payload | ConvertTo-Json -Depth 6
+
+    if (-not ([System.Management.Automation.PSTypeName]'System.Net.Http.HttpClient').Type) {
+        try { Add-Type -AssemblyName System.Net.Http -ErrorAction SilentlyContinue } catch { }
+    }
+
+    $httpClient = [System.Net.Http.HttpClient]::new()
+    $httpClient.Timeout = [TimeSpan]::FromSeconds($cfg.TimeoutSeconds)
+    $httpContent = [System.Net.Http.StringContent]::new($bodyJson, [System.Text.Encoding]::UTF8, "application/json")
+    $postTask = $httpClient.PostAsync($targetUrl, $httpContent)
+
+    return @{
+        Client = $httpClient
+        Task   = $postTask
+        Url    = $targetUrl
+    }
+}
+
 # --- PSREADLINE ІНТЕГРАЦІЯ (ГАРЯЧІ КЛАВІШІ) ---
 
 function Register-TerminalAiKeyHandler {
@@ -1838,8 +1928,6 @@ function Register-TerminalAiKeyHandler {
 
         try {
             $activeModel = $cfg.Model
-            $ollamaUrl = "$($cfg.OllamaUrl.TrimEnd('/'))/api/generate"
-
             $sysPrompt = Get-AiSystemPrompt
             $payload = @{
                 model      = $activeModel
@@ -1853,12 +1941,10 @@ function Register-TerminalAiKeyHandler {
                     num_predict = 120
                 }
             }
-            $bodyJson = $payload | ConvertTo-Json -Depth 6
 
-            $httpClient = [System.Net.Http.HttpClient]::new()
-            $httpClient.Timeout = [TimeSpan]::FromSeconds($cfg.TimeoutSeconds)
-            $httpContent = [System.Net.Http.StringContent]::new($bodyJson, [System.Text.Encoding]::UTF8, "application/json")
-            $postTask = $httpClient.PostAsync($ollamaUrl, $httpContent)
+            $asyncCall = Send-OllamaHttpAsync -Endpoint "api/generate" -Payload $payload
+            $httpClient = $asyncCall.Client
+            $postTask = $asyncCall.Task
 
             # Кадри анімації спінера та відлік секунд у реальному часі
             $spinnerFrames = @('⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏')
@@ -1911,17 +1997,23 @@ function Register-TerminalAiKeyHandler {
                 # Замінюємо індикатор на згенеровану готову команду
                 [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, $currLine.Length, $cleanCode)
             } else {
-                # Відновлюємо початковий запит якщо відповідь порожня
-                [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, $currLine.Length, $line)
+                # Інформуємо про помилку або відсутність результату та відновлюємо рядок
+                $msg = if ($cfg.Language -eq "uk") { "# [AI: Ollama offline / помилка відповіді]" } else { "# [AI: Ollama offline / error response]" }
+                [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, $currLine.Length, "$msg $displayQuery")
+                Start-Sleep -Milliseconds 900
+                [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, "$msg $displayQuery".Length, $line)
             }
         }
         catch {
-            # Безпечне відновлення рядка у разі винятку
+            # Безпечне відновлення рядка у разі винятку з індикацією помилки
             try {
                 $errLine = ""
                 $errCursor = 0
                 [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$errLine, [ref]$errCursor)
-                [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, $errLine.Length, $line)
+                $errMsg = if ($cfg.Language -eq "uk") { "# [AI: Ollama offline / помилка з'єднання]" } else { "# [AI: Ollama offline / connection error]" }
+                [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, $errLine.Length, "$errMsg $displayQuery")
+                Start-Sleep -Milliseconds 900
+                [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, "$errMsg $displayQuery".Length, $line)
             } catch { }
         }
     }

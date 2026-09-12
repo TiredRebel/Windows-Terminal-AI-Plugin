@@ -23,3 +23,6 @@ $RECYCLE.BIN/
 **/bin/
 **/obj/
 
+# Local tools & indexes
+.codegraph/
+

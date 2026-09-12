@@ -1,4 +1,4 @@
-# TerminalAI.psd1 - Маніфест модуля TerminalAI
+﻿# TerminalAI.psd1 - Маніфест модуля TerminalAI
 
 @{
     # Ідентифікація модуля
@@ -18,8 +18,8 @@
     # Необхідні модулі
     RequiredModules = @()
 
-    # Вкладені модулі
-    NestedModules = @('TerminalAI.Aot.dll')
+    # Вкладені модулі (AOT DLL завантажується динамічно у TerminalAI.psm1 для PowerShell 7+)
+    NestedModules = @()
 
     # Функції, що експортуються
     FunctionsToExport = @(
@@ -53,9 +53,7 @@
     )
 
     # Командлети, що експортуються
-    CmdletsToExport = @(
-        'Invoke-AiCommandFast'
-    )
+    CmdletsToExport = @()
 
     # Змінні, що експортуються
     VariablesToExport = @()

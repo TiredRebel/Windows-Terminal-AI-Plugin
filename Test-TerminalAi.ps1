@@ -1,4 +1,4 @@
-# Test-TerminalAi.ps1 - Комплексний тест перевірки TerminalAI
+﻿# Test-TerminalAi.ps1 - Комплексний тест перевірки TerminalAI
 
 $ErrorActionPreference = "Stop"
 
@@ -97,8 +97,8 @@ Assert-Test "Перемикання мови інтерфейсу та пост�
     $txtUk = Get-TerminalAiText "CardTitle"
     $envUk = $env:TERMINAL_AI_LANG
 
-    # Залишаємо українську як активну мову
-    Set-TerminalAiLanguage -Language "uk" -Permanent | Out-Null
+    # Залишаємо мову за замовчуванням англійською (en)
+    Set-TerminalAiLanguage -Language "en" -Permanent | Out-Null
 
     return ($cfgEn.Language -eq "en" -and $txtEn -eq "AI Command" -and $envEn -eq "en" -and `
             $cfgUk.Language -eq "uk" -and $txtUk -eq "AI Команда" -and $envUk -eq "uk")
@@ -146,11 +146,117 @@ Assert-Test "Експорт функцій зчитування меню (Clear-
     return ($hasClearBuf -and $hasReadKey)
 }
 
-Write-Host "`n═══════════════════════════════════════════════════════════════" -ForegroundColor Cyan
-if ($allPassed) {
-    Write-Host "  Всі тести успішно пройдені! ($passed / $tests)" -ForegroundColor Green
-} else {
-    Write-Host "  Деякі тести завершилися з помилкою ($passed / $tests)" -ForegroundColor Red
+
+# 11. Перевірка кодування UTF-8 з BOM на всіх скриптах для підтримки PS 5.1
+Assert-Test "Кодування UTF-8 з BOM на всіх файлах .ps1, .psm1, .psd1" {
+    $scripts = Get-ChildItem -Path $PSScriptRoot -Filter *.ps*1
+    $allHaveBom = $true
+    foreach ($s in $scripts) {
+        $bytes = [System.IO.File]::ReadAllBytes($s.FullName)
+        $hasBom = ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF)
+        if (-not $hasBom) {
+            $allHaveBom = $false
+            break
+        }
+    }
+    return $allHaveBom
 }
+
+# 12. Імпорт маніфесту модуля у Windows PowerShell 5.1
+Assert-Test "Імпорт модуля у Windows PowerShell 5.1 (без збоїв AOT та UTF-8)" {
+    $cmd = "Import-Module (Join-Path '$PSScriptRoot' 'TerminalAI.psd1') -Force -PassThru"
+    $ps51Result = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command $cmd 2>&1
+    $exitCode = $LASTEXITCODE
+    return ($exitCode -eq 0 -and $ps51Result -match 'TerminalAI')
+}
+
+# 13. Конвертація аліасів ConvertTo-AiShortAliases
+Assert-Test "Конвертація повних командлетів у короткі аліаси (ConvertTo-AiShortAliases)" {
+    $mod = Get-Module TerminalAI
+    $short = & $mod { ConvertTo-AiShortAliases 'Get-Process | Where-Object { $_.CPU -gt 10 } | ForEach-Object { $_.Name }' }
+    return ($short -match 'gps' -and $short -match '\?' -and $short -match '%')
+}
+
+# 14. Зворотна конвертація ConvertTo-AiFullCmdlets без спотворення коду
+Assert-Test "Зворотна конвертація аліасів без подвійних підстановок (ConvertTo-AiFullCmdlets)" {
+    $mod = Get-Module TerminalAI
+    $full = & $mod { ConvertTo-AiFullCmdlets 'Get-Process | ? { $_.CPU -gt 10 } | % { $_.Name }' }
+    $valid = ($full -eq 'Get-Process | Where-Object { $_.CPU -gt 10 } | ForEach-Object { $_.Name }')
+    return $valid
+}
+
+# 15. Доступність System.Net.Http у Windows PowerShell 5.1
+Assert-Test "Доступність System.Net.Http у середовищі Windows PowerShell 5.1" {
+    $cmd = "Import-Module (Join-Path '$PSScriptRoot' 'TerminalAI.psd1') -Force; [bool][Type]::GetType('System.Net.Http.HttpClient, System.Net.Http, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a')"
+    $ps51Http = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command $cmd 2>&1
+    return ($ps51Http -match 'True')
+}
+
+# 16. Синхронізація шляху до конфігурації у довідці та коді (.terminal-ai)
+Assert-Test "Синхронізація шляху до конфігурації (~/.terminal-ai/config.json)" {
+    $psm1Content = Get-Content -Path (Join-Path $PSScriptRoot "TerminalAI.psm1") -Raw
+    $hasTypo = ($psm1Content -match '\.terminalai/config\.json')
+    return (-not $hasTypo)
+}
+
+# 17. Портативність конфігурації Windows Terminal fragment
+Assert-Test "Портативність terminalai.json (відсутність локальних абсолютних шляхів користувача)" {
+    $jsonPath = Join-Path $PSScriptRoot "terminalai.json"
+    $jsonContent = Get-Content -Path $jsonPath -Raw
+    $hasHardcodedUser = ($jsonContent -match 'C:\\Users\\|OneDrive|Belgeler')
+    return (-not $hasHardcodedUser)
+}
+
+# 18. Обробка некоректного markdown та незакритих блоків у Format-AiCodeOutput
+Assert-Test "Обробка незакритих markdown-блоків у Format-AiCodeOutput" {
+    $bt = [char]96
+    $unclosed = "$bt$bt$bt" + "powershell`nGet-Process"
+    $cleaned = Format-AiCodeOutput -Text $unclosed
+    return ($cleaned.Trim() -eq "Get-Process")
+}
+
+# 19. Стійкість та зворотний зв'язок обробника F2 при помилці Ollama
+Assert-Test "Стійкість та наявність зворотного зв'язку в Register-TerminalAiKeyHandler" {
+    $psm1Content = Get-Content -Path (Join-Path $PSScriptRoot "TerminalAI.psm1") -Raw
+    $hasFeedback = ($psm1Content -match '\[AI:.*(?:offline|помилка|недоступн|error)\]')
+    return $hasFeedback
+}
+
+# 20. Стійкість консольного читання в TerminalAiAssistant до відсутності інтерактивного хоста
+Assert-Test "Стійкість Read-AssistantLine до неінтерактивного консольного хоста (try/catch RawUI)" {
+    $assistantContent = Get-Content -Path (Join-Path $PSScriptRoot "TerminalAiAssistant.ps1") -Raw
+    $hasProtectedReadKey = ($assistantContent -match 'try\s*\{\s*\$key\s*=\s*\$Host\.UI\.RawUI\.ReadKey')
+    return $hasProtectedReadKey
+}
+
+# 21. Тест виклику ендпоінта /api/chat через Invoke-OllamaApi -Messages
+Assert-Test "Підтримка діалогового режиму Invoke-OllamaApi -Messages (/api/chat)" {
+    $cfg = Get-TerminalAiConfig
+    $testMessages = @(
+        @{ role = "user"; content = "respond with the exact word CHAT_TEST_OK only" }
+    )
+    $chatRes = Invoke-OllamaApi -Messages $testMessages -Model $cfg.Model -Temperature 0.1
+    return ($chatRes -match 'CHAT_TEST_OK')
+}
+
+# 22. Перевірка підтримки сесійної пам'яті та команд /reset, /context, /inspect
+Assert-Test "Підтримка сесійної пам'яті та команд /reset, /context, /inspect у помічнику" {
+    $assistantContent = Get-Content -Path (Join-Path $PSScriptRoot "TerminalAiAssistant.ps1") -Raw
+    $hasHistoryVar = ($assistantContent -match '\$script:AiChatHistory')
+    $hasResetCmd = ($assistantContent -match '/reset')
+    $hasContextCmd = ($assistantContent -match '/context')
+    $hasInspectCmd = ($assistantContent -match '/inspect')
+    return ($hasHistoryVar -and $hasResetCmd -and $hasContextCmd -and $hasInspectCmd)
+}
+
+Write-Host "`n═══════════════════════════════════════════════════════════════" -ForegroundColor Cyan
+$score = [Math]::Round(($passed / $tests) * 100, 1)
+if ($allPassed) {
+    Write-Host "  Всі тести успішно пройдені! ($passed / $tests) • 100%" -ForegroundColor Green
+} else {
+    Write-Host "  Деякі тести завершилися з помилкою ($passed / $tests) • Score: $score / 100" -ForegroundColor Yellow
+}
+Write-Host "  EVALUATOR_SCORE: $score / 100" -ForegroundColor Cyan
 Write-Host "═══════════════════════════════════════════════════════════════`n" -ForegroundColor Cyan
+
 

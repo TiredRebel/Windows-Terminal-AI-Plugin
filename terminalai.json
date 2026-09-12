@@ -1,52 +1,52 @@
-{
-  "profiles": [
-    {
-      "name": "Terminal AI Assistant",
-      "guid": "{62068dd4-52e9-41f7-9feb-987581e2e117}",
-      "commandline": "pwsh.exe -NoExit -File \"C:\\\\Users\\\\mcgun\\\\OneDrive\\\\Belgeler\\\\PowerShell\\\\Modules\\\\TerminalAI\\\\TerminalAiAssistant.ps1\"",
-      "icon": "🤖",
-      "tabTitle": "AI Assistant (Ollama)",
-      "startingDirectory": "%USERPROFILE%"
-    },
-    {
-      "name": "PowerShell with TerminalAI",
-      "guid": "{7a3b4c5d-6e7f-8a9b-0c1d-2e3f4a5b6c7d}",
-      "commandline": "pwsh.exe -NoExit -Command \"Import-Module TerminalAI; Clear-Host; Show-TerminalAiWelcome\"",
-      "icon": "⚡",
-      "tabTitle": "PowerShell (AI)",
-      "startingDirectory": "%USERPROFILE%"
-    }
-  ],
-  "actions": [
-    {
-      "name": "AI: Запитати Ollama (ai)",
-      "command": {
-        "action": "sendInput",
-        "input": "ai \""
-      }
-    },
-    {
-      "name": "AI: Виправити останню помилку (ai-fix)",
-      "command": {
-        "action": "sendInput",
-        "input": "ai-fix\r"
-      }
-    },
-    {
-      "name": "AI: Згенерувати сценарій (ai-script)",
-      "command": {
-        "action": "sendInput",
-        "input": "ai-script \""
-      }
-    },
-    {
-      "name": "AI: Відкрити асистента у спліт-панелі",
-      "command": {
-        "action": "splitPane",
-        "split": "vertical",
-        "size": 0.4,
-        "commandline": "pwsh.exe -NoExit -File \"C:\\\\Users\\\\mcgun\\\\OneDrive\\\\Belgeler\\\\PowerShell\\\\Modules\\\\TerminalAI\\\\TerminalAiAssistant.ps1\""
-      }
-    }
-  ]
+﻿{
+    "profiles":  [
+                     {
+                         "name":  "Terminal AI Assistant",
+                         "guid":  "{62068dd4-52e9-41f7-9feb-987581e2e117}",
+                         "commandline":  "pwsh.exe -NoExit -Command \"Import-Module TerminalAI -ErrorAction SilentlyContinue; Invoke-AiAssistant\"",
+                         "icon":  "🤖",
+                         "tabTitle":  "AI Assistant (Ollama)",
+                         "startingDirectory":  "%USERPROFILE%"
+                     },
+                     {
+                         "name":  "PowerShell with TerminalAI",
+                         "guid":  "{7a3b4c5d-6e7f-8a9b-0c1d-2e3f4a5b6c7d}",
+                         "commandline":  "pwsh.exe -NoExit -Command \"Import-Module TerminalAI; Clear-Host; Show-TerminalAiWelcome\"",
+                         "icon":  "⚡",
+                         "tabTitle":  "PowerShell (AI)",
+                         "startingDirectory":  "%USERPROFILE%"
+                     }
+                 ],
+    "actions":  [
+                    {
+                        "name":  "AI: Ask Ollama (ai)",
+                        "command":  {
+                                        "action":  "sendInput",
+                                        "input":  "ai \""
+                                    }
+                    },
+                    {
+                        "name":  "AI: Fix last error (ai-fix)",
+                        "command":  {
+                                        "action":  "sendInput",
+                                        "input":  "ai-fix\r"
+                                    }
+                    },
+                    {
+                        "name":  "AI: Generate script (ai-script)",
+                        "command":  {
+                                        "action":  "sendInput",
+                                        "input":  "ai-script \""
+                                    }
+                    },
+                    {
+                        "name":  "AI: Open assistant in split pane",
+                        "command":  {
+                                        "action":  "splitPane",
+                                        "split":  "vertical",
+                                        "size":  0.4,
+                                        "commandline":  "pwsh.exe -NoExit -Command \"Import-Module TerminalAI -ErrorAction SilentlyContinue; Invoke-AiAssistant\""
+                                    }
+                    }
+                ]
 }

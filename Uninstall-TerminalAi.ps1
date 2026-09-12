@@ -1,4 +1,4 @@
-# Uninstall-TerminalAi.ps1 - Деінсталятор розширення TerminalAI
+﻿# Uninstall-TerminalAi.ps1 - Деінсталятор розширення TerminalAI
 
 [CmdletBinding()]
 param()
@@ -8,11 +8,19 @@ $ErrorActionPreference = "Continue"
 Write-Host "`nВидалення розширення TerminalAI..." -ForegroundColor Yellow
 
 # 1. Видалення модуля з PSModulePath
-$userModuleBase = ($env:PSModulePath -split ';')[0]
-$destModuleDir = Join-Path $userModuleBase "TerminalAI"
-if (Test-Path $destModuleDir) {
-    Remove-Item -Path $destModuleDir -Recurse -Force
-    Write-Host "✔ Каталог модуля видалено: $destModuleDir" -ForegroundColor Green
+$docsPath = [Environment]::GetFolderPath([Environment+SpecialFolder]::MyDocuments)
+$candidateRoots = @(
+    ($env:PSModulePath -split ';')[0],
+    (Join-Path $docsPath "PowerShell\Modules"),
+    (Join-Path $docsPath "WindowsPowerShell\Modules")
+) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
+
+foreach ($baseRoot in $candidateRoots) {
+    $destModuleDir = Join-Path $baseRoot "TerminalAI"
+    if (Test-Path $destModuleDir) {
+        Remove-Item -Path $destModuleDir -Recurse -Force
+        Write-Host "✔ Каталог модуля видалено: $destModuleDir" -ForegroundColor Green
+    }
 }
 
 # 2. Очищення $PROFILE
@@ -43,7 +51,7 @@ foreach ($wtSettingsFile in $wtSettingsCandidates) {
                 Write-Host "✔ Очищено дії AI з $wtSettingsFile" -ForegroundColor Green
             }
         } catch {
-            Write-Warning "Помилка при очищенні $wtSettingsFile: $_"
+            Write-Warning "Помилка при очищенні ${wtSettingsFile}: $_"
         }
     }
 }

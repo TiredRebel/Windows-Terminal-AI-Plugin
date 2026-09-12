@@ -1,4 +1,4 @@
-# Install-TerminalAi.ps1 - Інсталятор розширення TerminalAI для Windows Terminal та PowerShell
+﻿# Install-TerminalAi.ps1 - Інсталятор розширення TerminalAI для Windows Terminal та PowerShell
 [CmdletBinding()]
 param(
     [switch]$SkipTerminalConfig,
@@ -119,27 +119,34 @@ if (-not $ollamaCmd) {
 $ollamaUrl = "http://localhost:11434"
 $installedModels = @()
 
-# Перевірка доступності API
+# Перевірка доступності API (перевіряємо localhost та прямий IPv4 127.0.0.1)
 $isApiReady = $false
-try {
-    $tags = Invoke-RestMethod -Uri "$ollamaUrl/api/tags" -TimeoutSec 2 -ErrorAction Stop
-    $installedModels = @($tags.models.name)
-    $isApiReady = $true
-} catch { }
+foreach ($candUrl in @("http://localhost:11434", "http://127.0.0.1:11434")) {
+    try {
+        $tags = Invoke-RestMethod -Uri "$candUrl/api/tags" -TimeoutSec 2 -ErrorAction Stop
+        $installedModels = @($tags.models.name)
+        $isApiReady = $true
+        $ollamaUrl = $candUrl
+        break
+    } catch { }
+}
 
 if (-not $isApiReady -and (Get-Command ollama -ErrorAction SilentlyContinue)) {
     Write-Host "   • Служба Ollama не активна. Запуск фонового процесу..." -ForegroundColor DarkYellow
     Start-Process "ollama" -ArgumentList "serve" -WindowStyle Hidden -ErrorAction SilentlyContinue
 
     $isApiReady = Show-SpinnerWait -Message "Очікування запуску локальної служби Ollama" -TimeoutSec 15 -Condition {
-        try {
-            $t = Invoke-RestMethod -Uri "$ollamaUrl/api/tags" -TimeoutSec 1 -ErrorAction Stop
-            $script:installedModels = @($t.models.name)
-            return $true
-        } catch {
-            return $false
+        foreach ($candUrl in @("http://localhost:11434", "http://127.0.0.1:11434")) {
+            try {
+                $t = Invoke-RestMethod -Uri "$candUrl/api/tags" -TimeoutSec 1 -ErrorAction Stop
+                $script:installedModels = @($t.models.name)
+                $script:ollamaUrl = $candUrl
+                return $true
+            } catch { }
         }
+        return $false
     }
+    if ($script:installedModels) { $installedModels = $script:installedModels }
 }
 
 if ($isApiReady) {
@@ -213,41 +220,55 @@ if ($installedModels -notcontains $selectedModel -and (Get-Command ollama -Error
 
 Write-Host "   Вибрана активна модель: $selectedModel" -ForegroundColor Cyan
 
-# 4. Встановлення модуля у PSModulePath
+# 4. Встановлення модуля у PSModulePath (як для PowerShell 7+, так і для Windows PowerShell 5.1)
 Write-Host "`n3. Реєстрація модуля PowerShell..." -ForegroundColor Yellow
-$userModuleBase = ($env:PSModulePath -split ';')[0]
-if (-not (Test-Path $userModuleBase)) {
-    New-Item -ItemType Directory -Path $userModuleBase -Force | Out-Null
-}
 
-$destModuleDir = Join-Path $userModuleBase "TerminalAI"
-if (Test-Path $destModuleDir) {
-    Remove-Item -Path $destModuleDir -Recurse -Force
-}
+$docsPath = [Environment]::GetFolderPath([Environment+SpecialFolder]::MyDocuments)
+$candidateRoots = @(
+    ($env:PSModulePath -split ';')[0],
+    (Join-Path $docsPath "PowerShell\Modules"),
+    (Join-Path $docsPath "WindowsPowerShell\Modules")
+) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
 
-# Створюємо директорію та копіюємо файли модуля
-New-Item -ItemType Directory -Path $destModuleDir -Force | Out-Null
-Copy-Item -Path (Join-Path $projectDir "TerminalAI.psd1") -Destination $destModuleDir -Force
-Copy-Item -Path (Join-Path $projectDir "TerminalAI.psm1") -Destination $destModuleDir -Force
-Copy-Item -Path (Join-Path $projectDir "TerminalAiConfig.ps1") -Destination $destModuleDir -Force
-Copy-Item -Path (Join-Path $projectDir "TerminalAiAssistant.ps1") -Destination $destModuleDir -Force
+foreach ($userModuleBase in $candidateRoots) {
+    if (-not (Test-Path $userModuleBase)) {
+        New-Item -ItemType Directory -Path $userModuleBase -Force | Out-Null
+    }
 
-$aotDllPath = Join-Path $projectDir "TerminalAI.Aot.dll"
-if (-not (Test-Path $aotDllPath)) {
-    $aotDllPath = Join-Path $projectDir "AOT\bin\Release\net10.0\TerminalAI.Aot.dll"
-}
-if (Test-Path $aotDllPath) {
-    Copy-Item -Path $aotDllPath -Destination $destModuleDir -Force
-}
-$aotHelpPath = Join-Path $projectDir "TerminalAI.Aot.dll-Help.xml"
-if (-not (Test-Path $aotHelpPath)) {
-    $aotHelpPath = Join-Path $projectDir "AOT\TerminalAI.Aot.dll-Help.xml"
-}
-if (Test-Path $aotHelpPath) {
-    Copy-Item -Path $aotHelpPath -Destination $destModuleDir -Force
-}
+    $destModuleDir = Join-Path $userModuleBase "TerminalAI"
+    if (-not (Test-Path $destModuleDir)) {
+        New-Item -ItemType Directory -Path $destModuleDir -Force | Out-Null
+    }
 
-Write-Host "   ✔ Модуль скопійовано до: $destModuleDir" -ForegroundColor Green
+    # Копіюємо оновлені файли модуля
+    Copy-Item -Path (Join-Path $projectDir "TerminalAI.psd1") -Destination $destModuleDir -Force
+    Copy-Item -Path (Join-Path $projectDir "TerminalAI.psm1") -Destination $destModuleDir -Force
+    Copy-Item -Path (Join-Path $projectDir "TerminalAiConfig.ps1") -Destination $destModuleDir -Force
+    Copy-Item -Path (Join-Path $projectDir "TerminalAiAssistant.ps1") -Destination $destModuleDir -Force
+
+    $aotDllPath = Join-Path $projectDir "TerminalAI.Aot.dll"
+    if (-not (Test-Path $aotDllPath)) {
+        $aotDllPath = Join-Path $projectDir "AOT\bin\Release\net10.0\TerminalAI.Aot.dll"
+    }
+    if (Test-Path $aotDllPath) {
+        try {
+            Copy-Item -Path $aotDllPath -Destination $destModuleDir -Force -ErrorAction Stop
+        } catch {
+            Write-Verbose "TerminalAI.Aot.dll наразі заблокована відкритим процесом, залишаємо наявну версію."
+        }
+    }
+    $aotHelpPath = Join-Path $projectDir "TerminalAI.Aot.dll-Help.xml"
+    if (-not (Test-Path $aotHelpPath)) {
+        $aotHelpPath = Join-Path $projectDir "AOT\TerminalAI.Aot.dll-Help.xml"
+    }
+    if (Test-Path $aotHelpPath) {
+        try {
+            Copy-Item -Path $aotHelpPath -Destination $destModuleDir -Force -ErrorAction Stop
+        } catch { }
+    }
+
+    Write-Host "   ✔ Модуль успішно синхронізовано з: $destModuleDir" -ForegroundColor Green
+}
 
 # 4. Додавання автоімпорту до $PROFILE
 Write-Host "`n4. Оновлення профілю PowerShell ($PROFILE)..." -ForegroundColor Yellow
