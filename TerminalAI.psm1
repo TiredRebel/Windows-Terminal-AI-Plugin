@@ -19,6 +19,12 @@ if (Test-Path $configScriptPath) {
     . $configScriptPath
 }
 
+# Завантажуємо модуль Claude Code Agent Mode (Опціонально)
+$agentScriptPath = Join-Path $PSScriptRoot "TerminalAiAgent.ps1"
+if (Test-Path $agentScriptPath) {
+    . $agentScriptPath
+}
+
 # Завантажуємо високопродуктивний бінарний модуль C# (AOT), якщо доступний
 if ($PSVersionTable.PSVersion.Major -ge 7) {
     $aotCandidates = @(
@@ -342,6 +348,7 @@ function Show-TerminalAiHelp {
                 & $renderLine "   ai-fix         Діагностика та автоматичне виправлення останньої помилки" ([System.ConsoleColor]::White)
                 & $renderLine "   ai-script      Генератор комплексних багаторядкових .ps1 сценаріїв" ([System.ConsoleColor]::White)
                 & $renderLine "   ai-chat        Інтерактивний агент зі слеш-командами та Tab" ([System.ConsoleColor]::White)
+                & $renderLine "   ai-agent       Автономний агент Claude Code через локальну Ollama" ([System.ConsoleColor]::White)
                 & $renderLine ""
                 & $renderLine "2. КОРОТКІ ПРАПОРЦІ:" ([System.ConsoleColor]::Cyan)
                 & $renderLine "   -x, -y         Виконати згенеровану команду відразу (-Execute)" ([System.ConsoleColor]::Yellow)
@@ -367,6 +374,7 @@ function Show-TerminalAiHelp {
                 & $renderLine "   ai-fix         Diagnose and fix the last failed command in session" ([System.ConsoleColor]::White)
                 & $renderLine "   ai-script      Generate complex multi-step .ps1 automation scripts" ([System.ConsoleColor]::White)
                 & $renderLine "   ai-chat        Interactive terminal assistant with Tab completion" ([System.ConsoleColor]::White)
+                & $renderLine "   ai-agent       Autonomous Claude Code agent mode backed by Ollama" ([System.ConsoleColor]::White)
                 & $renderLine ""
                 & $renderLine "2. SHORT EXECUTION FLAGS:" ([System.ConsoleColor]::Cyan)
                 & $renderLine "   -x, -y         Execute command immediately without confirmation" ([System.ConsoleColor]::Yellow)
@@ -567,6 +575,7 @@ function Show-TerminalAiHelp {
                 & $renderLine "  ai-fix            Автоматичний аналіз та виправлення останньої помилки" ([System.ConsoleColor]::White)
                 & $renderLine "  ai-script         Генератор готових .ps1 скриптів з коментарями" ([System.ConsoleColor]::White)
                 & $renderLine "  ai-chat           Інтерактивний асистент зі слеш-командами та історією" ([System.ConsoleColor]::White)
+                & $renderLine "  ai-agent          Окремий агентний режим на базі Claude Code та Ollama" ([System.ConsoleColor]::White)
                 & $renderLine "  F2                Швидка генерація прямо в активному рядку вводу" ([System.ConsoleColor]::Yellow)
                 & $renderLine ""
                 & $renderLine "ТЕМАТИЧНІ РОЗДІЛИ ДОВІДКИ:" ([System.ConsoleColor]::Cyan)
@@ -586,6 +595,7 @@ function Show-TerminalAiHelp {
                 & $renderLine "  ai-fix            Diagnose and fix the last failed command in session" ([System.ConsoleColor]::White)
                 & $renderLine "  ai-script         Generate production-ready multi-line .ps1 scripts" ([System.ConsoleColor]::White)
                 & $renderLine "  ai-chat           Interactive terminal assistant with history" ([System.ConsoleColor]::White)
+                & $renderLine "  ai-agent          Autonomous Claude Code agent mode (backed by Ollama)" ([System.ConsoleColor]::White)
                 & $renderLine "  F2                Inline generation directly in PSReadLine prompt" ([System.ConsoleColor]::Yellow)
                 & $renderLine ""
                 & $renderLine "DETAILED TOPICS:" ([System.ConsoleColor]::Cyan)
@@ -2963,6 +2973,27 @@ function Test-TerminalAiInstallation {
         $allPassed = $false
     }
 
+    # 9. Claude Code Agent Mode (Optional)
+    $agentReadiness = $null
+    try {
+        if (Get-Command Test-AiAgentReadiness -ErrorAction SilentlyContinue) {
+            $agentReadiness = Test-AiAgentReadiness -PassThru
+        }
+    } catch { }
+
+    $claudeAvailable = ($null -ne $agentReadiness -and $agentReadiness.ClaudeReady)
+    $results["AgentModeAvailable"] = ($null -ne $agentReadiness -and $agentReadiness.Ready)
+    $results["ClaudeExecutable"] = if ($agentReadiness) { $agentReadiness.ClaudePath } else { $null }
+    $results["ClaudeVersion"] = if ($agentReadiness) { $agentReadiness.ClaudeVersion } else { $null }
+
+    Write-Host "  9. Claude Code (Agent):  " -NoNewline -ForegroundColor DarkGray
+    if ($claudeAvailable) {
+        $vStr = if ($agentReadiness.ClaudeVersion) { " (v$($agentReadiness.ClaudeVersion))" } else { "" }
+        Write-Host "✔ Detected$vStr - ready for 'ai-agent'" -ForegroundColor Green
+    } else {
+        Write-Host "ℹ Optional: Not installed (core features unaffected; install for 'ai-agent')" -ForegroundColor DarkCyan
+    }
+
     Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor Cyan
     if ($allPassed) {
         Write-Host "  ✦ All primary subsystems are healthy and operational! ✦" -ForegroundColor Green
@@ -3381,7 +3412,9 @@ Export-ModuleMember -Function @(
     "Protect-AiSecretData",
     "Format-AiScriptDiff",
     "Save-AiScriptFile",
-    "Test-TerminalAiInstallation"
+    "Test-TerminalAiInstallation",
+    "Invoke-AiAgent",
+    "Test-AiAgentReadiness"
 ) -Cmdlet $exportCmdlets -Alias @(
     "ai",
     "??",
@@ -3399,5 +3432,6 @@ Export-ModuleMember -Function @(
     "ai-chat",
     "ai-assistant",
     "ai-doctor",
+    "ai-agent",
     "Clean-AiCodeOutput"
 )

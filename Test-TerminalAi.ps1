@@ -219,14 +219,14 @@ Assert-Test "Імпорт модуля у Windows PowerShell 5.1 (без збо�
 
 # 13. Конвертація аліасів ConvertTo-AiShortAliases
 Assert-Test "Конвертація повних командлетів у короткі аліаси (ConvertTo-AiShortAliases)" {
-    $mod = Get-Module TerminalAI
+    $mod = Get-Module TerminalAI | Select-Object -First 1
     $short = & $mod { ConvertTo-AiShortAliases 'Get-Process | Where-Object { $_.CPU -gt 10 } | ForEach-Object { $_.Name }' }
     return ($short -match 'gps' -and $short -match '\?' -and $short -match '%')
 }
 
 # 14. Зворотна конвертація ConvertTo-AiFullCmdlets без спотворення коду
 Assert-Test "Зворотна конвертація аліасів без подвійних підстановок (ConvertTo-AiFullCmdlets)" {
-    $mod = Get-Module TerminalAI
+    $mod = Get-Module TerminalAI | Select-Object -First 1
     $full = & $mod { ConvertTo-AiFullCmdlets 'Get-Process | ? { $_.CPU -gt 10 } | % { $_.Name }' }
     $valid = ($full -eq 'Get-Process | Where-Object { $_.CPU -gt 10 } | ForEach-Object { $_.Name }')
     return $valid

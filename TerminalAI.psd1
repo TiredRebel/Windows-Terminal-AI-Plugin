@@ -55,7 +55,9 @@
         'Protect-AiSecretData',
         'Format-AiScriptDiff',
         'Save-AiScriptFile',
-        'Test-TerminalAiInstallation'
+        'Test-TerminalAiInstallation',
+        'Invoke-AiAgent',
+        'Test-AiAgentReadiness'
     )
 
     # Cmdlets to export
@@ -82,6 +84,7 @@
         'ai-chat',
         'ai-assistant',
         'ai-doctor',
+        'ai-agent',
         'Clean-AiCodeOutput'
     )
 

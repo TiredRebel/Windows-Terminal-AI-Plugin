@@ -338,6 +338,33 @@
   - Diagnostic verification: `ai-doctor` tested and confirmed operational with 100% clean English diagnostics across both engines.
   - Deployed to user profile modules via `Install-TerminalAi.ps1 -AutoConfirm`.
 
+### Cycle 12: Phase P3 — Optional Claude Code Agent Mode (`ai-agent` / `Invoke-AiAgent`)
+- **Date**: 2026-09-12
+- **Objective**: Implement Phase P3: an optional, isolated autonomous agent mode via `ai-agent` (`Invoke-AiAgent`) powered by Claude Code connecting directly to Ollama's Anthropic Messages API (`/v1/messages`), while keeping core one-shot command generation completely lightweight, fast, and untouched.
+- **Architectural Implementation**:
+  - `TerminalAiAgent.ps1`:
+    - `Find-ClaudeCodeExecutable`: Discovers Claude Code CLI via custom config, system `PATH`, or standard Windows paths (`~/.local/bin/claude.exe`, `%LOCALAPPDATA%\Programs\claude\claude.exe`, `%APPDATA%\npm\claude.cmd`). Strictly enforces custom path validity if provided.
+    - `Get-ClaudeCodeVersion`: Safely extracts semver version via non-windowed subprocess inspection.
+    - `Test-AiAgentReadiness`: Non-destructively probes Claude CLI presence, Ollama service reachability, model existence, and tool capability verification (`/api/show`).
+    - `Invoke-AiAgent`: Implements workspace trust confirmation banner (`[Y/n]`), environment isolation (`ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN=ollama`, dedicated `CLAUDE_CONFIG_DIR=~/.terminal-ai/claude`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`, ambient cloud key clearing), argument escaping, and interactive console process orchestration.
+  - `TerminalAiConfig.ps1`: Extended `Get-TerminalAiDefaultConfig` and `Set-TerminalAiConfig` with `AgentModel`, `ClaudeExecutable`, and `AgentDataDirectory`.
+  - `TerminalAI.psm1`: Dot-sourced `TerminalAiAgent.ps1`; enhanced `Test-TerminalAiInstallation` (`ai-doctor`) with Subsystem 9 (Claude Code Agent Mode - Optional); added `ai-agent` to `Show-TerminalAiHelp`; exported `Invoke-AiAgent`, `Test-AiAgentReadiness`, and alias `ai-agent`.
+  - `TerminalAI.psd1`: Added `Invoke-AiAgent` and `Test-AiAgentReadiness` to `FunctionsToExport`, and `ai-agent` to `AliasesToExport`.
+  - `Install-TerminalAi.ps1`: Added `TerminalAiAgent.ps1` to module synchronization payload.
+  - `Test-TerminalAi.ps1`: Hardened module selection in tests 13 and 14 for array resilience in multi-module environments.
+  - `tests/P3-AgentMode.Tests.ps1`: Created comprehensive 12-fixture test suite.
+  - `README.md`: Documented `ai-agent` role comparison table, CLI flags, local-only privacy contract, and usage examples.
+- **Verification Results**:
+  - `tools/check_syntax.ps1`: 15/15 OK (0 errors in PS 7 & PS 5.1).
+  - `tests/P3-AgentMode.Tests.ps1`: 12/12 PASS (100%) in PS 7 & PS 5.1.
+  - `tests/P0-SecurityGate.Tests.ps1`: 30/30 PASS in PS 7 & PS 5.1.
+  - `tests/P1-UxAssistant.Tests.ps1`: 13/13 PASS in PS 7 & PS 5.1.
+  - `tests/P2-MultiUserStability.Tests.ps1`: 13/13 PASS in PS 7 & PS 5.1.
+  - `Test-TerminalAi.ps1`: 22/22 evaluated PASS (Score 100/100) in PS 7 & PS 5.1.
+  - `tools/ensure_bom.ps1`: 15/15 UTF-8 BOM compliant.
+  - End-to-end `ai-doctor` & `ai-agent -CheckOnly`: 100% clean English diagnostics across both engines.
+- **Phase P3 Completion**: **PASSED & ACCEPTED**
+
 ---
 
 ## 9. Deferred Tasks

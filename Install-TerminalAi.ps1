@@ -320,6 +320,7 @@ foreach ($userModuleBase in $candidateRoots) {
     Copy-Item -Path (Join-Path $projectDir "TerminalAI.psm1") -Destination $destModuleDir -Force
     Copy-Item -Path (Join-Path $projectDir "TerminalAiConfig.ps1") -Destination $destModuleDir -Force
     Copy-Item -Path (Join-Path $projectDir "TerminalAiAssistant.ps1") -Destination $destModuleDir -Force
+    Copy-Item -Path (Join-Path $projectDir "TerminalAiAgent.ps1") -Destination $destModuleDir -Force
 
     $aotDllPath = Join-Path $projectDir "TerminalAI.Aot.dll"
     if (-not (Test-Path $aotDllPath)) {

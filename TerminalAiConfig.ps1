@@ -14,16 +14,19 @@ function Get-TerminalAiConfigPath {
 
 function Get-TerminalAiDefaultConfig {
     return [ordered]@{
-        OllamaUrl       = "http://localhost:11434"
-        Model           = "qwen2.5-coder:7b"
-        Language        = "en" # 'en' для англійської або 'uk' для української
-        Font            = "Cascadia Code"
-        Temperature     = 0.2
-        TimeoutSeconds  = 120
-        HotkeyChord     = "Ctrl+Alt+A"
-        AutoCopy        = $false
-        ShowExplanation = $true
-        UseAliases      = $false
+        OllamaUrl          = "http://localhost:11434"
+        Model              = "qwen2.5-coder:7b"
+        Language           = "en" # 'en' for English or 'uk' for Ukrainian
+        Font               = "Cascadia Code"
+        Temperature        = 0.2
+        TimeoutSeconds     = 120
+        HotkeyChord        = "Ctrl+Alt+A"
+        AutoCopy           = $false
+        ShowExplanation    = $true
+        UseAliases         = $false
+        AgentModel         = "qwen2.5-coder:7b"
+        ClaudeExecutable   = ""
+        AgentDataDirectory = ""
     }
 }
 
@@ -92,7 +95,10 @@ function Set-TerminalAiConfig {
         [string]$HotkeyChord,
         [bool]$AutoCopy,
         [bool]$ShowExplanation,
-        [bool]$UseAliases
+        [bool]$UseAliases,
+        [string]$AgentModel,
+        [string]$ClaudeExecutable,
+        [string]$AgentDataDirectory
     )
 
     $cfg = Get-TerminalAiConfig
@@ -110,6 +116,9 @@ function Set-TerminalAiConfig {
     if ($PSBoundParameters.ContainsKey('AutoCopy')) { $cfg.AutoCopy = $AutoCopy }
     if ($PSBoundParameters.ContainsKey('ShowExplanation')) { $cfg.ShowExplanation = $ShowExplanation }
     if ($PSBoundParameters.ContainsKey('UseAliases')) { $cfg.UseAliases = $UseAliases }
+    if ($PSBoundParameters.ContainsKey('AgentModel')) { $cfg.AgentModel = $AgentModel }
+    if ($PSBoundParameters.ContainsKey('ClaudeExecutable')) { $cfg.ClaudeExecutable = $ClaudeExecutable }
+    if ($PSBoundParameters.ContainsKey('AgentDataDirectory')) { $cfg.AgentDataDirectory = $AgentDataDirectory }
 
     Save-TerminalAiConfig -Config $cfg
     $msg = if ($cfg.Language -in @("uk", "ua")) {
