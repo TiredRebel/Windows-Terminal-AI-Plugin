@@ -8,7 +8,7 @@ public class AiConfig
 {
     public string OllamaUrl { get; set; } = "http://localhost:11434";
     public string Model { get; set; } = "qwen2.5-coder:7b";
-    public string Language { get; set; } = "uk";
+    public string Language { get; set; } = "en";
     public string Font { get; set; } = "Cascadia Code";
     public double Temperature { get; set; } = 0.2;
     public int TimeoutSeconds { get; set; } = 120;
@@ -26,18 +26,26 @@ public class AiConfig
 
     public static AiConfig Load()
     {
+        var cfg = new AiConfig();
         try
         {
             var path = GetConfigFilePath();
             if (File.Exists(path))
             {
                 var json = File.ReadAllText(path);
-                var cfg = JsonSerializer.Deserialize<AiConfig>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                if (cfg != null) return cfg;
+                var loaded = JsonSerializer.Deserialize<AiConfig>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (loaded != null) cfg = loaded;
             }
         }
         catch { }
-        return new AiConfig();
+
+        var envLang = Environment.GetEnvironmentVariable("TERMINAL_AI_LANG");
+        if (!string.IsNullOrEmpty(envLang))
+        {
+            cfg.Language = envLang is "ua" or "uk" ? "uk" : "en";
+        }
+
+        return cfg;
     }
 
     public void Save()
@@ -48,8 +56,13 @@ public class AiConfig
             var options = new JsonSerializerOptions { WriteIndented = true };
             var json = JsonSerializer.Serialize(this, options);
             File.WriteAllText(path, json);
+
+            // Persist to Windows User Environment Variable so all new terminal processes inherit it
+            Environment.SetEnvironmentVariable("TERMINAL_AI_LANG", Language, EnvironmentVariableTarget.User);
+            Environment.SetEnvironmentVariable("TERMINAL_AI_LANG", Language, EnvironmentVariableTarget.Process);
         }
         catch { }
     }
 }
+
 

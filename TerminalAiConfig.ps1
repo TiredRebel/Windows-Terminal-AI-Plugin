@@ -12,7 +12,7 @@ function Get-TerminalAiDefaultConfig {
     return [ordered]@{
         OllamaUrl       = "http://localhost:11434"
         Model           = "qwen2.5-coder:7b"
-        Language        = "uk" # 'uk' для української або 'en' для англійської
+        Language        = "en" # 'en' для англійської або 'uk' для української
         Font            = "Cascadia Code"
         Temperature     = 0.2
         TimeoutSeconds  = 120
@@ -21,6 +21,7 @@ function Get-TerminalAiDefaultConfig {
         ShowExplanation = $true
     }
 }
+
 
 function Get-TerminalAiConfig {
     [CmdletBinding()]
@@ -307,16 +308,11 @@ function Set-TerminalAiLanguage {
     # 1. Зберігаємо у ~/.terminal-ai/config.json
     Set-TerminalAiConfig -Language $normalizedLang | Out-Null
 
-    # 2. Якщо вказано -Permanent: фіксуємо також у User Environment Variable Windows
-    if ($Permanent) {
-        try {
-            [Environment]::SetEnvironmentVariable("TERMINAL_AI_LANG", $normalizedLang, "User")
-        } catch { }
-        $env:TERMINAL_AI_LANG = $normalizedLang
-    } else {
-        # Синхронізуємо змінну для поточної сесії
-        $env:TERMINAL_AI_LANG = $normalizedLang
-    }
+    # 2. Фіксуємо у середовищі користувача Windows ($env:TERMINAL_AI_LANG) та поточної сесії
+    try {
+        [Environment]::SetEnvironmentVariable("TERMINAL_AI_LANG", $normalizedLang, "User")
+    } catch { }
+    $env:TERMINAL_AI_LANG = $normalizedLang
 
     # 3. Оновлюємо JSON фрагмент розширення Windows Terminal
     try {
