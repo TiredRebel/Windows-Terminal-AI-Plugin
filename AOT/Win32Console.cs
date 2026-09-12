@@ -32,7 +32,10 @@ public static class Win32Console
                 keybd_event(VK_V, scanV, KEYEVENTF_KEYUP, UIntPtr.Zero);
                 keybd_event(VK_CONTROL, scanCtrl, KEYEVENTF_KEYUP, UIntPtr.Zero);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Win32Console.DelayedPaste] Error during simulated paste: {ex.Message}");
+            }
         });
     }
 
@@ -45,7 +48,10 @@ public static class Win32Console
                 Console.ReadKey(true);
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Win32Console.FlushInputBuffer] Error flushing console buffer: {ex.Message}");
+        }
     }
 
     public static MenuAction ReadMenuAction()
@@ -81,6 +87,9 @@ public static class Win32Console
 
                 if (k == ConsoleKey.S || ch is 's' or 'S' or 'ы' or 'Ы')
                     return MenuAction.ShortAlias;
+
+                if (k == ConsoleKey.W || ch is 'w' or 'W' or 'в' or 'В')
+                    return MenuAction.Save;
             }
         }
     }
@@ -94,5 +103,6 @@ public enum MenuAction
     Explain,
     Ask,
     ShortAlias,
+    Save,
     Cancel
 }

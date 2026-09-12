@@ -38,7 +38,10 @@ public class AiConfig
                 if (loaded != null) cfg = loaded;
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[AiConfig.Load] Failed to read config from '{GetConfigFilePath()}': {ex.Message}");
+        }
 
         var envLang = Environment.GetEnvironmentVariable("TERMINAL_AI_LANG");
         if (!string.IsNullOrEmpty(envLang))
@@ -62,7 +65,10 @@ public class AiConfig
             Environment.SetEnvironmentVariable("TERMINAL_AI_LANG", Language, EnvironmentVariableTarget.User);
             Environment.SetEnvironmentVariable("TERMINAL_AI_LANG", Language, EnvironmentVariableTarget.Process);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[AiConfig.Save] Failed to save config to '{GetConfigFilePath()}': {ex.Message}");
+        }
     }
 }
 
