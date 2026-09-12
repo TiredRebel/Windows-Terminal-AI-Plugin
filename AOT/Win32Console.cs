@@ -78,6 +78,9 @@ public static class Win32Console
 
                 if (k == ConsoleKey.A || ch is 'a' or 'A' or 'а' or 'А' or 'ф' or 'Ф')
                     return MenuAction.Ask;
+
+                if (k == ConsoleKey.S || ch is 's' or 'S' or 'ы' or 'Ы')
+                    return MenuAction.ShortAlias;
             }
         }
     }
@@ -90,5 +93,6 @@ public enum MenuAction
     Insert,
     Explain,
     Ask,
+    ShortAlias,
     Cancel
 }

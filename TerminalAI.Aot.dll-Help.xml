@@ -43,6 +43,13 @@
           <dev:type>SwitchParameter</dev:type>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>Alias</maml:name>
+          <maml:description>
+            <maml:para>Generate command using standard short PowerShell aliases (gps, gci, select, ?, %, sls) instead of full cmdlet names (aliases: -a, -Short, -UseAliases).</maml:para>
+          </maml:description>
+          <dev:type>SwitchParameter</dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named">
           <maml:name>Explain</maml:name>
           <maml:description>
             <maml:para>Request a detailed educational breakdown of the command structure, parameters, security, and performance considerations.</maml:para>
@@ -87,6 +94,13 @@
         <maml:name>Copy</maml:name>
         <maml:description>
           <maml:para>Copies the generated command directly to clipboard (-c).</maml:para>
+        </maml:description>
+        <dev:type>SwitchParameter</dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>Alias</maml:name>
+        <maml:description>
+          <maml:para>Generates compact commands with short PowerShell aliases like gps, gci, select, ?, % (-a, -Short, -UseAliases).</maml:para>
         </maml:description>
         <dev:type>SwitchParameter</dev:type>
       </command:parameter>
@@ -140,6 +154,13 @@
         <dev:code>aif models</dev:code>
         <dev:remarks>
           <maml:para>Lists all installed Ollama models with their sizes, update timestamps, and active model marker.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>-------------------------- EXAMPLE 5 --------------------------</maml:title>
+        <dev:code>aif "find processes listening on port 8080" -a</dev:code>
+        <dev:remarks>
+          <maml:para>Generates a compact pipeline using standard short aliases (gps | ? ...).</maml:para>
         </dev:remarks>
       </command:example>
     </command:examples>

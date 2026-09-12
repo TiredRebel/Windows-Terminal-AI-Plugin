@@ -15,6 +15,7 @@ public class AiConfig
     public string HotkeyChord { get; set; } = "Ctrl+Alt+A";
     public bool AutoCopy { get; set; } = false;
     public bool ShowExplanation { get; set; } = true;
+    public bool UseAliases { get; set; } = false;
 
     private static string GetConfigFilePath()
     {

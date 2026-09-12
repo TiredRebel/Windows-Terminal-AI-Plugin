@@ -232,6 +232,21 @@ Copy-Item -Path (Join-Path $projectDir "TerminalAI.psm1") -Destination $destModu
 Copy-Item -Path (Join-Path $projectDir "TerminalAiConfig.ps1") -Destination $destModuleDir -Force
 Copy-Item -Path (Join-Path $projectDir "TerminalAiAssistant.ps1") -Destination $destModuleDir -Force
 
+$aotDllPath = Join-Path $projectDir "TerminalAI.Aot.dll"
+if (-not (Test-Path $aotDllPath)) {
+    $aotDllPath = Join-Path $projectDir "AOT\bin\Release\net10.0\TerminalAI.Aot.dll"
+}
+if (Test-Path $aotDllPath) {
+    Copy-Item -Path $aotDllPath -Destination $destModuleDir -Force
+}
+$aotHelpPath = Join-Path $projectDir "TerminalAI.Aot.dll-Help.xml"
+if (-not (Test-Path $aotHelpPath)) {
+    $aotHelpPath = Join-Path $projectDir "AOT\TerminalAI.Aot.dll-Help.xml"
+}
+if (Test-Path $aotHelpPath) {
+    Copy-Item -Path $aotHelpPath -Destination $destModuleDir -Force
+}
+
 Write-Host "   ✔ Модуль скопійовано до: $destModuleDir" -ForegroundColor Green
 
 # 4. Додавання автоімпорту до $PROFILE

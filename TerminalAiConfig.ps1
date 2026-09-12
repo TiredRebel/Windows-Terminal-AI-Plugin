@@ -19,6 +19,7 @@ function Get-TerminalAiDefaultConfig {
         HotkeyChord     = "Ctrl+Alt+A"
         AutoCopy        = $false
         ShowExplanation = $true
+        UseAliases      = $false
     }
 }
 
@@ -88,7 +89,8 @@ function Set-TerminalAiConfig {
         [int]$TimeoutSeconds,
         [string]$HotkeyChord,
         [bool]$AutoCopy,
-        [bool]$ShowExplanation
+        [bool]$ShowExplanation,
+        [bool]$UseAliases
     )
 
     $cfg = Get-TerminalAiConfig
@@ -105,6 +107,7 @@ function Set-TerminalAiConfig {
     if ($PSBoundParameters.ContainsKey('HotkeyChord')) { $cfg.HotkeyChord = $HotkeyChord }
     if ($PSBoundParameters.ContainsKey('AutoCopy')) { $cfg.AutoCopy = $AutoCopy }
     if ($PSBoundParameters.ContainsKey('ShowExplanation')) { $cfg.ShowExplanation = $ShowExplanation }
+    if ($PSBoundParameters.ContainsKey('UseAliases')) { $cfg.UseAliases = $UseAliases }
 
     Save-TerminalAiConfig -Config $cfg
     $msg = if ($cfg.Language -eq "en") {

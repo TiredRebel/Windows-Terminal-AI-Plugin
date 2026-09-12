@@ -30,6 +30,10 @@ public class InvokeAiCommandFastCmdlet : PSCmdlet
     [Parameter]
     public SwitchParameter Ask { get; set; }
 
+    [Alias("a", "Short", "UseAliases")]
+    [Parameter]
+    public SwitchParameter Alias { get; set; }
+
     protected override void ProcessRecord()
     {
         var cfg = AiConfig.Load();
@@ -134,6 +138,35 @@ public class InvokeAiCommandFastCmdlet : PSCmdlet
             return;
         }
 
+        // 7.1. Керування режимом аліасів: ai-fast alias [on|off]
+        if (lowerPrompt is "alias" or "aliases" or "--alias" or "-a" or "аліас" or "аліаси")
+        {
+            var statusStr = cfg.UseAliases ? (isUk ? "УВІМКНЕНО (gps, gci, select, ?, %)" : "ENABLED (gps, gci, select, ?, %)") : (isUk ? "ВИМКНЕНО (повні командлети)" : "DISABLED (full cmdlets)");
+            Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"\n    ✦ {(isUk ? "Режим коротких аліасів" : "Short aliases mode")}: {statusStr}");
+            Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, $"    💡 {(isUk ? "Увімкнути:  aif alias on   |   Вимкнути: aif alias off" : "Enable:  aif alias on   |   Disable: aif alias off")}\n");
+            return;
+        }
+
+        if (Regex.IsMatch(lowerPrompt, @"^(?:alias|aliases|аліас|аліаси)\s+(?:on|1|true|enable|увімк|увімкнути)$") ||
+            lowerPrompt is "use-aliases" or "use aliases" or "використовувати аліаси" or "увімкнути аліаси")
+        {
+            cfg.UseAliases = true;
+            cfg.Save();
+            var msg = isUk ? "Режим коротких аліасів PowerShell успішно УВІМКНЕНО (за замовчуванням: gps, gci, select, ?, %)" : "PowerShell short aliases mode successfully ENABLED (defaulting to: gps, gci, select, ?, %)";
+            Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, $"\n    ✔ {msg}\n");
+            return;
+        }
+
+        if (Regex.IsMatch(lowerPrompt, @"^(?:alias|aliases|аліас|аліаси)\s+(?:off|0|false|disable|вимк|вимкнути)$") ||
+            lowerPrompt is "no-aliases" or "no aliases" or "не використовувати аліаси" or "вимкнути аліаси")
+        {
+            cfg.UseAliases = false;
+            cfg.Save();
+            var msg = isUk ? "Режим коротких аліасів PowerShell ВИМКНЕНО (використовуються повні імена командлетів)" : "PowerShell short aliases mode DISABLED (using full cmdlet names)";
+            Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, $"\n    ✔ {msg}\n");
+            return;
+        }
+
         // 8. Якщо явно запитано текстову відповідь (-Ask)
         if (Ask)
         {
@@ -142,11 +175,21 @@ public class InvokeAiCommandFastCmdlet : PSCmdlet
         }
 
         // 9. Генерація PowerShell команди
+        var preferAliases = Alias.IsPresent || cfg.UseAliases;
+        var naturalAliasMatch = Regex.Match(fullPrompt, @"(?:\s*[\(\[]?\s*(?:використовувати|використовуй|з|зі)\s+аліас(?:ами|и)?\s*[\)\]]?|\s*[\(\[]?\s*(?:use|with)\s+alias(?:es)?\s*[\)\]]?|\s*[\(\[]?\s*скорочен(?:і|ними|ими)\s+команд(?:ами|и)?\s*[\)\]]?)$", RegexOptions.IgnoreCase);
+        if (naturalAliasMatch.Success)
+        {
+            preferAliases = true;
+            fullPrompt = fullPrompt.Substring(0, naturalAliasMatch.Index).Trim();
+        }
+
         var connectingText = isUk ? $"Звертаюсь до Ollama ({activeModel})..." : $"Connecting to Ollama ({activeModel})...";
         Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"\n  ✦ {connectingText}");
 
         var sw = Stopwatch.StartNew();
-        var systemPrompt = "You are an expert PowerShell engineer. Generate strictly the raw PowerShell command with no markdown, backticks, or explanation.";
+        var systemPrompt = preferAliases
+            ? "You are an elite PowerShell engineer. Generate strictly the raw PowerShell command with no markdown, backticks, or explanation. STRICT ALIAS RULE: You MUST replace standard PowerShell cmdlets with their short aliases and compact forms wherever available: use 'gps' for Get-Process, 'gci' or 'ls' for Get-ChildItem, 'select' for Select-Object, '?' or 'where' for Where-Object, '%' or 'foreach' for ForEach-Object, 'sort' for Sort-Object, 'measure' for Measure-Object, 'gc' or 'cat' for Get-Content, 'sc' for Set-Content, 'sls' for Select-String, 'help' for Get-Help, 'gsv' for Get-Service, 'kill' for Stop-Process, 'ft' for Format-Table, 'fl' for Format-List, 'epcsv' for Export-Csv, 'ipcsv' for Import-Csv. Keep the command as compact and concise as possible."
+            : "You are an expert PowerShell engineer. Generate strictly the raw PowerShell command with no markdown, backticks, or explanation.";
 
         string command;
         try
@@ -186,38 +229,67 @@ public class InvokeAiCommandFastCmdlet : PSCmdlet
             return;
         }
 
-        // Меню дій
-        RenderMenu(isUk);
-
-        var action = Win32Console.ReadMenuAction();
-        switch (action)
+        // Меню дій з можливістю перемикання аліасів
+        while (true)
         {
-            case MenuAction.Execute:
+            RenderMenu(isUk, preferAliases);
+
+            var action = Win32Console.ReadMenuAction();
+            if (action == MenuAction.Execute)
+            {
                 ExecuteCommand(command, isUk);
                 break;
-
-            case MenuAction.Copy:
+            }
+            if (action == MenuAction.Copy)
+            {
                 CopyToClipboard(command);
                 Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, isUk ? "    ✔ Скопійовано в буфер обміну!\n" : "    ✔ Copied to clipboard!\n");
                 break;
-
-            case MenuAction.Insert:
+            }
+            if (action == MenuAction.Insert)
+            {
                 CopyToClipboard(command);
                 Win32Console.DelayedPaste(200);
                 Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, isUk ? "    ✔ Команду вставлено у рядок введення!\n" : "    ✔ Command inserted into input line!\n");
                 break;
-
-            case MenuAction.Explain:
+            }
+            if (action == MenuAction.Explain)
+            {
                 ShowExplanation(cfg, activeModel, command, isUk);
                 break;
-
-            case MenuAction.Ask:
+            }
+            if (action == MenuAction.Ask)
+            {
                 ShowAnswer(cfg, activeModel, fullPrompt, isUk);
                 break;
+            }
+            if (action == MenuAction.ShortAlias)
+            {
+                preferAliases = !preferAliases;
+                var modeText = preferAliases ? (isUk ? "Перетворюю з використанням аліасів..." : "Converting using short aliases...") : (isUk ? "Перетворюю на повні командлети..." : "Converting to full cmdlets...");
+                Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"\n  ✦ {modeText}");
 
-            case MenuAction.Cancel:
+                var togglePrompt = preferAliases
+                    ? $"Rewrite this PowerShell command strictly using standard short aliases (gps, gci, select, ?, %, sort, gc, sc, sls, help):\n{command}"
+                    : $"Rewrite this PowerShell command strictly using full official cmdlet names (Get-Process, Get-ChildItem, Select-Object, Where-Object, ForEach-Object):\n{command}";
+                var toggleSysPrompt = "You are an expert PowerShell engineer. Output strictly the rewritten raw PowerShell command with no markdown or explanation.";
+                try
+                {
+                    var newCmd = OllamaClient.GenerateAsync(cfg.OllamaUrl, activeModel, togglePrompt, toggleSysPrompt, cfg.Temperature).GetAwaiter().GetResult();
+                    if (!string.IsNullOrWhiteSpace(newCmd))
+                    {
+                        command = newCmd;
+                        RenderCard(command, activeModel, 0, isUk);
+                    }
+                }
+                catch { }
+                continue;
+            }
+            if (action == MenuAction.Cancel)
+            {
                 Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, isUk ? "    Скасовано.\n" : "    Canceled.\n");
                 break;
+            }
         }
     }
 
@@ -653,11 +725,17 @@ public class InvokeAiCommandFastCmdlet : PSCmdlet
         RenderRow(lblHotkey, $"{cfg.HotkeyChord} / F2", ConsoleColor.Yellow);
         RenderRow(lblLang, cfg.Language == "en" ? "en (English)" : "uk (Українська)", ConsoleColor.White);
 
+        var lblAliases = isUk ? "Аліаси команд:" : "Command Aliases:";
+        var valAliases = cfg.UseAliases ? (isUk ? "Увімкнено (короткі)" : "Enabled (short)") : (isUk ? "Вимкнено (повні)" : "Disabled (full)");
+        RenderRow(lblAliases, valAliases, cfg.UseAliases ? ConsoleColor.Yellow : ConsoleColor.DarkGray);
+
         Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    │                                                                  │");
         Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╰──────────────────────────────────────────────────────────────────╯\n");
 
+        var hintAlias = isUk ? "Перемкнути аліаси: ai-fast alias on | off" : "Toggle aliases:   ai-fast alias on | off";
         Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, $"    💡 {hintModel}");
-        Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, $"    💡 {hintLang}\n");
+        Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, $"    💡 {hintLang}");
+        Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, $"    💡 {hintAlias}\n");
     }
 
     private void RenderRow(string label, string value, ConsoleColor valueColor)
@@ -696,22 +774,22 @@ public class InvokeAiCommandFastCmdlet : PSCmdlet
 
             foreach (var m in models)
             {
-                var isCur = m.Name.Equals(cfg.Model, StringComparison.OrdinalIgnoreCase);
-                var curMarker = isCur ? "--> *" : "   ";
-                var sizeGb = Math.Round((double)m.Size / (1024 * 1024 * 1024), 2).ToString("0.00");
-                var updatedStr = m.ModifiedAt.HasValue ? m.ModifiedAt.Value.ToString("yyyy-MM-dd HH:mm") : "-";
+                var isCurrent = m.Name.Equals(cfg.Model, StringComparison.OrdinalIgnoreCase);
+                var curMark = isCurrent ? "  ★ " : "    ";
+                var curColor = isCurrent ? ConsoleColor.Green : ConsoleColor.White;
+                var sizeGb = (m.Size / 1024.0 / 1024.0 / 1024.0).ToString("F1");
+                var upd = m.ModifiedAt.HasValue ? m.ModifiedAt.Value.ToString("yyyy-MM-dd HH:mm") : "-";
 
-                var color = isCur ? ConsoleColor.Green : ConsoleColor.White;
-                Host.UI.Write(ConsoleColor.Yellow, Host.UI.RawUI.BackgroundColor, string.Format("  {0,-10} ", curMarker));
-                Host.UI.Write(color, Host.UI.RawUI.BackgroundColor, string.Format("{0,-32} ", m.Name));
-                Host.UI.Write(ConsoleColor.Gray, Host.UI.RawUI.BackgroundColor, string.Format("{0,-14} ", sizeGb));
-                Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, updatedStr);
+                Host.UI.Write(isCurrent ? ConsoleColor.Yellow : ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, string.Format("  {0,-10}", curMark));
+                Host.UI.Write(curColor, Host.UI.RawUI.BackgroundColor, string.Format("{0,-32} ", m.Name));
+                Host.UI.Write(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, string.Format("{0,-14} ", sizeGb));
+                Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, string.Format("{0,-20}", upd));
             }
-            Host.UI.WriteLine("");
+            Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "  " + new string('─', 78) + "\n");
         }
         catch (Exception ex)
         {
-            Host.UI.WriteErrorLine($"[TerminalAI.AOT] Помилка отримання моделей: {ex.Message}");
+            Host.UI.WriteErrorLine($"[TerminalAI.AOT] Помилка отримання списку моделей: {ex.Message}");
         }
     }
 
@@ -763,11 +841,12 @@ public class InvokeAiCommandFastCmdlet : PSCmdlet
         Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╰" + new string('─', boxWidth) + "╯\n");
     }
 
-    private void RenderMenu(bool isUk)
+    private void RenderMenu(bool isUk, bool preferAliases)
     {
         var tEnter = isUk ? "Виконати" : "Execute";
         var tCopy = isUk ? "Скопіювати" : "Copy";
         var tInsert = isUk ? "Вставити" : "Insert";
+        var tAlias = preferAliases ? (isUk ? "Повні" : "Full") : (isUk ? "Аліаси" : "Alias");
         var tExplain = isUk ? "Пояснити" : "Explain";
         var tAsk = isUk ? "Текст" : "Text";
         var tCancel = isUk ? "Скасувати" : "Cancel";
@@ -778,6 +857,8 @@ public class InvokeAiCommandFastCmdlet : PSCmdlet
         Host.UI.Write(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, $"{tCopy}   ");
         Host.UI.Write(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, "[I] ");
         Host.UI.Write(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, $"{tInsert}   ");
+        Host.UI.Write(ConsoleColor.DarkYellow, Host.UI.RawUI.BackgroundColor, "[S] ");
+        Host.UI.Write(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, $"{tAlias}   ");
         Host.UI.Write(ConsoleColor.Magenta, Host.UI.RawUI.BackgroundColor, "[X] ");
         Host.UI.Write(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, $"{tExplain}   ");
         Host.UI.Write(ConsoleColor.Blue, Host.UI.RawUI.BackgroundColor, "[A] ");

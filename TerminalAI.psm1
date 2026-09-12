@@ -118,6 +118,8 @@ function Get-TerminalAiText {
             "MenuEnter"         = "Виконати"
             "MenuCopy"          = "Скопіювати"
             "MenuInsert"        = "Вставити в рядок"
+            "MenuAlias"         = "Аліаси"
+            "MenuFull"          = "Повні"
             "MenuExplain"       = "Пояснити код"
             "MenuAsk"           = "Текстова відповідь"
             "MenuCancel"        = "Скасувати"
@@ -151,6 +153,8 @@ function Get-TerminalAiText {
             "MenuEnter"         = "Execute"
             "MenuCopy"          = "Copy"
             "MenuInsert"        = "Insert into line"
+            "MenuAlias"         = "Alias"
+            "MenuFull"          = "Full"
             "MenuExplain"       = "Explain code"
             "MenuAsk"           = "Text answer"
             "MenuCancel"        = "Cancel"
@@ -256,6 +260,7 @@ function Show-TerminalAiHelp {
                 & $renderLine "2. КОРОТКІ ПРАПОРЦІ:" ([System.ConsoleColor]::Cyan)
                 & $renderLine "   -x, -y         Виконати згенеровану команду відразу (-Execute)" ([System.ConsoleColor]::Yellow)
                 & $renderLine "   -c             Скопіювати команду відразу в буфер обміну (-Copy)" ([System.ConsoleColor]::Yellow)
+                & $renderLine "   -a, -Alias     Генерувати з короткими аліасами PowerShell (gps, gci, ?)" ([System.ConsoleColor]::Yellow)
                 & $renderLine "   -Explain       Згенерувати детальне структуроване пояснення коду" ([System.ConsoleColor]::Magenta)
                 & $renderLine "   -Ask, -chat    Отримати текстову відповідь/консультацію замість коду" ([System.ConsoleColor]::Blue)
                 & $renderLine ""
@@ -263,6 +268,7 @@ function Show-TerminalAiHelp {
                 & $renderLine "   [Enter]        Виконати згенеровану команду в поточній сесії" ([System.ConsoleColor]::Green)
                 & $renderLine "   [C] / [c]      Скопіювати в буфер обміну" ([System.ConsoleColor]::Yellow)
                 & $renderLine "   [I] / [i]      Вставити команду в рядок введення терміналу" ([System.ConsoleColor]::Cyan)
+                & $renderLine "   [S] / [s]      Перемкнути між короткими аліасами та повними назвами (Alias/Full)" ([System.ConsoleColor]::DarkYellow)
                 & $renderLine "   [X] / [x]      Пояснити синтаксис та безпеку команди" ([System.ConsoleColor]::Magenta)
                 & $renderLine "   [A] / [a]      Отримати розгорнуту текстову відповідь" ([System.ConsoleColor]::Blue)
                 & $renderLine "   [Esc]          Скасувати" ([System.ConsoleColor]::DarkGray)
@@ -279,6 +285,7 @@ function Show-TerminalAiHelp {
                 & $renderLine "2. SHORT EXECUTION FLAGS:" ([System.ConsoleColor]::Cyan)
                 & $renderLine "   -x, -y         Execute command immediately without confirmation" ([System.ConsoleColor]::Yellow)
                 & $renderLine "   -c             Copy generated command directly to clipboard" ([System.ConsoleColor]::Yellow)
+                & $renderLine "   -a, -Alias     Generate using standard short PowerShell aliases (gps, gci, ?)" ([System.ConsoleColor]::Yellow)
                 & $renderLine "   -Explain       Generate comprehensive educational breakdown of code" ([System.ConsoleColor]::Magenta)
                 & $renderLine "   -Ask, -chat    Get educational text response instead of script" ([System.ConsoleColor]::Blue)
                 & $renderLine ""
@@ -286,6 +293,7 @@ function Show-TerminalAiHelp {
                 & $renderLine "   [Enter]        Execute command in current session" ([System.ConsoleColor]::Green)
                 & $renderLine "   [C] / [c]      Copy command to system clipboard" ([System.ConsoleColor]::Yellow)
                 & $renderLine "   [I] / [i]      Insert command into prompt line for manual editing" ([System.ConsoleColor]::Cyan)
+                & $renderLine "   [S] / [s]      Toggle between short aliases and full cmdlet names (Alias/Full)" ([System.ConsoleColor]::DarkYellow)
                 & $renderLine "   [X] / [x]      Explain command syntax, flags, and safety" ([System.ConsoleColor]::Magenta)
                 & $renderLine "   [A] / [a]      Provide full conceptual explanation" ([System.ConsoleColor]::Blue)
                 & $renderLine "   [Esc]          Cancel and return to prompt" ([System.ConsoleColor]::DarkGray)
@@ -577,9 +585,12 @@ function Show-AiCodeCard {
 }
 
 function Show-AiActionMenu {
+    param([bool]$UseAliases = $false)
+
     $tEnter = Get-TerminalAiText "MenuEnter"
     $tCopy = Get-TerminalAiText "MenuCopy"
     $tInsert = Get-TerminalAiText "MenuInsert"
+    $tAlias = if ($UseAliases) { Get-TerminalAiText "MenuFull" } else { Get-TerminalAiText "MenuAlias" }
     $tExplain = Get-TerminalAiText "MenuExplain"
     $tAsk = Get-TerminalAiText "MenuAsk"
     $tCancel = Get-TerminalAiText "MenuCancel"
@@ -591,9 +602,11 @@ function Show-AiActionMenu {
     Write-Host "[I] " -NoNewline -ForegroundColor Cyan
     Write-Host $tInsert -ForegroundColor White
 
-    Write-Host "    [X]     " -NoNewline -ForegroundColor DarkYellow
+    Write-Host "    [S]     " -NoNewline -ForegroundColor DarkYellow
+    Write-Host ("{0,-18}" -f $tAlias) -NoNewline -ForegroundColor White
+    Write-Host "[X] " -NoNewline -ForegroundColor Magenta
     Write-Host ("{0,-18}" -f $tExplain) -NoNewline -ForegroundColor White
-    Write-Host "[A] " -NoNewline -ForegroundColor Magenta
+    Write-Host "[A] " -NoNewline -ForegroundColor Blue
     Write-Host ("{0,-18}" -f $tAsk) -NoNewline -ForegroundColor White
     Write-Host " [Esc] " -NoNewline -ForegroundColor Gray
     Write-Host "$tCancel`n" -ForegroundColor White
@@ -626,7 +639,7 @@ function Get-AiMenuKeyPress {
     #>
     [CmdletBinding()]
     param(
-        [string[]]$AllowedActions = @('Execute', 'Copy', 'Insert', 'Ask', 'Explain', 'Cancel')
+        [string[]]$AllowedActions = @('Execute', 'Copy', 'Insert', 'ShortAlias', 'Ask', 'Explain', 'Cancel')
     )
 
     while ($true) {
@@ -702,21 +715,28 @@ function Get-AiMenuKeyPress {
             }
         }
 
-        # 4. I (Insert) - англійська I/i, українська І/і, або фізична I в укр розкладці (Ш/ш)
+        # 4. I (Insert) - англійська I/i, або фізична I в укр розкладці (Ш/ш)
         if ('Insert' -in $AllowedActions) {
-            if ($keyEnum -eq [System.ConsoleKey]::I -or $vk -eq 73 -or $keyChar -in @('i', 'I', 'і', 'І', 'ш', 'Ш')) {
+            if ($keyEnum -eq [System.ConsoleKey]::I -or $vk -eq 73 -or $keyChar -in @('i', 'I', 'ш', 'Ш')) {
                 return 'Insert'
             }
         }
 
-        # 5. A (Ask) - англійська A/a, українська А/а, або фізична A в укр розкладці (Ф/ф)
+        # 5. S (Short / Alias) - англійська S/s, українська І/і (фізична S), або Ы/ы
+        if ('ShortAlias' -in $AllowedActions) {
+            if ($keyEnum -eq [System.ConsoleKey]::S -or $vk -eq 83 -or $keyChar -in @('s', 'S', 'і', 'І', 'ы', 'Ы')) {
+                return 'ShortAlias'
+            }
+        }
+
+        # 6. A (Ask) - англійська A/a, українська А/а, або фізична A в укр розкладці (Ф/ф)
         if ('Ask' -in $AllowedActions) {
             if ($keyEnum -eq [System.ConsoleKey]::A -or $vk -eq 65 -or $keyChar -in @('a', 'A', 'а', 'А', 'ф', 'Ф')) {
                 return 'Ask'
             }
         }
 
-        # 6. X (Explain) - англійська X/x, українська Х/х, або фізична X в укр розкладці (Ч/ч)
+        # 7. X (Explain) - англійська X/x, українська Х/х, або фізична X в укр розкладці (Ч/ч)
         if ('Explain' -in $AllowedActions) {
             if ($keyEnum -eq [System.ConsoleKey]::X -or $vk -eq 88 -or $keyChar -in @('x', 'X', 'х', 'Х', 'ч', 'Ч')) {
                 return 'Explain'
@@ -861,6 +881,41 @@ Provide a concise, direct, helpful explanation to the user's question.
 }
 
 function Get-AiSystemPrompt {
+    param([bool]$UseAliases = $false)
+
+    if ($UseAliases) {
+        return @"
+You are an elite PowerShell 7 and Windows Systems engineer.
+Target Environment: PowerShell $($PSVersionTable.PSVersion.Major).$($PSVersionTable.PSVersion.Minor) on Windows.
+Goal: Translate the user's natural language request into a single, efficient, idiomatic, compact PowerShell command or pipeline using standard aliases.
+Rules:
+1. Output ONLY the raw executable PowerShell code without markdown or explanations.
+2. STRICT ALIAS RULE: You MUST replace standard PowerShell cmdlets with their short aliases and compact forms wherever available:
+   - 'gps' instead of 'Get-Process'
+   - 'gci' or 'ls' instead of 'Get-ChildItem'
+   - 'select' instead of 'Select-Object'
+   - '?' or 'where' instead of 'Where-Object'
+   - '%' or 'foreach' instead of 'ForEach-Object'
+   - 'sort' instead of 'Sort-Object'
+   - 'measure' instead of 'Measure-Object'
+   - 'gc' or 'cat' instead of 'Get-Content'
+   - 'sc' instead of 'Set-Content'
+   - 'sls' instead of 'Select-String'
+   - 'help' instead of 'Get-Help'
+   - 'gsv' instead of 'Get-Service'
+   - 'kill' instead of 'Stop-Process'
+   - 'ft' instead of 'Format-Table'
+   - 'fl' instead of 'Format-List'
+   - 'epcsv' instead of 'Export-Csv'
+   - 'ipcsv' instead of 'Import-Csv'
+3. NEVER use fragile performance counter paths like Get-Counter '\Process(*)\% Processor Time' unless specifically asked for counter samples.
+4. NEVER hallucinate or invent fake cmdlets. Only use genuine PowerShell 7 cmdlets/aliases or installed tools.
+5. If the user asks about the active model, settings, or configuration, return: Get-TerminalAiConfig
+6. If the user asks to list installed models, return: Show-TerminalAiModels
+7. If the action is potentially destructive, include safe filtering and never use -Force or -Recurse recklessly.
+"@
+    }
+
     return @"
 You are an elite PowerShell 7 and Windows Systems engineer.
 Target Environment: PowerShell $($PSVersionTable.PSVersion.Major).$($PSVersionTable.PSVersion.Minor) on Windows.
@@ -891,6 +946,8 @@ function Invoke-AiCommand {
         Виконати згенеровану команду негайно без інтерактивного меню (аліаси: -x, -y).
     .PARAMETER Copy
         Скопіювати згенеровану команду безпосередньо в системний буфер обміну (аліас: -c).
+    .PARAMETER Alias
+        Використовувати стандартні короткі аліаси PowerShell (gps, gci, select, ?, %) замість повних назв (аліаси: -a, -Short, -UseAliases).
     .PARAMETER Explain
         Згенерувати структуроване навчальне пояснення синтаксису, параметрів та безпеки.
     .PARAMETER Ask
@@ -899,6 +956,8 @@ function Invoke-AiCommand {
         Перевизначити активну модель Ollama для поточного виклику.
     .EXAMPLE
         ai знайти всі файли більше 100MB у поточній папці
+    .EXAMPLE
+        ai "знайти процес на порті 8080" -a
     .EXAMPLE
         ai help shortcuts
     .EXAMPLE
@@ -919,6 +978,9 @@ function Invoke-AiCommand {
 
         [Alias("c")]
         [switch]$Copy,
+
+        [Alias("a", "Short", "UseAliases")]
+        [switch]$Alias,
 
         [switch]$Explain,
 
@@ -946,6 +1008,7 @@ function Invoke-AiCommand {
             Write-Host "    │   Швидкі підкоманди та скорочення:                                     │" -ForegroundColor Cyan
             Write-Host "    │     ai help [тема]або  aif help [тема]    (навчальна довідка й поради) │" -ForegroundColor Green
             Write-Host "    │     ai status     або  aif status         (стан системи, модель, мова) │" -ForegroundColor Green
+            Write-Host "    │     ai alias [on] або  aif alias [on|off] (режим коротких аліасів)     │" -ForegroundColor Green
             Write-Host "    │     ai models     |  aif -m               (список моделей Ollama)      │" -ForegroundColor Green
             Write-Host "    │     ai model <назва>                      (змінити активну модель)     │" -ForegroundColor Green
             Write-Host "    │     ai lang en | uk                       (перемкнути мову інтерфейсу) │" -ForegroundColor Green
@@ -954,6 +1017,7 @@ function Invoke-AiCommand {
             Write-Host "    │   Короткі ключі (прапорці):                                            │" -ForegroundColor Cyan
             Write-Host "    │     ai `"cmd`" -x   або  aif `"cmd`" -x       (виконати команду відразу)   │" -ForegroundColor Yellow
             Write-Host "    │     ai `"cmd`" -c   або  aif `"cmd`" -c       (скопіювати в буфер обміну)  │" -ForegroundColor Yellow
+            Write-Host "    │     ai `"cmd`" -a   або  aif `"cmd`" -a       (короткі аліаси: gps, gci, ?)│" -ForegroundColor Yellow
             Write-Host "    │     ai `"cmd`" -Explain                   (генерація з розбором коду)  │" -ForegroundColor Magenta
             Write-Host "    │     ai `"cmd`" -Ask                       (пряма текстова відповідь)   │" -ForegroundColor Blue
             Write-Host "    │                                                                        │" -ForegroundColor DarkCyan
@@ -970,6 +1034,7 @@ function Invoke-AiCommand {
             Write-Host "    │   Short Commands & Subcommands:                                        │" -ForegroundColor Cyan
             Write-Host "    │     ai help [top] or  aif help [topic]    (learning guide & cheatsheet)│" -ForegroundColor Green
             Write-Host "    │     ai status     or  aif status          (system information & model) │" -ForegroundColor Green
+            Write-Host "    │     ai alias [on] or  aif alias [on|off]  (short command aliases mode) │" -ForegroundColor Green
             Write-Host "    │     ai models     |  aif -m               (list installed models)      │" -ForegroundColor Green
             Write-Host "    │     ai model <name>                       (switch active Ollama model) │" -ForegroundColor Green
             Write-Host "    │     ai lang en | uk                       (switch interface language)  │" -ForegroundColor Green
@@ -978,6 +1043,7 @@ function Invoke-AiCommand {
             Write-Host "    │   Short Flags & Execution:                                             │" -ForegroundColor Cyan
             Write-Host "    │     ai `"cmd`" -x   or  aif `"cmd`" -x        (execute immediately)        │" -ForegroundColor Yellow
             Write-Host "    │     ai `"cmd`" -c   or  aif `"cmd`" -c        (copy to clipboard)          │" -ForegroundColor Yellow
+            Write-Host "    │     ai `"cmd`" -a   or  aif `"cmd`" -a        (short aliases: gps, gci, ?) │" -ForegroundColor Yellow
             Write-Host "    │     ai `"cmd`" -Explain                   (generate with explanation)  │" -ForegroundColor Magenta
             Write-Host "    │     ai `"cmd`" -Ask                       (direct educational answer)  │" -ForegroundColor Blue
             Write-Host "    │                                                                        │" -ForegroundColor DarkCyan
@@ -1098,12 +1164,22 @@ function Invoke-AiCommand {
         & $renderRow $lblHotkey $hkText ([System.ConsoleColor]::Yellow)
         $langDisplay = if ($cfg.Language -eq "en") { "en (English)" } else { "uk (Українська)" }
         & $renderRow $lblLang $langDisplay ([System.ConsoleColor]::White)
+        $lblAlias = if ($isUk) { "Короткі аліаси:" } else { "Command Aliases:" }
+        $aliasDisplay = if ($cfg.UseAliases) {
+            if ($isUk) { "Увімкнено (gps, gci, ?)" } else { "Enabled (gps, gci, ?)" }
+        } else {
+            if ($isUk) { "Вимкнено (повні назви)" } else { "Disabled (full cmdlets)" }
+        }
+        $aliasColor = if ($cfg.UseAliases) { [System.ConsoleColor]::Green } else { [System.ConsoleColor]::DarkGray }
+        & $renderRow $lblAlias $aliasDisplay $aliasColor
 
         Write-Host "    │                                                                  │" -ForegroundColor DarkCyan
         Write-Host "    ╰──────────────────────────────────────────────────────────────────╯" -ForegroundColor DarkCyan
         Write-Host ""
         Write-Host "    💡 $hintModel" -ForegroundColor DarkGray
         Write-Host "    💡 $hintFont" -ForegroundColor DarkGray
+        $hintAlias = if ($isUk) { "Аліаси команд:  ai alias on | off" } else { "Command aliases: ai alias on | off" }
+        Write-Host "    💡 $hintAlias" -ForegroundColor DarkGray
         Write-Host "    💡 $hintLang`n" -ForegroundColor DarkGray
         return
     }
@@ -1126,15 +1202,62 @@ function Invoke-AiCommand {
         return
     }
 
+    # 4. Керування режимом коротких аліасів (ai alias [on|off] або ai use-aliases)
+    if ($fullPrompt -match '^(?:alias|aliases|аліас|аліаси)\s+(?:on|1|true|enable|увімк|увімкнути)$' -or
+        $fullPrompt -in @("use-aliases", "use aliases", "використовувати аліаси", "увімкнути аліаси")) {
+        Set-TerminalAiConfig -UseAliases $true | Out-Null
+        $msg = if ($cfg.Language -eq "en") { "PowerShell short aliases mode successfully ENABLED (defaulting to: gps, gci, select, ?, %)" } else { "Режим коротких аліасів PowerShell успішно УВІМКНЕНО (за замовчуванням: gps, gci, select, ?, %)" }
+        Write-Host "`n    ✔ $msg`n" -ForegroundColor Green
+        return
+    }
+
+    if ($fullPrompt -match '^(?:alias|aliases|аліас|аліаси)\s+(?:off|0|false|disable|вимк|вимкнути)$' -or
+        $fullPrompt -in @("no-aliases", "no aliases", "не використовувати аліаси", "вимкнути аліаси")) {
+        Set-TerminalAiConfig -UseAliases $false | Out-Null
+        $msg = if ($cfg.Language -eq "en") { "PowerShell short aliases mode DISABLED (using full cmdlet names)" } else { "Режим коротких аліасів PowerShell ВИМКНЕНО (використовуються повні імена командлетів)" }
+        Write-Host "`n    ✔ $msg`n" -ForegroundColor Green
+        return
+    }
+
+    if ($fullPrompt -in @("alias", "aliases", "аліас", "аліаси")) {
+        Write-Host ""
+        if ($cfg.UseAliases) {
+            $aliasStatus = if ($isUk) { "УВІМКНЕНО" } else { "ENABLED" }
+            $aliasColor = [System.ConsoleColor]::Green
+        } else {
+            $aliasStatus = if ($isUk) { "ВИМКНЕНО" } else { "DISABLED" }
+            $aliasColor = [System.ConsoleColor]::DarkGray
+        }
+        if ($isUk) {
+            Write-Host "    ✦ Режим коротких аліасів PowerShell: " -NoNewline -ForegroundColor Cyan
+            Write-Host $aliasStatus -ForegroundColor $aliasColor
+            Write-Host "    💡 Увімкнути:  ai alias on   |  aif alias on" -ForegroundColor DarkGray
+            Write-Host "    💡 Вимкнути:   ai alias off  |  aif alias off`n" -ForegroundColor DarkGray
+        } else {
+            Write-Host "    ✦ PowerShell short aliases mode: " -NoNewline -ForegroundColor Cyan
+            Write-Host $aliasStatus -ForegroundColor $aliasColor
+            Write-Host "    💡 Enable:     ai alias on   |  aif alias on" -ForegroundColor DarkGray
+            Write-Host "    💡 Disable:    ai alias off  |  aif alias off`n" -ForegroundColor DarkGray
+        }
+        return
+    }
+
     # 4. Якщо явно запитано текстову відповідь (-Ask)
     if ($Ask) {
         Show-AiAnswer -Question $fullPrompt -Model $activeModel
         return
     }
 
+    # 5. Підготовка параметрів та аліасів
+    $preferAliases = [bool]($Alias.IsPresent -or $cfg.UseAliases)
+    if ($fullPrompt -match '(?:\s*[\(\[]?\s*(?:використовувати|використовуй|з|зі)\s+аліас(?:ами|и)?\s*[\)\]]?|\s*[\(\[]?\s*(?:use|with)\s+alias(?:es)?\s*[\)\]]?|\s*[\(\[]?\s*скорочен(?:і|ними|ими)\s+команд(?:ами|и)?\s*[\)\]]?)$') {
+        $preferAliases = $true
+        $fullPrompt = ($fullPrompt -replace '(?:\s*[\(\[]?\s*(?:використовувати|використовуй|з|зі)\s+аліас(?:ами|и)?\s*[\)\]]?|\s*[\(\[]?\s*(?:use|with)\s+alias(?:es)?\s*[\)\]]?|\s*[\(\[]?\s*скорочен(?:і|ними|ими)\s+команд(?:ами|и)?\s*[\)\]]?)$', '').Trim()
+    }
+
     Write-Host "`n  ✦ $(Get-TerminalAiText 'Connecting') ($activeModel)..." -ForegroundColor Cyan
 
-    $systemPrompt = Get-AiSystemPrompt
+    $systemPrompt = Get-AiSystemPrompt -UseAliases $preferAliases
     $rawResponse = Invoke-OllamaApi -Prompt $fullPrompt -SystemPrompt $systemPrompt -Model $activeModel -Temperature 0.0
     if ([string]::IsNullOrWhiteSpace($rawResponse)) {
         return
@@ -1145,7 +1268,7 @@ function Invoke-AiCommand {
 
     $command = Format-AiCodeOutput -Text $rawResponse
 
-    # 5. Перевірка на неіснуючий командлет (запобігання галюцинаціям)
+    # 6. Перевірка на неіснуючий командлет (запобігання галюцинаціям)
     $firstWord = ($command.Trim() -split '[\s|\(]')[0].TrimStart('(').Trim()
     $isUnknownCmdlet = $false
     if ($firstWord -match '^[A-Za-z]+-[A-Za-z0-9]+$') {
@@ -1181,46 +1304,76 @@ function Invoke-AiCommand {
         return
     }
 
-    # Дворівневе структуроване меню дій
-    Show-AiActionMenu
+    # Дворівневе структуроване меню дій з можливістю перемикання аліасів
+    while ($true) {
+        Show-AiActionMenu -UseAliases $preferAliases
 
-    $action = Get-AiMenuKeyPress -AllowedActions @('Execute', 'Copy', 'Insert', 'Ask', 'Explain', 'Cancel')
-    switch ($action) {
-        'Execute' {
-            Write-Host "    ▶ $(Get-TerminalAiText 'Executing')`n" -ForegroundColor Yellow
-            Invoke-Expression $command
-        }
-        'Cancel' {
-            Write-Host "    $(Get-TerminalAiText 'Canceled')`n" -ForegroundColor DarkGray
-        }
-        'Copy' {
-            Set-Clipboard -Value $command
-            Write-Host "    ✔ $(Get-TerminalAiText 'Copied')`n" -ForegroundColor Green
-        }
-        'Insert' {
-            Set-Clipboard -Value $command
-            $pasted = $false
-            try {
-                if (([System.Management.Automation.PSTypeName]'TerminalAiPasteHelper').Type) {
-                    [TerminalAiPasteHelper]::DelayedPaste(200)
-                    $pasted = $true
-                }
-            } catch { }
-
-            if (-not $pasted) {
-                try {
-                    $ws = New-Object -ComObject WScript.Shell
-                    $ws.SendKeys("^v")
-                } catch { }
+        $action = Get-AiMenuKeyPress -AllowedActions @('Execute', 'Copy', 'Insert', 'ShortAlias', 'Ask', 'Explain', 'Cancel')
+        switch ($action) {
+            'Execute' {
+                Write-Host "    ▶ $(Get-TerminalAiText 'Executing')`n" -ForegroundColor Yellow
+                Invoke-Expression $command
+                return
             }
-            Write-Host "    ✔ $(Get-TerminalAiText 'Inserted')`n" -ForegroundColor Green
-        }
-        'Ask' {
-            Show-AiAnswer -Question $fullPrompt -Model $activeModel
-        }
-        'Explain' {
-            Write-Host ""
-            Show-AiExplanation -Command $command -Model $activeModel
+            'Cancel' {
+                Write-Host "    $(Get-TerminalAiText 'Canceled')`n" -ForegroundColor DarkGray
+                return
+            }
+            'Copy' {
+                Set-Clipboard -Value $command
+                Write-Host "    ✔ $(Get-TerminalAiText 'Copied')`n" -ForegroundColor Green
+                return
+            }
+            'Insert' {
+                Set-Clipboard -Value $command
+                $pasted = $false
+                try {
+                    if (([System.Management.Automation.PSTypeName]'TerminalAiPasteHelper').Type) {
+                        [TerminalAiPasteHelper]::DelayedPaste(200)
+                        $pasted = $true
+                    }
+                } catch { }
+
+                if (-not $pasted) {
+                    try {
+                        $ws = New-Object -ComObject WScript.Shell
+                        $ws.SendKeys("^v")
+                    } catch { }
+                }
+                Write-Host "    ✔ $(Get-TerminalAiText 'Inserted')`n" -ForegroundColor Green
+                return
+            }
+            'Ask' {
+                Show-AiAnswer -Question $fullPrompt -Model $activeModel
+                return
+            }
+            'Explain' {
+                Write-Host ""
+                Show-AiExplanation -Command $command -Model $activeModel
+                return
+            }
+            'ShortAlias' {
+                $preferAliases = -not $preferAliases
+                $modeText = if ($preferAliases) {
+                    if ($isUk) { "Перетворюю з використанням аліасів..." } else { "Converting using short aliases..." }
+                } else {
+                    if ($isUk) { "Перетворюю на повні командлети..." } else { "Converting to full cmdlets..." }
+                }
+                Write-Host "`n  ✦ $modeText" -ForegroundColor Cyan
+
+                $togglePrompt = if ($preferAliases) {
+                    "Rewrite this PowerShell command strictly using standard short aliases (gps, gci, select, ?, %, sort, gc, sc, sls, help):`n$command"
+                } else {
+                    "Rewrite this PowerShell command strictly using full official cmdlet names (Get-Process, Get-ChildItem, Select-Object, Where-Object, ForEach-Object):`n$command"
+                }
+                $toggleSysPrompt = "You are an expert PowerShell engineer. Output strictly the rewritten raw PowerShell command with no markdown or explanation."
+                $newCmd = Invoke-OllamaApi -Prompt $togglePrompt -SystemPrompt $toggleSysPrompt -Model $activeModel -Temperature 0.0
+                if (-not [string]::IsNullOrWhiteSpace($newCmd)) {
+                    $command = Format-AiCodeOutput -Text $newCmd
+                    Show-AiCodeCard -Code $command -Title (Get-TerminalAiText "CardTitle") -Model $activeModel -CodeColor Green
+                }
+                continue
+            }
         }
     }
 }
@@ -1750,6 +1903,7 @@ function Register-TerminalAiArgumentCompleters {
                 [System.Management.Automation.CompletionResult]::new('help', 'help', 'ParameterValue', 'Educational guides & cheat-sheets'),
                 [System.Management.Automation.CompletionResult]::new('shortcuts', 'shortcuts', 'ParameterValue', 'Keybindings, flags, and aliases guide'),
                 [System.Management.Automation.CompletionResult]::new('status', 'status', 'ParameterValue', 'System information, active model and language'),
+                [System.Management.Automation.CompletionResult]::new('alias', 'alias', 'ParameterValue', 'Configure short PowerShell aliases (on | off)'),
                 [System.Management.Automation.CompletionResult]::new('models', 'models', 'ParameterValue', 'List installed Ollama models'),
                 [System.Management.Automation.CompletionResult]::new('model', 'model', 'ParameterValue', 'Switch active Ollama model'),
                 [System.Management.Automation.CompletionResult]::new('lang', 'lang', 'ParameterValue', 'Switch interface language (en | uk)'),
@@ -1763,6 +1917,15 @@ function Register-TerminalAiArgumentCompleters {
 
         # Другий аргумент: перевіряємо перший токен
         $firstArg = $tokens[1].ToLowerInvariant()
+
+        if ($firstArg -in @('alias', 'aliases', 'аліас', 'аліаси')) {
+            $aliasOpts = @(
+                [System.Management.Automation.CompletionResult]::new('on', 'on', 'ParameterValue', 'Enable short PowerShell aliases (gps, gci, select, ?, %)'),
+                [System.Management.Automation.CompletionResult]::new('off', 'off', 'ParameterValue', 'Disable short aliases (use full cmdlet names)'),
+                [System.Management.Automation.CompletionResult]::new('status', 'status', 'ParameterValue', 'Check current alias mode')
+            )
+            return ($aliasOpts | Where-Object { $_.CompletionText -like "$wordToComplete*" })
+        }
 
         if ($firstArg -in @('help', 'довідка', 'допомога')) {
             $topics = @(
