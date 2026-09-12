@@ -14,6 +14,23 @@ if (Test-Path $configScriptPath) {
     . $configScriptPath
 }
 
+# Завантажуємо високопродуктивний бінарний модуль C# (AOT), якщо доступний
+if ($PSVersionTable.PSVersion.Major -ge 7) {
+    $aotCandidates = @(
+        (Join-Path $PSScriptRoot "TerminalAI.Aot.dll"),
+        (Join-Path $PSScriptRoot "AOT\bin\Release\net10.0\TerminalAI.Aot.dll")
+    )
+    foreach ($cand in $aotCandidates) {
+        if (Test-Path $cand) {
+            try {
+                Import-Module $cand -Global -ErrorAction SilentlyContinue
+                break
+            } catch { }
+        }
+    }
+}
+
+
 # Допоміжний клас для надійної відкладеної вставки через синтез клавіш у Windows Terminal ConPTY
 if (-not ([System.Management.Automation.PSTypeName]'TerminalAiPasteHelper').Type) {
     try {

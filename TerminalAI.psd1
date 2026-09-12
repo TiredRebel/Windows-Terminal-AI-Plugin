@@ -18,6 +18,9 @@
     # Необхідні модулі
     RequiredModules = @()
 
+    # Вкладені модулі
+    NestedModules = @('TerminalAI.Aot.dll')
+
     # Функції, що експортуються
     FunctionsToExport = @(
         'Invoke-AiCommand',
@@ -48,7 +51,9 @@
     )
 
     # Командлети, що експортуються
-    CmdletsToExport = @()
+    CmdletsToExport = @(
+        'Invoke-AiCommandFast'
+    )
 
     # Змінні, що експортуються
     VariablesToExport = @()
@@ -57,6 +62,8 @@
     AliasesToExport = @(
         'ai',
         '??',
+        'ai-fast',
+        'aif',
         'ai-fix',
         'fix-error',
         'ai-script',
