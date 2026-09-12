@@ -157,6 +157,37 @@
   - All 4 cycles of Phase P0 (Cycles 1, 2, 3, 4) are completely implemented and verified.
 - **Verdict**: **PASSED**
 
+### Cycle 5/10: Assistant Hardening (FIFO History & Secret Redaction)
+- **Date**: 2026-09-12
+- **Hypothesis**: Redacting secrets (OpenAI, Anthropic, HuggingFace, GitHub PAT, AWS keys, Bearer tokens, PEM keys, passwords) deterministically before injecting user turns or file snippets into conversation memory, combined with an automated FIFO cap of 16 turns, prevents token context bloat and guarantees sensitive credentials never leak to the LLM endpoint or local session logs.
+- **Changed Files**:
+  - `TerminalAI.psm1`: Implemented `Protect-AiSecretData` with deterministic regex masking of credentials, tokens, and private keys. Exported in `Export-ModuleMember`.
+  - `TerminalAI.psd1`: Exported `Protect-AiSecretData` in `FunctionsToExport`.
+  - `TerminalAiAssistant.ps1`: Implemented `Add-AssistantHistoryMessage` with built-in secret redaction and 16-message FIFO cap; replaced all raw `$script:AiChatHistory.Add` calls across `/inspect`, error remediation, `/read`, and main prompt handlers.
+  - `tests/P1-UxAssistant.Tests.ps1`: Added fixtures FIX-P1-01 to FIX-P1-07 verifying redaction across all providers and FIFO cap behavior.
+- **Tests Executed**:
+  - `pwsh.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\P1-UxAssistant.Tests.ps1` -> 13 / 13 passed (100%).
+  - `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\P1-UxAssistant.Tests.ps1` -> 13 / 13 passed (100%).
+- **Verdict**: **PASSED**
+
+### Cycle 6/10: Script Generation Safety (Unified Diff Preview & Overwrite Protection)
+- **Date**: 2026-09-12
+- **Hypothesis**: Replacing raw `Set-Content` file writes with a centralized `Save-AiScriptFile` that generates a color-coded unified diff (`Format-AiScriptDiff`), skips identical files, and requires explicit user confirmation before overwriting existing files (or aborts in non-interactive sessions) prevents accidental data loss and provides complete transparency when AI scripts are saved to disk.
+- **Changed Files**:
+  - `TerminalAI.psm1`: Implemented `Format-AiScriptDiff` with bounded loops (`$steps < $maxSteps`) and colorized unified diff output. Implemented `Save-AiScriptFile` with identical content detection, unified diff rendering, interactive confirmation `[y/N]`, non-interactive guards, and atomic write via temporary file with UTF-8 BOM. Exported in `Export-ModuleMember`.
+  - `TerminalAI.psm1`: Updated `New-AiScript` to route all file saves through `Save-AiScriptFile`.
+  - `TerminalAI.psd1`: Exported `Format-AiScriptDiff` and `Save-AiScriptFile` in `FunctionsToExport`.
+  - `TerminalAiAssistant.ps1`: Updated `/save` command handler to call `Save-AiScriptFile`.
+  - `tests/P1-UxAssistant.Tests.ps1`: Added fixtures FIX-P1-08 to FIX-P1-13 testing diff generation, identical content detection, UTF-8 BOM creation, non-interactive abort, overwrite rejection, and overwrite approval.
+- **Tests Executed**:
+  - `pwsh.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\P1-UxAssistant.Tests.ps1` -> 13 / 13 passed (100%).
+  - `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\P1-UxAssistant.Tests.ps1` -> 13 / 13 passed (100%).
+  - Regression test `tests/P0-SecurityGate.Tests.ps1` -> 30 / 30 passed (100%) in PS 7 & PS 5.1.
+  - Regression test `Test-TerminalAi.ps1` -> 22 / 22 evaluated tests passed (100%) in PS 7 & PS 5.1.
+- **Phase P1 Completion**:
+  - Both cycles of Phase P1 (Cycles 5 and 6) are completely implemented and verified.
+- **Verdict**: **PASSED**
+
 ---
 
 ## 7. Hallucinations & Discrepancies Log
@@ -189,11 +220,31 @@
 - **Independent Verdict**: **PASS (100% ACCEPTED)**
 
 ### Independent Verifier Report — Cycle 3 (2026-09-12)
-- **Verifier Agent**: `Independent Verifier` (Conversation `db8b1140-6f71-4786-bb5f-dd6fbf32531d`)
-- **Parser Audit**: 0 parser errors across all 9 files. `Invoke-AiExecutionGate` cleanly exported in `TerminalAI.psm1` and `TerminalAI.psd1`.
+- **Verifier Agent**: `Independent Verifier Cycle 3` (Conversation `db8b1140-6f71-4786-bb5f-dd6fbf32531d`)
+- **Parser Audit**: 0 parser errors across all files. `Invoke-AiExecutionGate` cleanly exported in `TerminalAI.psm1` and `TerminalAI.psd1`.
 - **Elimination of Invoke-Expression**: Verified 0 raw `Invoke-Expression` / `iex` callers in execution paths.
 - **Fixture Audit**: 25 / 25 fixtures (FIX-01 to FIX-25) passed with 100% in both PowerShell 7 and Windows PowerShell 5.1.
 - **Regression Audit**: `Test-TerminalAi.ps1` passes 22 / 22 evaluated tests (100%, Score 100/100).
+- **Independent Verdict**: **PASS (100% ACCEPTED)**
+
+### Independent Verifier Report — Cycle 4 & Phase P0 (2026-09-12)
+- **Verifier Agent**: `Independent Verifier Cycle 4 & P0` (Conversation `fcf5d52b-189b-4431-948d-183da06308f7`)
+- **Parser Audit**: 0 parser errors across all files.
+- **Fixture Audit**: 30 / 30 fixtures (FIX-01 to FIX-30) passed with 100% in both PowerShell 7 and Windows PowerShell 5.1.
+- **Regression Audit**: `Test-TerminalAi.ps1` passes 22 / 22 evaluated tests (100%, Score 100/100).
+- **Documentation Audit**: Verified `README.md:384` temperature claim correction.
+- **Preview Safety**: Verified WhatIf simulation blocked safely for external binaries and unsupportive cmdlets.
+- **Independent Verdict**: **PASS (100% ACCEPTED)**
+
+### Independent Verifier Report — Phase P1 (Cycles 5 & 6) (2026-09-12)
+- **Verifier Agent**: `Independent Verifier Phase P1` (Conversation `79c10cd3-7338-48a4-a0e7-bc137d70864c`)
+- **Parser Audit**: `.\tools\check_syntax.ps1` executed in PS 7 and PS 5.1 across 12 files: **0 errors**.
+- **Phase P1 Fixtures**: 13 / 13 fixtures (FIX-P1-01 to FIX-P1-13) passed with 100% in both PowerShell 7 and Windows PowerShell 5.1.
+- **Regression Audit**: 30 / 30 fixtures passed in `tests/P0-SecurityGate.Tests.ps1`; 22 / 22 evaluated tests passed (Score 100/100) in `Test-TerminalAi.ps1`.
+- **Static Code Audit**:
+  - Raw `Set-Content` for AI script generation completely eliminated (`New-AiScript` and `/save` route 100% through `Save-AiScriptFile`).
+  - Direct `$script:AiChatHistory.Add` calls centralized exclusively inside `Add-AssistantHistoryMessage` with deterministic secret redaction and 16-message FIFO cap.
+- **Encoding Audit**: 100% UTF-8 BOM compliance confirmed across all 12 PowerShell scripts.
 - **Independent Verdict**: **PASS (100% ACCEPTED)**
 
 ---

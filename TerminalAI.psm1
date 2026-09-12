@@ -2399,6 +2399,267 @@ Rules:
     }
 }
 
+function Protect-AiSecretData {
+    <#
+    .SYNOPSIS
+        Детерміноване маскування секретів, API-токенів та паролів для захисту контексту.
+    .DESCRIPTION
+        Сканує текст та замінює відомі патерни токенів (OpenAI sk-, Anthropic sk-ant-, HuggingFace,
+        GitHub pat, AWS AKIA, Bearer токени, приватні ключі та паролі) на безпечні плейсхолдери,
+        унеможливлюючи витік конфіденційних даних у контекст LLM та логи сесії.
+    .PARAMETER Text
+        Вхідний текст або код для очищення.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $false, Position = 0)]
+        [string]$Text
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Text)) {
+        return $Text
+    }
+
+    $res = $Text
+
+    # 1. Приватні ключі PEM (RSA, EC, OpenSSH, DSA)
+    $res = [regex]::Replace($res, '(?s)-----BEGIN (?:[A-Z ]+)?PRIVATE KEY-----.*?-----END (?:[A-Z ]+)?PRIVATE KEY-----', '***[REDACTED PRIVATE KEY]***')
+
+    # 2. Добре відомі префікси API-токенів
+    $res = [regex]::Replace($res, '\b(sk-ant-[a-zA-Z0-9_\-]{20,})\b', 'sk-ant-***[REDACTED]***')
+    $res = [regex]::Replace($res, '\b(sk-[a-zA-Z0-9_\-]{20,})\b', 'sk-***[REDACTED]***')
+    $res = [regex]::Replace($res, '\b(hf_[a-zA-Z0-9]{20,})\b', 'hf_***[REDACTED]***')
+    $res = [regex]::Replace($res, '\b(ghp_[a-zA-Z0-9]{20,})\b', 'ghp_***[REDACTED]***')
+    $res = [regex]::Replace($res, '\b(github_pat_[a-zA-Z0-9_]{20,})\b', 'github_pat_***[REDACTED]***')
+    $res = [regex]::Replace($res, '\b(AKIA[0-9A-Z]{16})\b', '***[REDACTED AWS KEY]***')
+
+    # 3. Bearer токени (Authorization: Bearer <token>)
+    $res = [regex]::Replace($res, '(?i)(bearer\s+)[a-zA-Z0-9_\-\.]{20,}', '${1}***[REDACTED]***')
+
+    # 4. Паролі та секрети у параметрах/конфігураціях ($password, $pass, $pwd, api_key, secret, token = "...")
+    $res = [regex]::Replace($res, '(?i)([$]?(?:password|pass|pwd)\s*[:=]\s*[\x22\x27])(?![^\x22\x27]*\[REDACTED\])[^\r\n\x22\x27]{4,}([\x22\x27])', '${1}***[REDACTED]***${2}')
+    $res = [regex]::Replace($res, '(?i)([$]?(?:api[_-]?key|secret|token)\s*[:=]\s*[\x22\x27])(?![^\x22\x27]*\[REDACTED\])[^\r\n\x22\x27]{4,}([\x22\x27])', '${1}***[REDACTED]***${2}')
+
+    return $res
+}
+
+function Format-AiScriptDiff {
+    <#
+    .SYNOPSIS
+        Формує простий, швидкий та детермінований Unified Diff між існуючим та новим текстом.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string]$OldText,
+        [Parameter(Mandatory = $true)][string]$NewText,
+        [string]$OldLabel = "Existing File",
+        [string]$NewLabel = "New AI Script",
+        [switch]$PassThru
+    )
+
+    $oldLines = if ($OldText) { $OldText -split '\r?\n' } else { @() }
+    $newLines = if ($NewText) { $NewText -split '\r?\n' } else { @() }
+
+    $diffRecords = [System.Collections.Generic.List[psobject]]::new()
+    $i = 0
+    $j = 0
+    $maxSteps = ($oldLines.Count + $newLines.Count) * 2 + 10
+    $steps = 0
+
+    while (($i -lt $oldLines.Count -or $j -lt $newLines.Count) -and ($steps -lt $maxSteps)) {
+        $steps++
+        $o = if ($i -lt $oldLines.Count) { $oldLines[$i] } else { $null }
+        $n = if ($j -lt $newLines.Count) { $newLines[$j] } else { $null }
+
+        if ($null -ne $o -and $null -ne $n -and $o -eq $n) {
+            $diffRecords.Add([PSCustomObject]@{ Type = "Unchanged"; Line = "  $o" })
+            $i++; $j++
+        } elseif ($null -ne $o -and $null -ne $n -and $o -ne $n) {
+            if (($j + 1) -lt $newLines.Count -and $newLines[$j + 1] -eq $o) {
+                $diffRecords.Add([PSCustomObject]@{ Type = "Added"; Line = "+ $n" })
+                $j++
+            } elseif (($i + 1) -lt $oldLines.Count -and $oldLines[$i + 1] -eq $n) {
+                $diffRecords.Add([PSCustomObject]@{ Type = "Removed"; Line = "- $o" })
+                $i++
+            } else {
+                $diffRecords.Add([PSCustomObject]@{ Type = "Removed"; Line = "- $o" })
+                $diffRecords.Add([PSCustomObject]@{ Type = "Added"; Line = "+ $n" })
+                $i++; $j++
+            }
+        } elseif ($null -ne $o -and $null -eq $n) {
+            $diffRecords.Add([PSCustomObject]@{ Type = "Removed"; Line = "- $o" })
+            $i++
+        } elseif ($null -eq $o -and $null -ne $n) {
+            $diffRecords.Add([PSCustomObject]@{ Type = "Added"; Line = "+ $n" })
+            $j++
+        } else {
+            break
+        }
+    }
+
+    Write-Host ""
+    Write-Host "    --- $OldLabel" -ForegroundColor Red
+    Write-Host "    +++ $NewLabel" -ForegroundColor Green
+    foreach ($dl in $diffRecords) {
+        switch ($dl.Type) {
+            "Added"     { Write-Host "    $($dl.Line)" -ForegroundColor Green }
+            "Removed"   { Write-Host "    $($dl.Line)" -ForegroundColor Red }
+            "Unchanged" { Write-Host "    $($dl.Line)" -ForegroundColor DarkGray }
+        }
+    }
+    Write-Host ""
+
+    if ($PassThru) {
+        return @($diffRecords)
+    }
+}
+
+function Save-AiScriptFile {
+    <#
+    .SYNOPSIS
+        Безпечний атомарний запис AI-скрипту з показом diff та підтвердженням при перезаписі.
+    .DESCRIPTION
+        Перевіряє наявність файлу за вказаним шляхом. Якщо файл існує:
+        1. Якщо новий вміст повністю збігається з існуючим: повертає інформаційне повідомлення без зайвих дій.
+        2. Якщо вміст відрізняється: відображає unified diff і вимагає явного підтвердження [y/N].
+        3. Якщо підтверджено: виконує атомарний запис через тимчасовий файл з кодуванням UTF-8 BOM.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true, Position = 0)]
+        [string]$Path,
+
+        [Parameter(Mandatory = $true, Position = 1)]
+        [string]$Content,
+
+        [switch]$Force,
+
+        [string]$ConfirmInput,
+
+        [switch]$PassThru
+    )
+
+    $resolvedPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
+    $fileExists = Test-Path -Path $resolvedPath -PathType Leaf
+    $diff = @()
+
+    if ($fileExists) {
+        $existingContent = try {
+            [System.IO.File]::ReadAllText($resolvedPath, [System.Text.Encoding]::UTF8)
+        } catch {
+            Get-Content -Path $resolvedPath -Raw -ErrorAction SilentlyContinue
+        }
+
+        if ($null -ne $existingContent -and $existingContent.Trim() -eq $Content.Trim()) {
+            Write-Host "    ℹ [TerminalAI] File already exists with identical content: $resolvedPath" -ForegroundColor DarkCyan
+            if ($PassThru) {
+                return [PSCustomObject]@{
+                    Saved  = $true
+                    Status = "Identical"
+                    Path   = $resolvedPath
+                    Diff   = @()
+                }
+            }
+            return $true
+        }
+
+        # Файл існує і відрізняється: показуємо diff
+        Write-Host ""
+        Write-Host "    ┌─────────────────────────────────────────────────────────────┐" -ForegroundColor Yellow
+        Write-Host "    │             ⚠  EXISTING FILE OVERWRITE WARNING  ⚠           │" -ForegroundColor Yellow
+        Write-Host "    └─────────────────────────────────────────────────────────────┘" -ForegroundColor Yellow
+        Write-Host "    File: $resolvedPath" -ForegroundColor Cyan
+
+        $diff = Format-AiScriptDiff -OldText $existingContent -NewText $Content -OldLabel "Existing File" -NewLabel "New AI Script" -PassThru
+
+        if (-not $Force) {
+            $confirmed = $false
+            if ($PSBoundParameters.ContainsKey('ConfirmInput')) {
+                $response = $ConfirmInput
+            } else {
+                try {
+                    $isInteractive = [Environment]::UserInteractive
+                    if ([Console]::IsInputRedirected) { $isInteractive = $false }
+                } catch { $isInteractive = $true }
+
+                if (-not $isInteractive) {
+                    Write-Host "    ✖ Non-interactive session. Overwrite canceled for safety." -ForegroundColor Red
+                    if ($PassThru) {
+                        return [PSCustomObject]@{
+                            Saved  = $false
+                            Status = "BlockedNonInteractive"
+                            Path   = $resolvedPath
+                            Diff   = $diff
+                        }
+                    }
+                    return $false
+                }
+
+                $response = Read-Host "    Overwrite this file? [y/N]"
+            }
+
+            if ($response -match '^(y|yes|так|т)$') {
+                $confirmed = $true
+            }
+
+            if (-not $confirmed) {
+                Write-Host "    ✖ Overwrite canceled by user." -ForegroundColor DarkGray
+                if ($PassThru) {
+                    return [PSCustomObject]@{
+                        Saved  = $false
+                        Status = "OverwriteDenied"
+                        Path   = $resolvedPath
+                        Diff   = $diff
+                    }
+                }
+                return $false
+            }
+        }
+    }
+
+    # Атомарний запис: пишемо у .tmp, потім замінюємо
+    $enc = New-Object System.Text.UTF8Encoding($true)
+    $dir = [System.IO.Path]::GetDirectoryName($resolvedPath)
+    if ($dir -and -not (Test-Path $dir)) {
+        New-Item -Path $dir -ItemType Directory -Force | Out-Null
+    }
+
+    $tmpPath = "$resolvedPath.tmp." + [System.Guid]::NewGuid().ToString("N")
+    try {
+        [System.IO.File]::WriteAllText($tmpPath, $Content, $enc)
+        if ($fileExists) {
+            [System.IO.File]::Copy($tmpPath, $resolvedPath, $true)
+            [System.IO.File]::Delete($tmpPath)
+        } else {
+            [System.IO.File]::Move($tmpPath, $resolvedPath)
+        }
+        Write-Host "    ✔ File successfully saved: $resolvedPath" -ForegroundColor Green
+        if ($PassThru) {
+            return [PSCustomObject]@{
+                Saved  = $true
+                Status = if ($fileExists) { "Overwritten" } else { "Created" }
+                Path   = $resolvedPath
+                Diff   = if ($fileExists) { $diff } else { @() }
+            }
+        }
+        return $true
+    } catch {
+        if (Test-Path $tmpPath) {
+            Remove-Item -Path $tmpPath -Force -ErrorAction SilentlyContinue
+        }
+        Write-Host "    ✖ Error saving file: $($_.Exception.Message)" -ForegroundColor Red
+        if ($PassThru) {
+            return [PSCustomObject]@{
+                Saved  = $false
+                Status = "Error"
+                Path   = $resolvedPath
+                Error  = $_.Exception.Message
+            }
+        }
+        return $false
+    }
+}
+
 function New-AiScript {
     <#
     .SYNOPSIS
@@ -2446,15 +2707,12 @@ Requirements:
     $scriptContent = Format-AiCodeOutput -Text $rawResponse
 
     if ($OutputPath) {
-        $resolvedPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutputPath)
-        Set-Content -Path $resolvedPath -Value $scriptContent -Encoding UTF8
-        Write-Host "  ✔ $(Get-TerminalAiText 'SavedAt') $resolvedPath" -ForegroundColor Green
-
-        if ($Edit) {
+        $saved = Save-AiScriptFile -Path $OutputPath -Content $scriptContent
+        if ($saved -and $Edit) {
             if (Get-Command code -ErrorAction SilentlyContinue) {
-                code $resolvedPath
+                code $OutputPath
             } else {
-                notepad $resolvedPath
+                notepad $OutputPath
             }
         }
     } else {
@@ -2469,8 +2727,7 @@ Requirements:
             $promptFileName = (Get-TerminalAiText "EnterFileName") -f $defaultName
             $savePath = Read-Host "  $promptFileName"
             if ([string]::IsNullOrWhiteSpace($savePath)) { $savePath = $defaultName }
-            Set-Content -Path $savePath -Value $scriptContent -Encoding UTF8
-            Write-Host "  ✔ $(Get-TerminalAiText 'SavedAt') $(Convert-Path $savePath)" -ForegroundColor Green
+            Save-AiScriptFile -Path $savePath -Content $scriptContent
         }
     }
 }
@@ -2891,7 +3148,10 @@ Export-ModuleMember -Function @(
     "Clear-AiInputBuffer",
     "Get-AiMenuKeyPress",
     "Test-AiCommandAst",
-    "Invoke-AiExecutionGate"
+    "Invoke-AiExecutionGate",
+    "Protect-AiSecretData",
+    "Format-AiScriptDiff",
+    "Save-AiScriptFile"
 ) -Alias @(
     "ai",
     "??",

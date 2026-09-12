@@ -334,6 +334,36 @@ function Read-AssistantLine {
     }
 }
 
+function Add-AssistantHistoryMessage {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Role,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Content,
+
+        [int]$MaxHistory = 16
+    )
+
+    if ($null -eq $script:AiChatHistory) {
+        $script:AiChatHistory = [System.Collections.Generic.List[hashtable]]::new()
+    }
+
+    # Детерміноване маскування секретних даних перед збереженням у контекст
+    $sanitized = if (Get-Command Protect-AiSecretData -ErrorAction SilentlyContinue) {
+        Protect-AiSecretData -Text $Content
+    } else {
+        $Content
+    }
+
+    $script:AiChatHistory.Add(@{ role = $Role; content = $sanitized })
+
+    # FIFO обмеження глибини контексту
+    while ($script:AiChatHistory.Count -gt $MaxHistory) {
+        $script:AiChatHistory.RemoveAt(0)
+    }
+}
+
 $currentLang = if ($cfg.Language -in @("uk", "ua")) { "uk" } else { "en" }
 Show-AssistantHeader -Model $activeModel -Lang $currentLang
 
@@ -402,7 +432,7 @@ while ($true) {
         }
         if ($inspectSub -match 'add|inject|context') {
             $envNote = "Environment Context: PS $($PSVersionTable.PSVersion), Path: $((Get-Location).Path), LastError: $(if ($global:Error.Count -gt 0) { $global:Error[0].Exception.Message } else { 'None' })"
-            $script:AiChatHistory.Add(@{ role = "user"; content = $envNote })
+            Add-AssistantHistoryMessage -Role "user" -Content $envNote
             Write-Host "  ✔ Environment snapshot added to conversation context!" -ForegroundColor Green
         }
         Write-Host ""
@@ -477,8 +507,8 @@ while ($true) {
         if ([string]::IsNullOrWhiteSpace($targetFile)) {
             $targetFile = "ai_script_" + (Get-Date -Format "yyyyMMdd_HHmmss") + ".ps1"
         }
-        Set-Content -Path $targetFile -Value $lastCodeBlock -Encoding UTF8
-        Write-Host "$($txt.Saved) $(Convert-Path $targetFile)`n" -ForegroundColor Green
+        Save-AiScriptFile -Path $targetFile -Content $lastCodeBlock
+        Write-Host ""
         continue
     }
     elseif ($inputQuery -in @("/run", "/exec", "run", "exec")) {
@@ -539,12 +569,12 @@ while ($true) {
                 if ($fixConfirm -notmatch '^(n|no|ні)$') {
                     $bt3 = '```'
                     $errContext = "When executing this PowerShell command:`n$bt3" + "powershell`n$lastCodeBlock`n$bt3`nAn error occurred:`n$capturedErrorMessage`nPlease analyze this failure and provide a corrected, robust version."
-                    $script:AiChatHistory.Add(@{ role = "user"; content = $errContext })
+                    Add-AssistantHistoryMessage -Role "user" -Content $errContext
 
                     Write-Host "`n$($txt.Thinking)`n" -ForegroundColor DarkGray
                     $reply = Invoke-OllamaApi -Messages $script:AiChatHistory -SystemPrompt $systemPrompt -Model $activeModel -Temperature 0.2
                     if ($reply) {
-                        $script:AiChatHistory.Add(@{ role = "assistant"; content = $reply })
+                        Add-AssistantHistoryMessage -Role "assistant" -Content $reply
                         Write-Host $reply -ForegroundColor White
 
                         if ($reply -match '(?s)```(?:powershell|pwsh)?\r?\n?(.*?)\r?\n?```') {
@@ -625,7 +655,7 @@ while ($true) {
         if ($injectConfirm -notmatch '^(n|no|ні)$') {
             $bt3 = '```'
             $fileNote = "Local file inspected: $resolvedPath`n$bt3`n" + ($lines -join "`n") + "`n$bt3"
-            $script:AiChatHistory.Add(@{ role = "user"; content = $fileNote })
+            Add-AssistantHistoryMessage -Role "user" -Content $fileNote
             $okMsg = if ($currentLang -eq "uk") { "✔ Вміст файлу додано до контексту діалогу!`n" } else { "✔ File content added to conversation context!`n" }
             Write-Host $okMsg -ForegroundColor Green
         }
@@ -646,19 +676,14 @@ Always prefer clean, idiomatic PowerShell 7 syntax. Format scripts in markdown c
 Maintain context from previous conversation turns to provide relevant follow-up assistance.
 "@
 
-    # Додаємо репліку користувача в історію діалогу
-    $script:AiChatHistory.Add(@{ role = "user"; content = $inputQuery })
-
-    # Обмежуємо глибину контексту (останні 16 реплік), щоб не переповнювати контекстне вікно моделі
-    while ($script:AiChatHistory.Count -gt 16) {
-        $script:AiChatHistory.RemoveAt(0)
-    }
+    # Додаємо репліку користувача в історію діалогу через санітизатор з FIFO обмеженням
+    Add-AssistantHistoryMessage -Role "user" -Content $inputQuery
 
     Write-Host "`n$($txt.Thinking)`n" -ForegroundColor DarkGray
 
     $reply = Invoke-OllamaApi -Messages $script:AiChatHistory -SystemPrompt $systemPrompt -Model $activeModel -Temperature 0.3
     if ($reply) {
-        $script:AiChatHistory.Add(@{ role = "assistant"; content = $reply })
+        Add-AssistantHistoryMessage -Role "assistant" -Content $reply
         Write-Host $reply -ForegroundColor White
 
         if ($reply -match '(?s)```(?:powershell|pwsh)?\r?\n?(.*?)\r?\n?```') {

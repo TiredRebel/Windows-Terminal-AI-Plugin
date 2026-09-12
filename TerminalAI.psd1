@@ -51,7 +51,10 @@
         'Show-TerminalAiHelp',
         'Register-TerminalAiArgumentCompleters',
         'Test-AiCommandAst',
-        'Invoke-AiExecutionGate'
+        'Invoke-AiExecutionGate',
+        'Protect-AiSecretData',
+        'Format-AiScriptDiff',
+        'Save-AiScriptFile'
     )
 
     # Командлети, що експортуються
