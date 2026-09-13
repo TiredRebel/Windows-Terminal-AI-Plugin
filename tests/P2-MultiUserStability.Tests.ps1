@@ -19,6 +19,8 @@ if (-not (Get-Module -Name TerminalAI)) {
 
 $testRoot = Join-Path $env:TEMP ("tai_p2_test_" + [System.Guid]::NewGuid().ToString("N"))
 New-Item -Path $testRoot -ItemType Directory -Force | Out-Null
+$origConfigDir = $env:TERMINAL_AI_CONFIG_DIR
+$env:TERMINAL_AI_CONFIG_DIR = Join-Path $testRoot "Config"
 
 $script:TotalTests = 0
 $script:PassedTests = 0
@@ -252,6 +254,7 @@ Set-Alias -Name np -Value notepad.exe
     }
 
 } finally {
+    $env:TERMINAL_AI_CONFIG_DIR = $origConfigDir
     if (Test-Path $testRoot) {
         Remove-Item -Path $testRoot -Recurse -Force -ErrorAction SilentlyContinue
     }

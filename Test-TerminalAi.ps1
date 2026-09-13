@@ -367,4 +367,11 @@ finally {
     }
 }
 
+if (-not $allPassed) {
+    exit 1
+} else {
+    exit 0
+}
+
+
 
