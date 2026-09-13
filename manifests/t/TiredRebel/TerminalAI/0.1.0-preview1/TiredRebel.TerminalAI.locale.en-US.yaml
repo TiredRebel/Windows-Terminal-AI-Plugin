@@ -1,0 +1,29 @@
+# Created with WinGet Automation Tooling
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
+
+PackageIdentifier: TiredRebel.TerminalAI
+PackageVersion: 0.1.0-preview1
+PackageLocale: en-US
+Publisher: TiredRebel
+PublisherUrl: https://github.com/TiredRebel
+PublisherSupportUrl: https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/issues
+PackageName: TerminalAI
+PackageUrl: https://github.com/TiredRebel/Windows-Terminal-AI-Plugin
+License: MIT
+LicenseUrl: https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/blob/main/LICENSE
+Copyright: (c) 2026 TiredRebel. All rights reserved.
+ShortDescription: TerminalAI is a local-by-default AI assistant for Windows Terminal and PowerShell powered by Ollama. Features command generation, script synthesis, error fixing, and compiled .NET 10 helper.
+Description: |-
+  TerminalAI is a local-by-default AI assistant for Windows Terminal and PowerShell powered by Ollama. Features command generation, script synthesis, error fixing, and compiled .NET 10 helper.
+Tags:
+  - ai
+  - ollama
+  - terminal
+  - windows-terminal
+  - powershell
+  - copilot
+  - llm
+  - local-ai
+ReleaseNotesUrl: https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/releases/tag/v0.1.0-preview1
+ManifestType: defaultLocale
+ManifestVersion: 1.9.0

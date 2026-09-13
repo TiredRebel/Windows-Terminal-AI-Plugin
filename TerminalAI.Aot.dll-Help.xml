@@ -4,7 +4,7 @@
     <command:details>
       <command:name>Invoke-AiCommandFast</command:name>
       <maml:description>
-        <maml:para>High-performance compiled C# binary cmdlet for Ollama-powered natural language PowerShell command generation, explanation, and system control.</maml:para>
+        <maml:para>Compiled C# cmdlet for Ollama-powered natural-language PowerShell command generation, explanation, and controlled execution.</maml:para>
       </maml:description>
       <maml:copyright>
         <maml:para>(c) 2026 TerminalAI Community. All rights reserved.</maml:para>
@@ -15,7 +15,7 @@
     </command:details>
 
     <maml:description>
-      <maml:para>Invoke-AiCommandFast (aliases: ai-fast, aif) provides ultra-fast command translation using a static persistent SocketsHttpHandler and compiled native code. It generates executable PowerShell pipelines, offers interactive confirmation menus, explains code, and executes or copies commands directly.</maml:para>
+      <maml:para>Invoke-AiCommandFast (aliases: ai-fast, aif) uses a shared HttpClient backed by SocketsHttpHandler and a managed C# implementation. It generates PowerShell pipelines, offers interactive confirmation menus, explains code, and executes or copies commands when requested.</maml:para>
     </maml:description>
 
     <command:syntax>
@@ -62,6 +62,34 @@
             <maml:para>Ask a direct conceptual or technical question and receive an educational text response instead of code (aliases: -chat, -question).</maml:para>
           </maml:description>
           <dev:type>SwitchParameter</dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>Agent</maml:name>
+          <maml:description>
+            <maml:para>Delegate execution to autonomous Claude Code agent mode backed by Invoke-AiAgent (alias: -Autonomous).</maml:para>
+          </maml:description>
+          <dev:type>SwitchParameter</dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>SavePath</maml:name>
+          <maml:description>
+            <maml:para>Save generated script to the specified file path with interactive unified diff preview and overwrite protection (aliases: -Save, -OutFile).</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>Force</maml:name>
+          <maml:description>
+            <maml:para>Overwrite target file without interactive confirmation when saving script (alias: -f).</maml:para>
+          </maml:description>
+          <dev:type>SwitchParameter</dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>ConfirmInput</maml:name>
+          <maml:description>
+            <maml:para>Pre-supplied confirmation response ('y' or 'n') for unattended automation and security gate testing.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named">
           <maml:name>Model</maml:name>
@@ -119,6 +147,34 @@
         <dev:type>SwitchParameter</dev:type>
       </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>Agent</maml:name>
+        <maml:description>
+          <maml:para>Delegates the request to autonomous Claude Code agent mode backed by Invoke-AiAgent (alias: -Autonomous).</maml:para>
+        </maml:description>
+        <dev:type>SwitchParameter</dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>SavePath</maml:name>
+        <maml:description>
+          <maml:para>Saves the generated script to a file with unified diff preview, overwrite confirmation, and UTF-8 BOM encoding (aliases: -Save, -OutFile).</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>Force</maml:name>
+        <maml:description>
+          <maml:para>Bypasses overwrite confirmation when saving to an existing script file (alias: -f).</maml:para>
+        </maml:description>
+        <dev:type>SwitchParameter</dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>ConfirmInput</maml:name>
+        <maml:description>
+          <maml:para>Specifies pre-supplied gate confirmation ('y' or 'n') for unattended automation and unit testing.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named">
         <maml:name>Model</maml:name>
         <maml:description>
           <maml:para>Specifies an Ollama model name to override the default setting.</maml:para>
@@ -132,14 +188,14 @@
         <maml:title>-------------------------- EXAMPLE 1 --------------------------</maml:title>
         <dev:code>aif "show top 5 processes by CPU usage"</dev:code>
         <dev:remarks>
-          <maml:para>Generates a PowerShell pipeline to display top processes and opens the interactive menu ([Enter] Execute, [C] Copy, [I] Insert, [X] Explain, [A] Text).</maml:para>
+          <maml:para>Generates a PowerShell pipeline to display top processes and opens the interactive menu ([Enter] Execute, [C] Copy, [I] Insert, [S] Toggle Aliases, [X] Explain, [A] Text, [W] Save, [Esc] Cancel).</maml:para>
         </dev:remarks>
       </command:example>
       <command:example>
         <maml:title>-------------------------- EXAMPLE 2 --------------------------</maml:title>
         <dev:code>aif "find all .log files modified today" -x</dev:code>
         <dev:remarks>
-          <maml:para>Generates the command and executes it immediately using the -x switch.</maml:para>
+          <maml:para>Generates the command and executes it immediately using the -x switch (subject to fail-closed AST security gate).</maml:para>
         </dev:remarks>
       </command:example>
       <command:example>
@@ -161,6 +217,27 @@
         <dev:code>aif "find processes listening on port 8080" -a</dev:code>
         <dev:remarks>
           <maml:para>Generates a compact pipeline using standard short aliases (gps | ? ...).</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>-------------------------- EXAMPLE 6 --------------------------</maml:title>
+        <dev:code>aif "script to monitor memory and disk space" -SavePath "./monitor.ps1"</dev:code>
+        <dev:remarks>
+          <maml:para>Generates a complete multi-line script and safely writes it to disk with unified diff preview, UTF-8 BOM encoding, and overwrite confirmation.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>-------------------------- EXAMPLE 7 --------------------------</maml:title>
+        <dev:code>aif agent "analyze git diff and execute unit tests"</dev:code>
+        <dev:remarks>
+          <maml:para>Delegates the natural language task to autonomous Claude Code agent mode backed by Invoke-AiAgent.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>-------------------------- EXAMPLE 8 --------------------------</maml:title>
+        <dev:code>aif "get external IP address" -c</dev:code>
+        <dev:remarks>
+          <maml:para>Generates the command and copies it directly to clipboard using native Win32 API with deterministic secret sanitization.</maml:para>
         </dev:remarks>
       </command:example>
     </command:examples>

@@ -2828,11 +2828,11 @@ function Test-TerminalAiInstallation {
 
     # 1. PowerShell Environment
     $psVer = $PSVersionTable.PSVersion
-    $psEdition = $PSVersionTable.PSEdition
-    $results["PowerShellVersion"] = "$psVer ($psEdition)"
+    $currentEdition = $PSVersionTable.PSEdition
+    $results["PowerShellVersion"] = "$psVer ($currentEdition)"
     $results["PowerShellOk"] = $true
     Write-Host "  1. PowerShell:           " -NoNewline -ForegroundColor DarkGray
-    Write-Host "✔ $psVer ($psEdition)" -ForegroundColor Green
+    Write-Host "✔ $psVer ($currentEdition)" -ForegroundColor Green
 
     # 2. Module in PSModulePath
     $module = Get-Module -Name TerminalAI -ListAvailable | Select-Object -First 1

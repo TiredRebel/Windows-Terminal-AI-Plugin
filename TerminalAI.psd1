@@ -3,17 +3,20 @@
 @{
     # Ідентифікація модуля
     RootModule = 'TerminalAI.psm1'
-    ModuleVersion = '1.0.0'
+    ModuleVersion = '0.1.0'
     GUID = '9b6d8f50-32fa-4cb8-8dc7-95f2081d0ef5'
-    Author = 'Windows Terminal AI'
-    CompanyName = 'Community'
-    Copyright = '(c) 2026. All rights reserved.'
+    Author = 'TiredRebel'
+    CompanyName = 'TerminalAI'
+    Copyright = '(c) 2026 TiredRebel. All rights reserved.'
 
     # Module Description
-    Description = 'Windows Terminal and PowerShell AI assistant: command generation, multi-line scripts, automated error fixing, and inline hotkeys powered by local Ollama.'
+    Description = 'PowerShell AI assistant for Windows Terminal and console: command generation, multi-line scripts, error fixing, and compiled .NET 10 helper powered by Ollama. Local by default when configured with local Ollama.'
 
     # Мінімальна версія PowerShell
     PowerShellVersion = '5.1'
+
+    # Сумісні редакції PowerShell
+    CompatiblePSEditions = @('Desktop', 'Core')
 
     # Необхідні модулі
     RequiredModules = @()
@@ -91,8 +94,11 @@
     # Приватні дані та теги
     PrivateData = @{
         PSData = @{
-            Tags = @('AI', 'Ollama', 'WindowsTerminal', 'PowerShell', 'Copilot', 'LLM')
-            ProjectUri = 'https://github.com/microsoft/terminal'
+            Prerelease = 'preview1'
+            Tags = @('AI', 'Ollama', 'WindowsTerminal', 'PowerShell', 'Copilot', 'LLM', 'LocalAI', 'DotNet10')
+            ProjectUri = 'https://github.com/TiredRebel/Windows-Terminal-AI-Plugin'
+            LicenseUri = 'https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/blob/main/LICENSE'
+            ReleaseNotes = 'TerminalAI v0.1.0-preview1: Local-by-default Ollama integration, fail-closed AST risk analysis, compiled .NET 10 helper module, multi-user installer, ai-doctor diagnostics, optional Claude Code agent mode.'
         }
     }
 }
