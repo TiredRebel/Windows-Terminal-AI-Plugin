@@ -206,8 +206,8 @@ try {
     # FIX-P3-10: Test-TerminalAiInstallation includes Subsystem 9 without failing overall health
     Assert-P3Fixture "FIX-P3-10" "ai-doctor includes Subsystem 9 (Claude Code) and remains healthy" {
         $diag = Test-TerminalAiInstallation -PassThru
-        $hasAgentProp = ($null -ne $diag.AgentModeAvailable)
-        $hasClaudeProp = ($null -ne $diag.ClaudeExecutable)
+        $hasAgentProp = ($null -ne $diag.PSObject.Properties["AgentModeAvailable"])
+        $hasClaudeProp = ($null -ne $diag.PSObject.Properties["ClaudeExecutable"])
         return ($hasAgentProp -and $hasClaudeProp -and ($diag.PowerShellOk -eq $true))
     }
 
