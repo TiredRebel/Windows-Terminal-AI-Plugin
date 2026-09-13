@@ -29,3 +29,9 @@ $RECYCLE.BIN/
 # Release distribution artifacts
 dist/
 
+# Internal development logs, analytics, and plans
+docs/antigravity/
+docs/claudecode-portable-feasibility.md
+AOT/AOT_IMPLEMENTATION_LOG.md
+manifests/t/TiredRebel/TerminalAI/1.0.0/
+
