@@ -1,10 +1,10 @@
 ﻿<#
 .SYNOPSIS
-    Набір автоматичних тестів для Фази P2:
-    - Цикл 7: Багатокористувацький інсталятор/деінсталятор та ізоляція $PROFILE
-    - Цикл 8: Сумісність PS 5.1 / PS 7 без розривів синтаксису
-    - Цикл 9: Стабільність Windows Terminal Fragments JSON schema
-    - Цикл 10: Модуль самодіагностики Test-TerminalAiInstallation (ai-doctor)
+    Automated tests for phase P2:
+    - Cycle 7: Multi-user installer/uninstaller and profile isolation
+    - Cycle 8: PowerShell 5.1 and 7 syntax compatibility
+    - Cycle 9: Windows Terminal fragment schema stability
+    - Cycle 10: Test-TerminalAiInstallation diagnostics
 #>
 
 [CmdletBinding()]
@@ -147,7 +147,7 @@ Set-Alias -Name np -Value notepad.exe
         & $uninstallScript -CustomProfilePath $fakeProfile -CustomModulePath $fakeModuleRoot -CustomFragmentPath $fakeFragmentRoot -PurgeConfig
         $purged = -not (Test-Path $cfgDir)
 
-        $env:TERMINAL_AI_CONFIG_DIR = $null
+        $env:TERMINAL_AI_CONFIG_DIR = Join-Path $testRoot "Config"
         $preserved -and $purged
     }
 

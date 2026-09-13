@@ -1,7 +1,7 @@
-﻿# TerminalAI.psd1 - Маніфест модуля TerminalAI
+﻿# TerminalAI.psd1 - TerminalAI module manifest
 
 @{
-    # Ідентифікація модуля
+    # Module identity
     RootModule = 'TerminalAI.psm1'
     ModuleVersion = '0.1.0'
     GUID = '9b6d8f50-32fa-4cb8-8dc7-95f2081d0ef5'
@@ -12,19 +12,19 @@
     # Module Description
     Description = 'PowerShell AI assistant for Windows Terminal and console: command generation, multi-line scripts, error fixing, and compiled .NET 10 helper powered by Ollama. Local by default when configured with local Ollama.'
 
-    # Мінімальна версія PowerShell
+    # Minimum PowerShell version
     PowerShellVersion = '5.1'
 
-    # Сумісні редакції PowerShell
+    # Compatible PowerShell editions
     CompatiblePSEditions = @('Desktop', 'Core')
 
-    # Необхідні модулі
+    # Required modules
     RequiredModules = @()
 
-    # Вкладені модулі (AOT DLL завантажується динамічно у TerminalAI.psm1 для PowerShell 7+)
+    # Nested modules (the compiled DLL loads dynamically from TerminalAI.psm1 on PowerShell 7+)
     NestedModules = @()
 
-    # Функції, що експортуються
+    # Exported functions
     FunctionsToExport = @(
         'Invoke-AiCommand',
         'Invoke-AiFix',
@@ -66,10 +66,10 @@
     # Cmdlets to export
     CmdletsToExport = @('Invoke-AiCommandFast')
 
-    # Змінні, що експортуються
+    # Exported variables
     VariablesToExport = @()
 
-    # Аліаси, що експортуються
+    # Exported aliases
     AliasesToExport = @(
         'ai',
         '??',
@@ -91,7 +91,7 @@
         'Clean-AiCodeOutput'
     )
 
-    # Приватні дані та теги
+    # Private data and tags
     PrivateData = @{
         PSData = @{
             Prerelease = 'preview1'

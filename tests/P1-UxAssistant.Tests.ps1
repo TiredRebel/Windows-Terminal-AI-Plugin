@@ -1,14 +1,14 @@
 ﻿<#
 .SYNOPSIS
-    Набір автоматичних тестів для Фази P1:
-    - Цикл 5: Assistant Hardening (FIFO History & Secret Redaction)
-    - Цикл 6: Script Generation Safety (Unified Diff Preview & Overwrite Protection)
+    Automated tests for phase P1:
+    - Cycle 5: Assistant Hardening (FIFO History & Secret Redaction)
+    - Cycle 6: Script Generation Safety (Unified Diff Preview & Overwrite Protection)
 .DESCRIPTION
-    Перевіряє роботу функцій:
+    Covers these functions:
     - Protect-AiSecretData
     - Format-AiScriptDiff
     - Save-AiScriptFile
-    - Add-AssistantHistoryMessage (логіка FIFO та санітизації)
+    - Add-AssistantHistoryMessage (FIFO and sanitization)
 #>
 
 [CmdletBinding()]

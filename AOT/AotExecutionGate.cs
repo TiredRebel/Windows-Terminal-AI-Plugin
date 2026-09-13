@@ -88,8 +88,7 @@ public static class AotExecutionGate
             }
 
             WriteColorLine(ui, ConsoleColor.Cyan,
-                isUk ? "    🔍 [WhatIf Preview] Запуск команди у безпечному режимі симуляції..."
-                     : "    🔍 [WhatIf Preview] Running command in safe simulation mode...");
+                "    🔍 [WhatIf Preview] Running command in safe simulation mode...");
 
             try
             {
@@ -135,7 +134,7 @@ public static class AotExecutionGate
             RenderSecurityGateCard(ui, command, analysis, isUk);
 
             string promptDefault = (analysis.OverallRisk is CommandRiskLevel.High or CommandRiskLevel.Critical) ? "y/N" : "Y/n";
-            string promptText = isUk ? $"    Виконати цю команду? [{promptDefault}]: " : $"    Execute this command? [{promptDefault}]: ";
+            string promptText = $"    Execute this command? [{promptDefault}]: ";
 
             string? response = confirmInput;
             if (response == null)
@@ -144,8 +143,7 @@ public static class AotExecutionGate
                 if (!isInteractive)
                 {
                     WriteColorLine(ui, ConsoleColor.Red,
-                        isUk ? "    ✖ Виявлено неінтерактивне середовище. Непідтверджену команду заблоковано."
-                             : "    ✖ Non-interactive host detected. Unconfirmed command blocked.");
+                        "    ✖ Non-interactive host detected. Unconfirmed command blocked.");
                     return new ExecutionGateResult(false, "BlockedNonInteractive", command, analysis, null);
                 }
 
@@ -165,14 +163,14 @@ public static class AotExecutionGate
             var trimmedResponse = response.Trim();
             if (analysis.OverallRisk is CommandRiskLevel.High or CommandRiskLevel.Critical)
             {
-                if (Regex.IsMatch(trimmedResponse, @"^(?:y|yes|так|т)$", RegexOptions.IgnoreCase))
+                if (Regex.IsMatch(trimmedResponse, @"^(?:y|yes)$", RegexOptions.IgnoreCase))
                 {
                     confirmed = true;
                 }
             }
             else
             {
-                if (string.IsNullOrWhiteSpace(trimmedResponse) || Regex.IsMatch(trimmedResponse, @"^(?:y|yes|так|т)$", RegexOptions.IgnoreCase))
+                if (string.IsNullOrWhiteSpace(trimmedResponse) || Regex.IsMatch(trimmedResponse, @"^(?:y|yes)$", RegexOptions.IgnoreCase))
                 {
                     confirmed = true;
                 }
@@ -181,7 +179,7 @@ public static class AotExecutionGate
             if (!confirmed)
             {
                 WriteColorLine(ui, ConsoleColor.DarkGray,
-                    isUk ? "    ✖ Виконання скасовано користувачем." : "    ✖ Execution canceled by user.");
+                    "    ✖ Execution canceled by user.");
                 return new ExecutionGateResult(false, "Denied", command, analysis, null);
             }
         }
@@ -190,7 +188,7 @@ public static class AotExecutionGate
         try
         {
             WriteColorLine(ui, ConsoleColor.Yellow,
-                isUk ? "    ▶ Виконання команди:\n" : "    ▶ Executing command:\n");
+                "    ▶ Executing command:\n");
 
             if (sessionState != null)
             {

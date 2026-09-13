@@ -26,7 +26,7 @@ $isUk = ($Language -eq "uk")
 
 . (Join-Path $PSScriptRoot "InstallerCommon.ps1")
 
-$step1 = if ($isUk) { "▶ Перевірка Ollama в системі..." } else { "▶ Checking Ollama in system..." }
+$step1 = "▶ Checking Ollama in system..."
 Write-Host $step1 -ForegroundColor Yellow
 $ollamaCmd = Get-Command ollama -ErrorAction Ignore
 $ollamaExeCandidates = @(
@@ -46,23 +46,23 @@ if (-not $ollamaCmd) {
 }
 
 if (-not $ollamaCmd) {
-    $msgNoOllama = if ($isUk) { "   ⚠ Ollama не знайдено на вашому комп'ютері." } else { "   ⚠ Ollama was not found on your system." }
+    $msgNoOllama = "   ⚠ Ollama was not found on your system."
     Write-Host $msgNoOllama -ForegroundColor DarkYellow
     $shouldInstall = $false
     if ($AutoConfirm) {
         $shouldInstall = $true
     } elseif (-not [Console]::IsInputRedirected) {
-        $promptInstall = if ($isUk) { "   Бажаєте встановити Ollama автоматично зараз? [Y/n]" } else { "   Do you want to install Ollama automatically now? [Y/n]" }
+        $promptInstall = "   Do you want to install Ollama automatically now? [Y/n]"
         $ans = Read-Host $promptInstall
-        $shouldInstall = ($ans -match '^(y|yes|так|т|$)' -or [string]::IsNullOrWhiteSpace($ans))
+        $shouldInstall = ($ans -match '^(y|yes|$)' -or [string]::IsNullOrWhiteSpace($ans))
     }
 
     if ($shouldInstall) {
-        $msgStartInstall = if ($isUk) { "   ▶ Початок встановлення Ollama..." } else { "   ▶ Starting Ollama installation..." }
+        $msgStartInstall = "   ▶ Starting Ollama installation..."
         Write-Host $msgStartInstall -ForegroundColor Cyan
         $installedViaWinget = $false
         if (Get-Command winget -ErrorAction Ignore) {
-            $msgWinget = if ($isUk) { "   • Встановлення через winget з таймером та прогресом..." } else { "   • Installing via winget..." }
+            $msgWinget = "   • Installing via winget..."
             Write-Host $msgWinget -ForegroundColor DarkGray
             try {
                 & winget install Ollama.Ollama --accept-source-agreements --accept-package-agreements
@@ -73,10 +73,10 @@ if (-not $ollamaCmd) {
         if (-not $installedViaWinget) {
             $installerUrl = "https://ollama.com/download/OllamaSetup.exe"
             $installerPath = Join-Path $env:TEMP "OllamaSetup.exe"
-            $msgDownload = if ($isUk) { "   • Завантаження інсталятора з $installerUrl..." } else { "   • Downloading installer from $installerUrl..." }
+            $msgDownload = "   • Downloading installer from $installerUrl..."
             Write-Host $msgDownload -ForegroundColor DarkGray
             Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath -UseBasicParsing
-            $msgSilent = if ($isUk) { "   • Запуск тихого встановлення Ollama..." } else { "   • Launching silent Ollama installation..." }
+            $msgSilent = "   • Launching silent Ollama installation..."
             Write-Host $msgSilent -ForegroundColor DarkGray
             Start-Process -FilePath $installerPath -ArgumentList "/silent" -Wait
         }
@@ -91,18 +91,18 @@ if (-not $ollamaCmd) {
         }
         $ollamaCmd = Get-Command ollama -ErrorAction Ignore
         if ($ollamaCmd) {
-            $msgInstalled = if ($isUk) { "   ✔ Ollama успішно встановлена!" } else { "   ✔ Ollama installed successfully!" }
+            $msgInstalled = "   ✔ Ollama installed successfully!"
             Write-Host $msgInstalled -ForegroundColor Green
         } else {
-            $msgNotPath = if ($isUk) { "   ⚠ Встановлення завершено, але ollama.exe не знайдено в PATH." } else { "   ⚠ Installation finished, but ollama.exe was not found in PATH." }
+            $msgNotPath = "   ⚠ Installation finished, but ollama.exe was not found in PATH."
             Write-Host $msgNotPath -ForegroundColor DarkYellow
         }
     } else {
-        $msgSkipped = if ($isUk) { "   ⚠ Встановлення Ollama пропущено користувачем." } else { "   ⚠ Ollama installation skipped by user." }
+        $msgSkipped = "   ⚠ Ollama installation skipped by user."
         Write-Host $msgSkipped -ForegroundColor DarkGray
     }
 } else {
-    $msgFound = if ($isUk) { "   ✔ Ollama знайдена: $($ollamaCmd.Source)" } else { "   ✔ Ollama found: $($ollamaCmd.Source)" }
+    $msgFound = "   ✔ Ollama found: $($ollamaCmd.Source)"
     Write-Host $msgFound -ForegroundColor Green
 }
 
@@ -122,11 +122,11 @@ foreach ($candUrl in @("http://127.0.0.1:11434", "http://localhost:11434")) {
 }
 
 if (-not $isApiReady -and (Get-Command ollama -ErrorAction Ignore)) {
-    $msgServeStart = if ($isUk) { "   • Служба Ollama не активна. Запуск фонового процесу..." } else { "   • Ollama service is inactive. Starting background process..." }
+    $msgServeStart = "   • Ollama service is inactive. Starting background process..."
     Write-Host $msgServeStart -ForegroundColor DarkYellow
     Start-Process "ollama" -ArgumentList "serve" -WindowStyle Hidden -ErrorAction SilentlyContinue
 
-    $spinnerMsg = if ($isUk) { "Очікування запуску локальної служби Ollama" } else { "Waiting for local Ollama service to start" }
+    $spinnerMsg = "Waiting for local Ollama service to start"
     $isApiReady = Show-SpinnerWait -Message $spinnerMsg -TimeoutSec 10 -IsUkrainian $isUk -Condition {
         foreach ($candUrl in @("http://127.0.0.1:11434", "http://localhost:11434")) {
             try {
@@ -142,26 +142,26 @@ if (-not $isApiReady -and (Get-Command ollama -ErrorAction Ignore)) {
 }
 
 if ($isApiReady) {
-    $msgActive = if ($isUk) { "   ✔ Служба Ollama активна! Встановлено моделей: $($installedModels.Count)" } else { "   ✔ Ollama service is active! Installed models: $($installedModels.Count)" }
+    $msgActive = "   ✔ Ollama service is active! Installed models: $($installedModels.Count)"
     Write-Host $msgActive -ForegroundColor Green
 } else {
-    $msgNotResp = if ($isUk) { "   ⚠ Ollama не відповідає на $ollamaUrl. Переконайтеся, що вона запущена ('ollama serve')." } else { "   ⚠ Ollama is not responding at $ollamaUrl. Make sure it is running ('ollama serve')." }
+    $msgNotResp = "   ⚠ Ollama is not responding at $ollamaUrl. Make sure it is running ('ollama serve')."
     Write-Host $msgNotResp -ForegroundColor DarkYellow
 }
 
 # Hardware analysis & model recommendation
-$step2 = if ($isUk) { "`n▶ Аналіз конфігурації комп'ютера..." } else { "`n▶ Analyzing system hardware configuration..." }
+$step2 = "`n▶ Analyzing system hardware configuration..."
 Write-Host $step2 -ForegroundColor Yellow
 $ramGb = 16
-$gpuName = if ($isUk) { "Не визначено" } else { "Not detected" }
+$gpuName = "Not detected"
 try {
     $ramGb = [Math]::Round(((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB), 1)
     $gpuList = @(Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name | Where-Object { $_ -notmatch 'Virtual|Remote|Basic' })
     if ($gpuList.Count -gt 0) { $gpuName = $gpuList[0] }
 } catch { }
 
-$lblRam = if ($isUk) { "   • Оперативна пам'ять (RAM):" } else { "   • Physical RAM:" }
-$lblGpu = if ($isUk) { "   • Графічний адаптер (GPU): " } else { "   • Graphics Adapter (GPU): " }
+$lblRam = "   • Physical RAM:"
+$lblGpu = "   • Graphics Adapter (GPU): "
 Write-Host "$lblRam $ramGb GB" -ForegroundColor White
 Write-Host "$lblGpu $gpuName" -ForegroundColor White
 
@@ -173,7 +173,7 @@ $recommendedModel = if ($ramGb -ge 16 -or $gpuName -match 'RTX|Radeon RX') {
     "qwen2.5-coder:1.5b"
 }
 
-$lblRec = if ($isUk) { "   💡 Рекомендована модель для вашої конфігурації: " } else { "   💡 Recommended model for your configuration: " }
+$lblRec = "   💡 Recommended model for your configuration: "
 Write-Host $lblRec -NoNewline -ForegroundColor Cyan
 Write-Host "$recommendedModel" -ForegroundColor Green
 
@@ -192,34 +192,34 @@ if ($PreferredModel) {
 
 # Pull model if missing
 if ($installedModels -notcontains $selectedModel -and (Get-Command ollama -ErrorAction Ignore)) {
-    $msgMissing = if ($isUk) { "`n   ⚠ Модель '$selectedModel' ще не завантажена в Ollama." } else { "`n   ⚠ Model '$selectedModel' is not yet downloaded in Ollama." }
+    $msgMissing = "`n   ⚠ Model '$selectedModel' is not yet downloaded in Ollama."
     Write-Host $msgMissing -ForegroundColor DarkYellow
     $shouldPull = $false
     if ($AutoConfirm) {
         $shouldPull = $true
     } elseif (-not [Console]::IsInputRedirected) {
-        $promptPull = if ($isUk) { "   Завантажити '$selectedModel' зараз через 'ollama pull'? [Y/n] (або введіть іншу назву моделі)" } else { "   Download '$selectedModel' now via 'ollama pull'? [Y/n] (or enter custom model name)" }
+        $promptPull = "   Download '$selectedModel' now via 'ollama pull'? [Y/n] (or enter custom model name)"
         $pullChoice = Read-Host $promptPull
-        if ($pullChoice -match '^(y|yes|так|т|$)' -or [string]::IsNullOrWhiteSpace($pullChoice)) {
+        if ($pullChoice -match '^(y|yes|$)' -or [string]::IsNullOrWhiteSpace($pullChoice)) {
             $shouldPull = $true
-        } elseif ($pullChoice -notmatch '^(n|no|ні|н)$') {
+        } elseif ($pullChoice -notmatch '^(n|no)$') {
             $selectedModel = $pullChoice.Trim()
             $shouldPull = $true
         }
     }
 
     if ($shouldPull) {
-        $msgPulling = if ($isUk) { "   ▶ Завантаження моделі '$selectedModel' (з нативним індикатором прогресу Ollama)..." } else { "   ▶ Downloading model '$selectedModel' (with native Ollama progress)..." }
+        $msgPulling = "   ▶ Downloading model '$selectedModel' (with native Ollama progress)..."
         Write-Host $msgPulling -ForegroundColor Cyan
         & ollama pull $selectedModel
         if ($LASTEXITCODE -eq 0) {
-            $msgPulled = if ($isUk) { "   ✔ Модель '$selectedModel' успішно завантажена!" } else { "   ✔ Model '$selectedModel' downloaded successfully!" }
+            $msgPulled = "   ✔ Model '$selectedModel' downloaded successfully!"
             Write-Host $msgPulled -ForegroundColor Green
         }
     }
 }
 
-$lblSelected = if ($isUk) { "   Вибрана активна модель:" } else { "   Selected active model:" }
+$lblSelected = "   Selected active model:"
 Write-Host "$lblSelected $selectedModel" -ForegroundColor Cyan
 
 # Persist the resolved model / endpoint, if the Core product's config script is

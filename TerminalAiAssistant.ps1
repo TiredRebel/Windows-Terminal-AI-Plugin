@@ -1,11 +1,11 @@
-﻿# TerminalAiAssistant.ps1 - Інтерактивний AI-Асистент для Windows Terminal (Спліт-панель / Окремий агент)
-# Може запускатися через 'ai-chat', у боковій панелі Windows Terminal або як окремий скрипт
+﻿# TerminalAiAssistant.ps1 - Interactive AI assistant for Windows Terminal
+# Runs through ai-chat, in a Windows Terminal side pane, or as a standalone script
 
 param(
     [string]$Model
 )
 
-# Забезпечуємо повну підтримку UTF-8 для консолі
+# Enable complete UTF-8 support in the console
 try {
     [Console]::InputEncoding = [System.Text.Encoding]::UTF8
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -24,61 +24,16 @@ $activeModel = if ($Model) { $Model } else { $cfg.Model }
 function Get-AssistantDict {
     param([string]$Lang)
     $dict = @{
-        "uk" = @{
-            "Title"           = "TERMINAL AI ASSISTANT (OLLAMA LOCAL)"
-            "ModelLabel"      = "Модель:"
-            "EndpointLabel"   = "Ендпоінт:"
-            "LangLabel"       = "Мова:"
-            "CommandsHeader"  = "Доступні команди:"
-            "DescHelp"        = "Показати детальну довідку з командами"
-            "DescModels"      = "Переглянути встановлені моделі Ollama"
-            "DescModel"       = "Змінити активну модель"
-            "DescLang"        = "Змінити мову (наприклад: /lang permanent uk)"
-            "DescCopy"        = "Скопіювати останній згенерований блок коду"
-            "DescSave"        = "Зберегти останній код у файл .ps1"
-            "DescClear"       = "Очистити екран"
-            "DescReset"       = "Скинути історію діалогу (нова сесія)"
-            "DescContext"     = "Переглянути історію та контекст діалогу"
-            "DescInspect"     = "Інспекція поточного PowerShell середовища"
-            "DescRun"         = "Виконати останній згенерований код (з підтвердженням)"
-            "DescRead"        = "Прочитати локальний файл та переглянути/додати до контексту"
-            "DescExit"        = "Вийти з асистента"
-            "TabHint"         = "💡 Підказка: натискайте Tab для автодоповнення слеш-команд (/help, /run, /read, /reset, /inspect)!"
-            "PromptInvitation"= "Задайте питання або опишіть потрібний скрипт (українською чи англійською):"
-            "PromptLabel"     = "🤖 AI-Prompt> "
-            "Thinking"        = "  [AI: Формую відповідь...]"
-            "Copied"          = "✔ Останній блок коду скопійовано в буфер обміну!"
-            "NoCode"          = "Немає збереженого коду для копіювання чи виконання."
-            "Saved"           = "✔ Скрипт успішно збережено у:"
-            "ModelChanged"    = "✔ Активну модель змінено на:"
-            "LangChanged"     = "✔ Мову інтерфейсу змінено на українську!"
-            "LangChangedPermanent" = "✔ Мову успішно зафіксовано як ПОСТІЙНУ: uk (config.json + `$env:TERMINAL_AI_LANG)!"
-            "LangCurrent"     = "Поточна мова: uk (Українська). Щоб перемкнути: /lang en або /lang permanent en"
-            "ContextReset"    = "✔ Історію діалогу, журнал системних помилок та збережений код успішно очищено! Розпочато нову чисту сесію."
-            "ContextEmpty"    = "Історія діалогу наразі порожня."
-            "ContextTurns"    = "✦ Історія діалогу (повідомлень у контексті: {0}):"
-            "EnvTitle"        = "✦ Інспекція середовища Windows Terminal AI:"
-            "RunPrompt"       = "Підтвердження виконання PowerShell коду:"
-            "RunConfirm"      = "Виконати цей код зараз?"
-            "Running"         = "Виконання коду..."
-            "RunSuccess"      = "Код успішно виконано!"
-            "RunError"        = "Помилка під час виконання"
-            "AskFix"          = "Бажаєте передати цю помилку AI для аналізу та виправлення?"
-            "RunCancelled"    = "Виконання скасовано користувачем."
-            "CodeHint"        = "[💡 Підказка: введіть /run щоб виконати код, /copy щоб скопіювати, або /save щоб зберегти у файл]"
-            "Goodbye"         = "До зустрічі!"
-            "HelpTitle"       = "✦ Terminal AI Assistant • Швидка довідка"
-        }
         "en" = @{
             "Title"           = "TERMINAL AI ASSISTANT (OLLAMA LOCAL)"
             "ModelLabel"      = "Model:"
             "EndpointLabel"   = "Endpoint:"
-            "LangLabel"       = "Language:"
+            "LangLabel"       = "Model response language:"
             "CommandsHeader"  = "Available commands:"
             "DescHelp"        = "Show detailed command reference"
             "DescModels"      = "View installed Ollama models"
             "DescModel"       = "Change active model"
-            "DescLang"        = "Change language (e.g.: /lang permanent en)"
+            "DescLang"        = "Change model response language (e.g.: /lang permanent en)"
             "DescCopy"        = "Copy last generated code block"
             "DescSave"        = "Save last code to a .ps1 file"
             "DescClear"       = "Clear screen"
@@ -96,9 +51,9 @@ function Get-AssistantDict {
             "NoCode"          = "No code block available to copy or execute."
             "Saved"           = "✔ Script successfully saved to:"
             "ModelChanged"    = "✔ Active model changed to:"
-            "LangChanged"     = "✔ Interface language changed to English!"
-            "LangChangedPermanent" = "✔ Language successfully set as PERMANENT: en (config.json + `$env:TERMINAL_AI_LANG)!"
-            "LangCurrent"     = "Current language: en (English). To switch: /lang uk or /lang permanent uk"
+            "LangChanged"     = "✔ Model response language changed to English!"
+            "LangChangedPermanent" = "✔ Model response language set permanently to en (config.json + `$env:TERMINAL_AI_LANG)!"
+            "LangCurrent"     = "Current model response language: en (English). To switch: /lang uk or /lang permanent uk"
             "ContextReset"    = "✔ Conversation history, system error log, and cached code successfully cleared! Starting fresh session."
             "ContextEmpty"    = "Conversation history is currently empty."
             "ContextTurns"    = "✦ Conversation history ({0} messages in context):"
@@ -115,7 +70,7 @@ function Get-AssistantDict {
             "HelpTitle"       = "✦ Terminal AI Assistant • Quick Reference"
         }
     }
-    $targetLang = if ($Lang -in @("uk", "ua")) { "uk" } else { "en" }
+    $targetLang = "en"
     return $dict[$targetLang]
 }
 
@@ -141,7 +96,7 @@ function Show-AssistantHeader {
     Write-Host " $($txt.EndpointLabel) " -NoNewline -ForegroundColor Gray
     Write-Host "$($cfg.OllamaUrl)" -ForegroundColor DarkGray
     Write-Host " $($txt.LangLabel)     " -NoNewline -ForegroundColor Gray
-    $langDisplay = if ($Lang -in @("uk", "ua")) { "uk (Українська)" } else { "en (English)" }
+    $langDisplay = if ($Lang -in @("uk", "ua")) { "uk (Ukrainian)" } else { "en (English)" }
     Write-Host "$langDisplay" -ForegroundColor Yellow
     Write-Host " $($txt.CommandsHeader)" -ForegroundColor Gray
     Write-Host "   /help         - $($txt.DescHelp)" -ForegroundColor DarkCyan
@@ -194,9 +149,9 @@ function Show-AssistantHelpCard {
     Write-Host "    ╰──────────────────────────────────────────────────────────────────╯" -ForegroundColor DarkCyan
     Write-Host ""
     if ($isUk) {
-        Write-Host "    💡 Автодоповнення: наберіть '/' і натисніть Tab для вибору команди!" -ForegroundColor DarkGray
-        Write-Host "    💡 Виконання: наберіть '/run' для безпечного запуску останнього згенерованого коду" -ForegroundColor DarkGray
-        Write-Host "    💡 Читання файлу: наберіть '/read <файл>' для інспекції файлів робочої папки`n" -ForegroundColor DarkGray
+        Write-Host "    💡 Autocomplete: type '/' and press Tab to choose a command." -ForegroundColor DarkGray
+        Write-Host "    💡 Execute: type '/run' to run the latest generated code safely." -ForegroundColor DarkGray
+        Write-Host "    💡 Read a file: type '/read <file>' to inspect files in the working directory.`n" -ForegroundColor DarkGray
     } else {
         Write-Host "    💡 Autocomplete: type '/' and press Tab to cycle through slash-commands!" -ForegroundColor DarkGray
         Write-Host "    💡 Execution: type '/run' to safely execute the last generated code block" -ForegroundColor DarkGray
@@ -211,7 +166,7 @@ function Read-AssistantLine {
 
     Write-Host $Prompt -NoNewline -ForegroundColor Green
 
-    # Якщо ввід перенаправлено (automated/non-interactive), використовуємо стандартний Read-Host
+    # Use Read-Host when input is redirected or non-interactive
     if ([Console]::IsInputRedirected) {
         return (Read-Host)
     }
@@ -248,7 +203,7 @@ function Read-AssistantLine {
             return ""
         }
 
-        # Tab (VK 9) - автодоповнення
+        # Tab completion
         if ($vk -eq 9) {
             $currText = $buffer.ToString()
             if (-not $lastWasTab) {
@@ -316,7 +271,7 @@ function Read-AssistantLine {
             continue
         }
 
-        # Escape (VK 27) - очистити рядок
+        # Escape clears the line
         if ($vk -eq 27) {
             $eraseCount = $buffer.Length
             if ($eraseCount -gt 0) {
@@ -326,7 +281,7 @@ function Read-AssistantLine {
             continue
         }
 
-        # Звичайні символи (з повною підтримкою Unicode, кирилиці та пробілів)
+        # Regular Unicode characters and spaces
         if (-not [char]::IsControl($ch) -and [int]$ch -gt 0) {
             $buffer.Append($ch) | Out-Null
             Write-Host -NoNewline $ch
@@ -349,7 +304,7 @@ function Add-AssistantHistoryMessage {
         $script:AiChatHistory = [System.Collections.Generic.List[hashtable]]::new()
     }
 
-    # Детерміноване маскування секретних даних перед збереженням у контекст
+    # Mask secrets deterministically before storing context
     $sanitized = if (Get-Command Protect-AiSecretData -ErrorAction Ignore) {
         Protect-AiSecretData -Text $Content
     } else {
@@ -358,7 +313,7 @@ function Add-AssistantHistoryMessage {
 
     $script:AiChatHistory.Add(@{ role = $Role; content = $sanitized })
 
-    # FIFO обмеження глибини контексту
+    # Bound context depth with FIFO eviction
     while ($script:AiChatHistory.Count -gt $MaxHistory) {
         $script:AiChatHistory.RemoveAt(0)
     }
@@ -377,7 +332,7 @@ while ($true) {
     if ([string]::IsNullOrWhiteSpace($inputQuery)) { continue }
     $inputQuery = $inputQuery.Trim().Trim([char]0xFEFF, [char]0x200B)
 
-    # Обробка службових команд
+    # Handle assistant commands
     if ($inputQuery -in @("/exit", "exit", "quit", ":q")) {
         Write-Host "$($txt.Goodbye)`n" -ForegroundColor Cyan
         break
@@ -429,7 +384,7 @@ while ($true) {
         Write-Host "  • OS: $([System.Environment]::OSVersion.VersionString)" -ForegroundColor Gray
         Write-Host "  • Working Directory: $((Get-Location).Path)" -ForegroundColor Gray
         Write-Host "  • Active Model: $activeModel" -ForegroundColor Gray
-        Write-Host "  • Active Language: $currentLang" -ForegroundColor Gray
+        Write-Host "  • Model Response Language: $currentLang" -ForegroundColor Gray
         if ($global:Error.Count -gt 0) {
             $lastErr = $global:Error[0]
             $errText = if ($lastErr.Exception -and $lastErr.Exception.Message) { $lastErr.Exception.Message } else { $lastErr.ToString() }
@@ -476,7 +431,7 @@ while ($true) {
             $targetLang = ""
             $isPermanent = $inputQuery.StartsWith("/lang-permanent")
             foreach ($p in $parts) {
-                if ($p -in @("permanent", "save", "default", "--permanent", "-p", "постійно")) {
+                if ($p -in @("permanent", "save", "default", "--permanent", "-p")) {
                     $isPermanent = $true
                 } elseif ($p -in @("en", "eng", "english")) {
                     $targetLang = "en"
@@ -535,7 +490,7 @@ while ($true) {
         Write-Host ("─" * 68) -ForegroundColor DarkGray
 
         $confirm = Read-AssistantLine -Prompt "$($txt.RunConfirm) [y/N]: "
-        if ($confirm -match '^(y|yes|так|т)$') {
+        if ($confirm -match '^(y|yes)$') {
             Write-Host "`n$($txt.Running)`n" -ForegroundColor Green
             $errCountBefore = $global:Error.Count
             $lastExitBefore = $LASTEXITCODE
@@ -599,9 +554,9 @@ while ($true) {
             } elseif ($hasExecutionError) {
                 Write-Host "`n✖ $($txt.RunError): $capturedErrorMessage`n" -ForegroundColor Red
 
-                # Запитуємо користувача, чи передати помилку AI для негайного аналізу та виправлення
+                # Ask whether AI should analyze and fix the error
                 $fixConfirm = Read-AssistantLine -Prompt "$($txt.AskFix) [Y/n]: "
-                if ($fixConfirm -notmatch '^(n|no|ні)$') {
+                if ($fixConfirm -notmatch '^(n|no)$') {
                     $bt3 = '```'
                     $errContext = "When executing this PowerShell command:`n$bt3" + "powershell`n$lastCodeBlock`n$bt3`nAn error occurred:`n$capturedErrorMessage`nPlease analyze this failure and provide a corrected, robust version."
                     Add-AssistantHistoryMessage -Role "user" -Content $errContext
@@ -629,7 +584,7 @@ while ($true) {
     elseif ($inputQuery -match '^/read(?:\s+(.+))?$') {
         $rawTarget = $Matches[1]
         if ([string]::IsNullOrWhiteSpace($rawTarget)) {
-            $msg = if ($currentLang -in @("uk", "ua")) { "Вкажіть файл для читання: /read <файл>" } else { "Specify file path: /read <file>" }
+            $msg = "Specify file path: /read <file>"
             Write-Host "$msg`n" -ForegroundColor Yellow
             continue
         }
@@ -658,11 +613,11 @@ while ($true) {
 
         if (-not $resolvedPath -or -not (Test-Path $resolvedPath)) {
             if ($currentLang -in @("uk", "ua")) {
-                Write-Host "Файл не знайдено: $rawTarget" -ForegroundColor Red
-                Write-Host "  Перевірені розташування:" -ForegroundColor DarkGray
-                Write-Host "    • Поточна папка: $((Get-Location).Path)" -ForegroundColor DarkGray
-                Write-Host "    • Папка модуля: $PSScriptRoot" -ForegroundColor DarkGray
-                Write-Host "  Підказка: вкажіть повний шлях або натисніть Tab після '/read ' для автодоповнення файлів." -ForegroundColor DarkGray
+                Write-Host "File not found: $rawTarget" -ForegroundColor Red
+                Write-Host "  Checked locations:" -ForegroundColor DarkGray
+                Write-Host "    • Current directory: $((Get-Location).Path)" -ForegroundColor DarkGray
+                Write-Host "    • Module directory: $PSScriptRoot" -ForegroundColor DarkGray
+                Write-Host "  Tip: provide a full path or press Tab after '/read ' to complete file names." -ForegroundColor DarkGray
             } else {
                 Write-Host "File not found: $rawTarget" -ForegroundColor Red
                 Write-Host "  Checked locations:" -ForegroundColor DarkGray
@@ -680,28 +635,28 @@ while ($true) {
         }
 
         $lines = @(Get-Content -Path $resolvedPath -TotalCount 100 -ErrorAction SilentlyContinue)
-        $contentHeader = if ($currentLang -in @("uk", "ua")) { "✦ Вміст $resolvedPath (перші 100 рядків):" } else { "✦ Content of $resolvedPath (first 100 lines):" }
+        $contentHeader = "✦ Content of $resolvedPath (first 100 lines):"
         Write-Host "`n$contentHeader" -ForegroundColor Cyan
         Write-Host ("─" * 68) -ForegroundColor DarkGray
         $lines | Out-Host
         Write-Host ("─" * 68) -ForegroundColor DarkGray
 
-        $askPrompt = if ($currentLang -in @("uk", "ua")) { "Додати вміст цього файлу до контексту діалогу? [Y/n]: " } else { "Add this file content to conversation context? [Y/n]: " }
+        $askPrompt = "Add this file content to conversation context? [Y/n]: "
         $injectConfirm = Read-AssistantLine -Prompt $askPrompt
-        if ($injectConfirm -notmatch '^(n|no|ні)$') {
+        if ($injectConfirm -notmatch '^(n|no)$') {
             $bt3 = '```'
             $fileNote = "Local file inspected: $resolvedPath`n$bt3`n" + ($lines -join "`n") + "`n$bt3"
             Add-AssistantHistoryMessage -Role "user" -Content $fileNote
-            $okMsg = if ($currentLang -in @("uk", "ua")) { "✔ Вміст файлу додано до контексту діалогу!`n" } else { "✔ File content added to conversation context!`n" }
+            $okMsg = "✔ File content added to conversation context!`n"
             Write-Host $okMsg -ForegroundColor Green
         }
         continue
     }
 
     $langInstruction = if ($currentLang -in @("uk", "ua")) {
-        "LANGUAGE ENFORCEMENT: You MUST respond strictly in Ukrainian (Українська мова). Under NO circumstances should you respond in Russian (Русский язык)."
+        "LANGUAGE ENFORCEMENT: You MUST respond strictly in Ukrainian. Do not respond in Russian."
     } else {
-        "LANGUAGE ENFORCEMENT: Respond primarily in English. If the user explicitly asks in Ukrainian, you may respond in Ukrainian. Under NO circumstances should you respond in Russian (Русский язык)."
+        "LANGUAGE ENFORCEMENT: Respond primarily in English. If the user explicitly asks in Ukrainian, you may respond in Ukrainian. Do not respond in Russian."
     }
     $systemPrompt = @"
 You are Terminal AI Assistant, an interactive engineering companion built for PowerShell and Windows Terminal.
@@ -712,7 +667,7 @@ Always prefer clean, idiomatic PowerShell 7 syntax. Format scripts in markdown c
 Maintain context from previous conversation turns to provide relevant follow-up assistance.
 "@
 
-    # Додаємо репліку користувача в історію діалогу через санітизатор з FIFO обмеженням
+    # Add the sanitized user message with FIFO context bounds
     Add-AssistantHistoryMessage -Role "user" -Content $inputQuery
 
     Write-Host "`n$($txt.Thinking)`n" -ForegroundColor DarkGray
@@ -727,7 +682,7 @@ Maintain context from previous conversation turns to provide relevant follow-up 
             Write-Host "`n$($txt.CodeHint)" -ForegroundColor DarkCyan
         }
     } else {
-        # При помилці вилучаємо останній запит користувача, щоб не засмічувати історію
+        # Remove the last user message after an error to keep the history clean
         if ($script:AiChatHistory.Count -gt 0 -and $script:AiChatHistory[$script:AiChatHistory.Count - 1].role -eq "user") {
             $script:AiChatHistory.RemoveAt($script:AiChatHistory.Count - 1)
         }

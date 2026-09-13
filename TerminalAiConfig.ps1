@@ -1,4 +1,4 @@
-﻿# TerminalAiConfig.ps1 - Конфігурація TerminalAI, керування мовами та шрифтами
+﻿# TerminalAiConfig.ps1 - TerminalAI configuration, language, and font management
 
 function Get-TerminalAiConfigPath {
     $configDir = if ($env:TERMINAL_AI_CONFIG_DIR) {
@@ -41,7 +41,7 @@ function Get-TerminalAiConfig {
     if (Test-Path $configPath) {
         try {
             $json = Get-Content -Path $configPath -Raw -ErrorAction Stop | ConvertFrom-Json
-            # Об'єднуємо з дефолтними значеннями на випадок нових полів
+            # Merge with defaults to support newly added fields
             foreach ($key in $defaultConfig.Keys) {
                 if ($null -eq $json.$key) {
                     $json | Add-Member -MemberType NoteProperty -Name $key -Value $defaultConfig[$key]
@@ -122,7 +122,7 @@ function Set-TerminalAiConfig {
 
     Save-TerminalAiConfig -Config $cfg
     $msg = if ($cfg.Language -in @("uk", "ua")) {
-        "✔ [TerminalAI] Конфігурацію успішно збережено в $(Get-TerminalAiConfigPath)"
+        "✔ [TerminalAI] Configuration saved to $(Get-TerminalAiConfigPath)"
     } else {
         "✔ [TerminalAI] Configuration successfully saved to $(Get-TerminalAiConfigPath)"
     }
@@ -205,11 +205,11 @@ function Show-TerminalAiFonts {
     $cfg = Get-TerminalAiConfig
     $isUk = ($cfg.Language -in @("uk", "ua"))
 
-    $title = if ($isUk) { "Встановлені моноширинні шрифти терміналу" } else { "Installed Monospace Terminal Fonts" }
-    $activeLabel = if ($isUk) { "Активний" } else { "Active" }
-    $curLabel = if ($isUk) { "Поточний" } else { "Current" }
-    $changeHint = if ($isUk) { "Змінити шрифт:" } else { "Change font:" }
-    $orHint = if ($isUk) { "Або з розміром (pt):" } else { "Or with font size:" }
+    $title = "Installed Monospace Terminal Fonts"
+    $activeLabel = "Active"
+    $curLabel = "Current"
+    $changeHint = "Change font:"
+    $orHint = "Or with font size:"
 
     Write-Host ""
     Write-Host "    ✦ Terminal AI • $title ($($curLabel): $($fontInfo.ActiveFont))" -ForegroundColor Cyan
@@ -249,7 +249,7 @@ function Set-TerminalAiFont {
 
     $wtPath = Get-WindowsTerminalSettingsPath
     if (-not $wtPath) {
-        $msgNotFound = if ($isUk) { "Файл налаштувань Windows Terminal (settings.json) не знайдено." } else { "Windows Terminal settings file (settings.json) not found." }
+        $msgNotFound = "Windows Terminal settings file (settings.json) not found."
         Write-Error " [TerminalAI] $msgNotFound"
         return
     }
@@ -275,19 +275,19 @@ function Set-TerminalAiFont {
         $newJson = $wtJson | ConvertTo-Json -Depth 20
         Set-Content -Path $wtPath -Value $newJson -Encoding UTF8
 
-        # Зберігаємо в конфіг TerminalAI
+        # Save to the TerminalAI configuration
         Set-TerminalAiConfig -Font $Font | Out-Null
 
         $cfg = Get-TerminalAiConfig
         $isUk = ($cfg.Language -in @("uk", "ua"))
         $msg = if ($isUk) {
-            "✔ [TerminalAI] Шрифт терміналу успішно змінено на '$Font'!"
+            "✔ [TerminalAI] Terminal font changed to '$Font'."
         } else {
             "✔ [TerminalAI] Terminal font successfully changed to '$Font'!"
         }
         Write-Host "`n    $msg" -ForegroundColor Green
         if ($Size -gt 0) {
-            $lblSize = if ($isUk) { "Розмір шрифту:" } else { "Font size:" }
+            $lblSize = "Font size:"
             Write-Host "    $lblSize $Size pt`n" -ForegroundColor DarkCyan
         } else {
             Write-Host ""
@@ -295,7 +295,7 @@ function Set-TerminalAiFont {
     }
     catch {
         $msgErr = if ($isUk) {
-            " [TerminalAI] Не вдалося оновити шрифт у $($wtPath): $($_.Exception.Message)"
+            " [TerminalAI] Failed to update the font in $($wtPath): $($_.Exception.Message)"
         } else {
             " [TerminalAI] Failed to update font in $($wtPath): $($_.Exception.Message)"
         }
@@ -306,11 +306,11 @@ function Set-TerminalAiFont {
 function Set-TerminalAiLanguage {
     <#
     .SYNOPSIS
-        Встановлює та зберігає мову інтерфейсу TerminalAI (uk або en).
+        Sets and saves the requested language for model-generated prose responses.
     .PARAMETER Language
-        Мова: uk (або ua) для української, en для англійської.
+        Language code: uk or ua for Ukrainian, en for English.
     .PARAMETER Permanent
-        Зберігає мову як постійну за замовчуванням у config.json та системному середовищі користувача Windows ($env:TERMINAL_AI_LANG).
+        Persists the language in config.json and the Windows user environment.
     .EXAMPLE
         ai-lang uk
     .EXAMPLE
@@ -331,10 +331,10 @@ function Set-TerminalAiLanguage {
 
     $normalizedLang = if ($Language -in @("ua", "uk")) { "uk" } else { "en" }
 
-    # 1. Зберігаємо у ~/.terminal-ai/config.json
+    # Save to ~/.terminal-ai/config.json
     Set-TerminalAiConfig -Language $normalizedLang | Out-Null
 
-    # 2. Фіксуємо у середовищі користувача Windows ($env:TERMINAL_AI_LANG) та поточної сесії
+    # Persist in the Windows user environment and current session
     if ($Permanent -and -not $env:TERMINAL_AI_CONFIG_DIR) {
         try {
             [Environment]::SetEnvironmentVariable("TERMINAL_AI_LANG", $normalizedLang, "User")
@@ -342,7 +342,7 @@ function Set-TerminalAiLanguage {
     }
     $env:TERMINAL_AI_LANG = $normalizedLang
 
-    # 3. Оновлюємо JSON фрагмент розширення Windows Terminal
+    # Update the Windows Terminal fragment
     if (-not $env:TERMINAL_AI_CONFIG_DIR) {
         try {
             Update-TerminalAiFragment -Language $normalizedLang
@@ -353,24 +353,24 @@ function Set-TerminalAiLanguage {
     if ($normalizedLang -eq "uk") {
         Write-Host ""
         if ($Permanent) {
-            Write-Host "    ✔ Мову TerminalAI успішно зафіксовано як ПОСТІЙНУ: uk (Українська)!" -ForegroundColor Green
-            Write-Host "      • Збережено в конфігурації: $cfgPath" -ForegroundColor DarkCyan
-            Write-Host "      • Зафіксовано в середовищі користувача Windows: `$env:TERMINAL_AI_LANG = 'uk'" -ForegroundColor DarkCyan
-            Write-Host "      • Мова зберігатиметься при кожному перезавантаженні та у всіх терміналах.`n" -ForegroundColor DarkGray
+            Write-Host "    ✔ Model response language set permanently to uk (Ukrainian)." -ForegroundColor Green
+            Write-Host "      • Saved in configuration: $cfgPath" -ForegroundColor DarkCyan
+            Write-Host "      • Saved in the Windows user environment: `$env:TERMINAL_AI_LANG = 'uk'" -ForegroundColor DarkCyan
+            Write-Host "      • The setting persists across reboots and terminal sessions.`n" -ForegroundColor DarkGray
         } else {
-            Write-Host "    ✔ Мову TerminalAI успішно змінено на українську!" -ForegroundColor Green
-            Write-Host "      • Збережено в конфігурації: $cfgPath" -ForegroundColor DarkGray
-            Write-Host "      💡 Щоб зробити залізно постійною на рівні системи: ai lang permanent uk`n" -ForegroundColor DarkGray
+            Write-Host "    ✔ Model response language changed to Ukrainian." -ForegroundColor Green
+            Write-Host "      • Saved in configuration: $cfgPath" -ForegroundColor DarkGray
+            Write-Host "      💡 To persist at the system level: ai lang permanent uk`n" -ForegroundColor DarkGray
         }
     } else {
         Write-Host ""
         if ($Permanent) {
-            Write-Host "    ✔ TerminalAI language successfully set as PERMANENT: en (English)!" -ForegroundColor Green
+            Write-Host "    ✔ Model response language set permanently to en (English)." -ForegroundColor Green
             Write-Host "      • Saved to configuration: $cfgPath" -ForegroundColor DarkCyan
             Write-Host "      • Persisted in Windows user environment: `$env:TERMINAL_AI_LANG = 'en'" -ForegroundColor DarkCyan
             Write-Host "      • Language will persist across reboots and all terminal sessions.`n" -ForegroundColor DarkGray
         } else {
-            Write-Host "    ✔ TerminalAI language successfully changed to English!" -ForegroundColor Green
+            Write-Host "    ✔ Model response language changed to English." -ForegroundColor Green
             Write-Host "      • Saved to configuration: $cfgPath" -ForegroundColor DarkGray
             Write-Host "      💡 To lock permanently at system level: ai lang permanent en`n" -ForegroundColor DarkGray
         }
@@ -384,10 +384,10 @@ function Update-TerminalAiFragment {
     $isEn = ($Language -ne "uk" -and $Language -ne "ua")
     $assistantCommand = "pwsh.exe -NoExit -Command `"Import-Module TerminalAI -ErrorAction SilentlyContinue; Invoke-AiAssistant`""
 
-    $actionAsk = if ($isEn) { "AI: Ask Ollama (ai)" } else { "AI: Запитати Ollama (ai)" }
-    $actionFix = if ($isEn) { "AI: Fix last error (ai-fix)" } else { "AI: Виправити останню помилку (ai-fix)" }
-    $actionScript = if ($isEn) { "AI: Generate script (ai-script)" } else { "AI: Згенерувати сценарій (ai-script)" }
-    $actionSplit = if ($isEn) { "AI: Open assistant in split pane" } else { "AI: Відкрити асистента у спліт-панелі" }
+    $actionAsk = "AI: Ask Ollama (ai)"
+    $actionFix = "AI: Fix last error (ai-fix)"
+    $actionScript = "AI: Generate script (ai-script)"
+    $actionSplit = "AI: Open assistant in split pane"
 
     $fragmentObj = [ordered]@{
         profiles = @(
@@ -444,7 +444,7 @@ function Update-TerminalAiFragment {
 
     $fragJson = $fragmentObj | ConvertTo-Json -Depth 10
 
-    # 1. Каталог Windows Terminal Fragments
+    # Windows Terminal fragments directory
     $destFrag = "$env:LOCALAPPDATA\Microsoft\Windows Terminal\Fragments\TerminalAI\terminalai.json"
     $destFragDir = Split-Path $destFrag
     if (-not (Test-Path $destFragDir)) {
@@ -452,7 +452,7 @@ function Update-TerminalAiFragment {
     }
     Set-Content -Path $destFrag -Value $fragJson -Encoding UTF8
 
-    # 2. Каталог проєкту (якщо відомий)
+    # Project directory when known
     $projectDir = $PSScriptRoot
     if ($projectDir -and (Test-Path (Join-Path $projectDir "terminalai.json"))) {
         Set-Content -Path (Join-Path $projectDir "terminalai.json") -Value $fragJson -Encoding UTF8
@@ -462,7 +462,7 @@ function Update-TerminalAiFragment {
 function Set-TerminalAiDefaultLanguage {
     <#
     .SYNOPSIS
-        Встановлює мову TerminalAI як постійну за замовчуванням (конфіг + системне середовище).
+        Persists the default model response language in configuration and the system environment.
     .EXAMPLE
         ai-lang-permanent uk
     .EXAMPLE

@@ -125,9 +125,7 @@ public static class AotScriptSafety
 
             if (string.Equals(existingContent.Trim(), content.Trim(), StringComparison.Ordinal))
             {
-                var infoMsg = isUk
-                    ? $"    ℹ [TerminalAI] Файл вже існує з ідентичним вмістом: {resolvedPath}"
-                    : $"    ℹ [TerminalAI] File already exists with identical content: {resolvedPath}";
+                var infoMsg = $"    ℹ [TerminalAI] File already exists with identical content: {resolvedPath}";
 
                 if (caller?.Host?.UI != null)
                 {
@@ -175,7 +173,7 @@ public static class AotScriptSafety
                 bool confirmed = false;
                 if (!string.IsNullOrEmpty(confirmInput))
                 {
-                    if (Regex.IsMatch(confirmInput.Trim(), @"^(y|yes|так|т)$", RegexOptions.IgnoreCase))
+                    if (Regex.IsMatch(confirmInput.Trim(), @"^(?:y|yes)$", RegexOptions.IgnoreCase))
                     {
                         confirmed = true;
                     }
@@ -195,9 +193,7 @@ public static class AotScriptSafety
 
                     if (!isInteractive)
                     {
-                        var blockedMsg = isUk
-                            ? "    ✖ Неінтерактивна сесія. Перезапис скасовано заради безпеки."
-                            : "    ✖ Non-interactive session. Overwrite canceled for safety.";
+                        var blockedMsg = "    ✖ Non-interactive session. Overwrite canceled for safety.";
 
                         if (caller?.Host?.UI != null)
                         {
@@ -217,10 +213,10 @@ public static class AotScriptSafety
                         };
                     }
 
-                    var promptText = isUk ? "    Перезаписати цей файл? [y/N]: " : "    Overwrite this file? [y/N]: ";
+                    var promptText = "    Overwrite this file? [y/N]: ";
                     Console.Write(promptText);
                     var response = Console.ReadLine()?.Trim() ?? string.Empty;
-                    if (Regex.IsMatch(response, @"^(y|yes|так|т)$", RegexOptions.IgnoreCase))
+                    if (Regex.IsMatch(response, @"^(?:y|yes)$", RegexOptions.IgnoreCase))
                     {
                         confirmed = true;
                     }
@@ -228,9 +224,7 @@ public static class AotScriptSafety
 
                 if (!confirmed)
                 {
-                    var cancelMsg = isUk
-                        ? "    ✖ Перезапис скасовано користувачем."
-                        : "    ✖ Overwrite canceled by user.";
+                    var cancelMsg = "    ✖ Overwrite canceled by user.";
 
                     if (caller?.Host?.UI != null)
                     {
@@ -274,9 +268,7 @@ public static class AotScriptSafety
                 File.Move(tmpPath, resolvedPath);
             }
 
-            var successMsg = isUk
-                ? $"    ✔ Файл успішно збережено: {resolvedPath}"
-                : $"    ✔ File successfully saved: {resolvedPath}";
+            var successMsg = $"    ✔ File successfully saved: {resolvedPath}";
 
             if (caller?.Host?.UI != null)
             {
@@ -306,9 +298,7 @@ public static class AotScriptSafety
                 }
             }
 
-            var errMsg = isUk
-                ? $"    ✖ Помилка збереження файлу: {ex.Message}"
-                : $"    ✖ Error saving file: {ex.Message}";
+            var errMsg = $"    ✖ Error saving file: {ex.Message}";
 
             if (caller?.Host?.UI != null)
             {

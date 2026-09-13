@@ -39,8 +39,8 @@ function Show-BootstrapSpinner {
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     $chars = @('⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏')
     $i = 0
-    $doneLabel = if ($IsUkrainian) { "готово!" } else { "ready!" }
-    $timeoutLabel = if ($IsUkrainian) { "Час очікування вичерпано." } else { "Wait timeout elapsed." }
+    $doneLabel = "ready!"
+    $timeoutLabel = "Wait timeout elapsed."
     while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
         if (& $Condition) {
             Write-Host "`r   ✔ $Message - $doneLabel ($([Math]::Round($sw.Elapsed.TotalSeconds, 1))s)          " -ForegroundColor Green
@@ -56,7 +56,7 @@ function Show-BootstrapSpinner {
     return $false
 }
 
-$hdrTitle = if ($isUk) { "   TerminalAI • Однокомандний Portable Bootstrapper   " } else { "   TerminalAI • One-Command Portable Bootstrapper   " }
+$hdrTitle = "   TerminalAI • One-Command Portable Bootstrapper   "
 Write-Host "`n═══════════════════════════════════════════════════════════════" -ForegroundColor Cyan
 Write-Host $hdrTitle -ForegroundColor Cyan
 Write-Host "═══════════════════════════════════════════════════════════════`n" -ForegroundColor Cyan
@@ -75,12 +75,12 @@ if (-not $isPwsh) {
 
     if ($foundPwsh -and -not [Console]::IsInputRedirected -and -not $NonInteractive) {
         $msgRelaunchPrompt = if ($isUk) {
-            "Знайдено PowerShell 7 ($foundPwsh). Бажаєте перезапустити в PS 7 для скомпільованого модуля .NET 10? [Y/n]"
+            "PowerShell 7 was found at $foundPwsh. Restart in PowerShell 7 for the compiled .NET 10 module? [Y/n]"
         } else {
             "PowerShell 7 detected ($foundPwsh). Relaunch in PS 7 for compiled .NET 10 helper? [Y/n]"
         }
         $ans = Read-Host "   $msgRelaunchPrompt"
-        if ($ans -match '^(y|yes|так|т|$)' -or [string]::IsNullOrWhiteSpace($ans)) {
+        if ($ans -match '^(y|yes|$)' -or [string]::IsNullOrWhiteSpace($ans)) {
             $scriptPath = $MyInvocation.MyCommand.Path
             if ($scriptPath -and (Test-Path $scriptPath)) {
                 Start-Process -FilePath $foundPwsh -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-File", "`"$scriptPath`"", "-Mode", $Mode, "-Language", $Language
@@ -92,7 +92,7 @@ if (-not $isPwsh) {
 
 # 4. Ollama detection and service check
 if (-not $SkipOllama) {
-    $stepOllama = if ($isUk) { "1. Перевірка локального рушія Ollama..." } else { "1. Checking local Ollama engine..." }
+    $stepOllama = "1. Checking local Ollama engine..."
     Write-Host $stepOllama -ForegroundColor Yellow
 
     $ollamaCmd = Get-Command ollama -ErrorAction SilentlyContinue
@@ -111,14 +111,14 @@ if (-not $SkipOllama) {
     }
 
     if (-not $ollamaCmd) {
-        $msgNoOllama = if ($isUk) { "   ⚠ Ollama не знайдено на комп'ютері." } else { "   ⚠ Ollama is not installed on this system." }
+        $msgNoOllama = "   ⚠ Ollama is not installed on this system."
         Write-Host $msgNoOllama -ForegroundColor DarkYellow
 
         $shouldInstall = $AutoConfirm
         if (-not $shouldInstall -and -not [Console]::IsInputRedirected -and -not $NonInteractive) {
-            $promptInstall = if ($isUk) { "   Встановити Ollama автоматично зараз? [Y/n]" } else { "   Install Ollama automatically now? [Y/n]" }
+            $promptInstall = "   Install Ollama automatically now? [Y/n]"
             $ans = Read-Host $promptInstall
-            $shouldInstall = ($ans -match '^(y|yes|так|т|$)' -or [string]::IsNullOrWhiteSpace($ans))
+            $shouldInstall = ($ans -match '^(y|yes|$)' -or [string]::IsNullOrWhiteSpace($ans))
         }
 
         if ($shouldInstall) {
@@ -170,7 +170,7 @@ if (-not $SkipOllama) {
     if (-not $isApiReady -and $ollamaCmd) {
         Write-Host "   • Ollama service is inactive. Starting background daemon..." -ForegroundColor DarkYellow
         Start-Process "ollama" -ArgumentList "serve" -WindowStyle Hidden -ErrorAction SilentlyContinue
-        $spinnerLabel = if ($isUk) { "Очікування запуску Ollama" } else { "Waiting for Ollama service to start" }
+        $spinnerLabel = "Waiting for Ollama service to start"
         $isApiReady = Show-BootstrapSpinner -Message $spinnerLabel -TimeoutSec 12 -IsUkrainian $isUk -Condition {
             foreach ($url in $candidateUrls) {
                 try {
@@ -189,11 +189,11 @@ if (-not $SkipOllama) {
         
         # Check active model
         if ($installedModels -notcontains $Model) {
-            $msgPull = if ($isUk) { "Рекомендовану модель '$Model' не знайдено. Завантажити зараз? [Y/n]" } else { "Recommended model '$Model' is not installed. Download now? [Y/n]" }
+            $msgPull = "Recommended model '$Model' is not installed. Download now? [Y/n]"
             $shouldPull = $AutoConfirm
             if (-not $shouldPull -and -not [Console]::IsInputRedirected -and -not $NonInteractive) {
                 $ansPull = Read-Host "   $msgPull"
-                $shouldPull = ($ansPull -match '^(y|yes|так|т|$)' -or [string]::IsNullOrWhiteSpace($ansPull))
+                $shouldPull = ($ansPull -match '^(y|yes|$)' -or [string]::IsNullOrWhiteSpace($ansPull))
             }
             if ($shouldPull -and $ollamaCmd) {
                 Write-Host "   ▶ Pulling model '$Model' (this may take a couple of minutes)..." -ForegroundColor Cyan
@@ -213,7 +213,7 @@ if ($Mode -eq "Auto") {
         $Mode = "Portable"
     } else {
         $promptMode = if ($isUk) {
-            "Оберіть режим запуску:`n  [1] Portable  - Швидкий запуск у поточній сесії (нульовий слід, без зміни `$PROFILE)`n  [2] Install   - Повне встановлення з інтеграцією у Windows Terminal`nВаш вибір [1/2] (за замовчуванням 1):"
+            "Choose a launch mode:`n  [1] Portable  - Start quickly in the current session (no persistent changes to `$PROFILE)`n  [2] Install   - Full installation with Windows Terminal integration`nYour choice [1/2] (default: 1):"
         } else {
             "Choose execution mode:`n  [1] Portable  - Run directly in current session (zero system footprint, leaves `$PROFILE untouched)`n  [2] Install   - Full installation with Windows Terminal integration`nYour choice [1/2] (default 1):"
         }
@@ -288,7 +288,7 @@ if ($Mode -eq "Install") {
     }
 
     $msgActive = if ($isUk) {
-        "✔ TerminalAI успішно активовано у поточній сесії (нульовий слід у системі).`n  Спробуйте: ai `"знайти великі файли`" або натисніть F2 у рядку введення!`n"
+        "✔ TerminalAI is active in the current session with no persistent system changes.`n  Try: ai `"find large files`" or press F2 at the prompt!`n"
     } else {
         "✔ TerminalAI successfully loaded in current session (zero system footprint).`n  Try: ai `"find large files`" or press F2 inline!`n"
     }

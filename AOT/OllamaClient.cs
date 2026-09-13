@@ -99,9 +99,7 @@ public static class OllamaClient
             {
                 if (resp.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    var notFoundMsg = isUk
-                        ? $"Модель '{model}' не знайдено в Ollama (HTTP 404). Виконайте 'ollama pull {model}' або виберіть іншу модель через 'aif model <name>'."
-                        : $"Model '{model}' was not found in Ollama (HTTP 404). Run 'ollama pull {model}' or choose another model via 'aif model <name>'.";
+                    var notFoundMsg = $"Model '{model}' was not found in Ollama (HTTP 404). Run 'ollama pull {model}' or choose another model via 'aif model <name>'.";
                     throw new InvalidOperationException(notFoundMsg);
                 }
                 var rawErr = await resp.Content.ReadAsStringAsync(cts.Token).ConfigureAwait(false);
@@ -118,23 +116,17 @@ public static class OllamaClient
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            var timeoutMsg = isUk
-                ? $"Перевищено ліміт часу очікування відповіді Ollama ({effectiveTimeout} сек) для моделі '{model}'. Збільште 'TimeoutSeconds' у конфігурації або виберіть швидшу модель."
-                : $"Ollama request timed out after {effectiveTimeout}s for model '{model}'. You can increase 'TimeoutSeconds' in config or use a faster model.";
+            var timeoutMsg = $"Ollama request timed out after {effectiveTimeout}s for model '{model}'. You can increase 'TimeoutSeconds' in config or use a faster model.";
             throw new TimeoutException(timeoutMsg);
         }
         catch (HttpRequestException ex) when (ex.InnerException is System.Net.Sockets.SocketException sockEx && sockEx.SocketErrorCode == System.Net.Sockets.SocketError.ConnectionRefused)
         {
-            var connMsg = isUk
-                ? $"Не вдалося підключитися до сервісу Ollama за адресою '{url}'. Переконайтеся, що Ollama встановлено та запущено ('ollama serve')."
-                : $"Cannot connect to Ollama service at '{url}'. Please ensure Ollama is installed and running ('ollama serve').";
+            var connMsg = $"Cannot connect to Ollama service at '{url}'. Please ensure Ollama is installed and running ('ollama serve').";
             throw new InvalidOperationException(connMsg, ex);
         }
         catch (JsonException ex)
         {
-            var jsonMsg = isUk
-                ? $"Отримано некоректну відповідь JSON від Ollama: {ex.Message}"
-                : $"Received malformed JSON response from Ollama: {ex.Message}";
+            var jsonMsg = $"Received malformed JSON response from Ollama: {ex.Message}";
             throw new InvalidOperationException(jsonMsg, ex);
         }
     }

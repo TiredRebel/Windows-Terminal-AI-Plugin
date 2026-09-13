@@ -206,7 +206,7 @@ function Test-AiAgentReadiness {
     } else {
         Write-Host "✖ Not found in PATH or standard directories" -ForegroundColor Red
         if ($isUk) {
-            Write-Host "     Встановіть Claude Code: npm install -g @anthropic-ai/claude-code" -ForegroundColor DarkYellow
+            Write-Host "     Install Claude Code: npm install -g @anthropic-ai/claude-code" -ForegroundColor DarkYellow
         } else {
             Write-Host "     Install Claude Code: npm install -g @anthropic-ai/claude-code" -ForegroundColor DarkYellow
         }
@@ -218,7 +218,7 @@ function Test-AiAgentReadiness {
     } else {
         Write-Host "✖ Service unreachable at $ollamaUrl" -ForegroundColor Red
         if ($isUk) {
-            Write-Host "     Запустіть службу Ollama: ollama serve" -ForegroundColor DarkYellow
+            Write-Host "     Start the Ollama service: ollama serve" -ForegroundColor DarkYellow
         } else {
             Write-Host "     Start Ollama service: ollama serve" -ForegroundColor DarkYellow
         }
@@ -232,7 +232,7 @@ function Test-AiAgentReadiness {
     } elseif ($ollamaReady) {
         Write-Host "✖ '$targetModel' not found in Ollama" -ForegroundColor Red
         if ($isUk) {
-            Write-Host "     Завантажте модель: ollama pull $targetModel" -ForegroundColor DarkYellow
+            Write-Host "     Download the model: ollama pull $targetModel" -ForegroundColor DarkYellow
         } else {
             Write-Host "     Download model: ollama pull $targetModel" -ForegroundColor DarkYellow
         }
@@ -250,13 +250,13 @@ function Test-AiAgentReadiness {
     Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor Cyan
     if ($overallReady) {
         if ($isUk) {
-            Write-Host "  ✦ Усе готово для автономного запуску 'ai-agent'! ✦" -ForegroundColor Green
+            Write-Host "  ✦ Everything is ready to run 'ai-agent' autonomously! ✦" -ForegroundColor Green
         } else {
             Write-Host "  ✦ All agent prerequisites are met. Ready for 'ai-agent'! ✦" -ForegroundColor Green
         }
     } else {
         if ($isUk) {
-            Write-Host "  ⚠ Одне або декілька налаштувань потребують уваги. Дивіться вище." -ForegroundColor Yellow
+            Write-Host "  ⚠ One or more settings need attention. See above." -ForegroundColor Yellow
         } else {
             Write-Host "  ⚠ One or more prerequisites are missing. See instructions above." -ForegroundColor Yellow
         }
@@ -342,7 +342,7 @@ function Invoke-AiAgent {
     if (-not $readiness.Ready) {
         Test-AiAgentReadiness -Model $targetModel -WorkingDir $targetDir | Out-Null
         $failMsg = if ($isUk) {
-            "Неможливо запустити Claude Code агента: не виконано передумови вище."
+            "Cannot start the Claude Code agent because the prerequisites above are not met."
         } else {
             "Cannot launch Claude Code agent: prerequisites above were not met."
         }
@@ -383,7 +383,7 @@ function Invoke-AiAgent {
             $ans = [Console]::ReadLine()
             if ($ans -and $ans.Trim() -match '^[nN]') {
                 $cancelMsg = if ($isUk) {
-                    "Запуск агента скасовано користувачем."
+                    "Agent launch was canceled by the user."
                 } else {
                     "Agent launch cancelled by user."
                 }

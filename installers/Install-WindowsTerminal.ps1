@@ -35,7 +35,7 @@ if (-not (Assert-TerminalAiScopeAdmin -Scope $Scope -IsUkrainian $isUk)) { retur
 
 $projectDir = if ($PSScriptRoot) { Split-Path -Parent $PSScriptRoot } else { Get-Location }
 
-$step = if ($isUk) { "▶ Налаштування Windows Terminal (Fragments & Actions)..." } else { "▶ Configuring Windows Terminal (Fragments & Actions)..." }
+$step = "▶ Configuring Windows Terminal (Fragments & Actions)..."
 Write-Host $step -ForegroundColor Yellow
 
 # Register JSON Fragment Extension
@@ -54,16 +54,16 @@ try {
     $fragSource = Join-Path $projectDir "terminalai.json"
     if (Test-Path $fragSource) {
         Copy-Item -Path $fragSource -Destination (Join-Path $fragDir "terminalai.json") -Force
-        $msgFragReg = if ($isUk) { "   ✔ Зареєстровано Windows Terminal Fragment Extension ($Scope): $fragDir" } else { "   ✔ Registered Windows Terminal Fragment Extension ($Scope): $fragDir" }
+        $msgFragReg = "   ✔ Registered Windows Terminal Fragment Extension ($Scope): $fragDir"
         Write-Host $msgFragReg -ForegroundColor Green
     }
 } catch {
-    $warnFrag = if ($isUk) { "   Не вдалося створити Fragment Extension: $($_.Exception.Message)" } else { "   Failed to create Fragment Extension: $($_.Exception.Message)" }
+    $warnFrag = "   Failed to create Fragment Extension: $($_.Exception.Message)"
     Write-Warning $warnFrag
 }
 
 if ($ModifySettingsJson) {
-    $msgLegacyWt = if ($isUk) { "   • Оновлення налаштувань actions у settings.json (legacy mode)..." } else { "   • Updating actions in settings.json (legacy mode)..." }
+    $msgLegacyWt = "   • Updating actions in settings.json (legacy mode)..."
     Write-Host $msgLegacyWt -ForegroundColor DarkGray
     $wtSettingsCandidates = @(
         "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json",
@@ -83,7 +83,7 @@ if ($ModifySettingsJson) {
         try {
             $backupFile = "$wtSettingsFile.terminalai.backup.json"
             Copy-Item -Path $wtSettingsFile -Destination $backupFile -Force
-            $msgBakWt = if ($isUk) { "   ✔ Створено резервну копію: $backupFile" } else { "   ✔ Created backup: $backupFile" }
+            $msgBakWt = "   ✔ Created backup: $backupFile"
             Write-Host $msgBakWt -ForegroundColor DarkGray
 
             $wtJson = Get-Content -Path $wtSettingsFile -Raw | ConvertFrom-Json
@@ -99,10 +99,10 @@ if ($ModifySettingsJson) {
             $destModuleDir = $moduleDestinations | Select-Object -Last 1
             $assistantScriptPath = if ($destModuleDir) { Join-Path $destModuleDir "TerminalAiAssistant.ps1" } else { Join-Path $projectDir "TerminalAiAssistant.ps1" }
 
-            $actionAskName = if ($isUk) { "AI: Запитати Ollama (ai)" } else { "AI: Ask Ollama (ai)" }
-            $actionFixName = if ($isUk) { "AI: Виправити останню помилку (ai-fix)" } else { "AI: Fix last error (ai-fix)" }
-            $actionScriptName = if ($isUk) { "AI: Згенерувати сценарій (ai-script)" } else { "AI: Generate script (ai-script)" }
-            $actionSplitName = if ($isUk) { "AI: Відкрити асистента у спліт-панелі" } else { "AI: Open assistant in split pane" }
+            $actionAskName = "AI: Ask Ollama (ai)"
+            $actionFixName = "AI: Fix last error (ai-fix)"
+            $actionScriptName = "AI: Generate script (ai-script)"
+            $actionSplitName = "AI: Open assistant in split pane"
 
             $aiActions = @(
                 [ordered]@{
@@ -155,15 +155,15 @@ if ($ModifySettingsJson) {
             $wtJson.actions = $newActionsList.ToArray()
             $newSettingsJson = $wtJson | ConvertTo-Json -Depth 10
             Set-Content -Path $wtSettingsFile -Value $newSettingsJson -Encoding UTF8
-            $msgAddedActions = if ($isUk) { "   ✔ Додано дій Windows Terminal: $addedCount (файл: $wtSettingsFile)" } else { "   ✔ Added Windows Terminal actions: $addedCount (file: $wtSettingsFile)" }
+            $msgAddedActions = "   ✔ Added Windows Terminal actions: $addedCount (file: $wtSettingsFile)"
             Write-Host $msgAddedActions -ForegroundColor Green
         }
         catch {
-            $warnModWt = if ($isUk) { "   Не вдалося модифікувати налаштування Windows Terminal: $($_.Exception.Message)" } else { "   Failed to modify Windows Terminal settings: $($_.Exception.Message)" }
+            $warnModWt = "   Failed to modify Windows Terminal settings: $($_.Exception.Message)"
             Write-Warning $warnModWt
         }
     }
 } else {
-    $msgFragClean = if ($isUk) { "   ℹ Windows Terminal Fragment Extension активовано (неінвазивний режим, settings.json залишено чистим)." } else { "   ℹ Windows Terminal Fragment Extension active (non-invasive mode, settings.json left untouched)." }
+    $msgFragClean = "   ℹ Windows Terminal Fragment Extension active (non-invasive mode, settings.json left untouched)."
     Write-Host $msgFragClean -ForegroundColor DarkCyan
 }

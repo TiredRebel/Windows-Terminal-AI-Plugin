@@ -9,7 +9,7 @@
       - Connection refused friendly error messages
       - Model 404 friendly error messages
       - CancellationToken immediate cancellation
-      - Bilingual error message parity (EN default, UK on demand)
+      - English error message parity for either response-language setting
 #>
 
 $ErrorActionPreference = 'Stop'
@@ -98,16 +98,16 @@ Assert-AotFixture "FIX-HC-03" "Connection refused produces friendly error messag
     if (-not $caught) { throw "Expected exception for unreachable connection" }
 }
 
-# FIX-HC-04: Connection refused produces friendly diagnostic message in Ukrainian when isUk=$true
-Assert-AotFixture "FIX-HC-04" "Connection refused produces friendly error message in Ukrainian" {
+# FIX-HC-04: Connection errors remain English when the Ukrainian response-language setting is active
+Assert-AotFixture "FIX-HC-04" "Connection refused produces an English error with the Ukrainian response-language setting" {
     $caught = $false
     try {
         [TerminalAI.Aot.OllamaClient]::GenerateAsync("http://127.0.0.1:11439", "fake-model", "test", "test", 0.1, 10, $true).GetAwaiter().GetResult()
     } catch {
         $caught = $true
         $msg = $_.Exception.ToString()
-        if (-not ($msg.Contains("Не вдалося підключитися до сервісу Ollama") -or $msg.Contains("ollama serve"))) {
-            throw "Error message should contain Ukrainian connection advice, got: '$msg'"
+        if (-not ($msg.Contains("Cannot connect to Ollama service") -or $msg.Contains("ollama serve"))) {
+            throw "Error message should contain English connection advice, got: '$msg'"
         }
     }
     if (-not $caught) { throw "Expected exception for unreachable connection" }
@@ -169,8 +169,8 @@ Assert-AotFixture "FIX-HC-07" "Throws TimeoutException when server does not resp
     if (-not $caught) { throw "Expected timeout exception" }
 }
 
-# FIX-HC-08: TimeoutException produces Ukrainian text when isUk=$true
-Assert-AotFixture "FIX-HC-08" "TimeoutException produces localized Ukrainian text when isUk is true" {
+# FIX-HC-08: Timeout errors remain English when the Ukrainian response-language setting is active
+Assert-AotFixture "FIX-HC-08" "TimeoutException stays English with the Ukrainian response-language setting" {
     $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
     $listener.Start()
     $port = ([System.Net.IPEndPoint]$listener.LocalEndpoint).Port
@@ -190,7 +190,7 @@ Assert-AotFixture "FIX-HC-08" "TimeoutException produces localized Ukrainian tex
     } catch {
         $caught = $true
         $msg = $_.Exception.ToString()
-        if (-not ($msg.Contains("Перевищено ліміт часу") -or $msg.Contains("TimeoutSeconds"))) {
+        if (-not ($msg.Contains("timed out") -or $msg.Contains("TimeoutSeconds"))) {
             throw "Expected Ukrainian timeout message, got: '$msg'"
         }
     } finally {

@@ -29,7 +29,7 @@ function Assert-TerminalAiScopeAdmin {
     if (Test-TerminalAiIsAdmin) { return $true }
 
     $msgAdmin = if ($IsUkrainian) {
-        "[TerminalAI] Встановлення для всіх користувачів (-Scope AllUsers) вимагає прав адміністратора (Run as Administrator)."
+        "[TerminalAI] Installation for all users (-Scope AllUsers) requires Administrator privileges (Run as Administrator)."
     } else {
         "[TerminalAI] Installation for all users (-Scope AllUsers) requires Administrator privileges (Run as Administrator)."
     }
@@ -78,8 +78,8 @@ function Show-SpinnerWait {
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     $chars = @('⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏')
     $i = 0
-    $doneLabel = if ($IsUkrainian) { "готово!" } else { "ready!" }
-    $timeoutLabel = if ($IsUkrainian) { "Час очікування вичерпано." } else { "Wait timeout elapsed." }
+    $doneLabel = "ready!"
+    $timeoutLabel = "Wait timeout elapsed."
     while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
         if (& $Condition) {
             Write-Host "`r   ✔ $Message - $doneLabel ($([Math]::Round($sw.Elapsed.TotalSeconds, 1))s)          " -ForegroundColor Green

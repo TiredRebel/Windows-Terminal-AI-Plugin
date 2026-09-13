@@ -1,705 +1,380 @@
-# TerminalAI — Повнофункціональне AI-розширення для Windows Terminal та PowerShell
+# TerminalAI — local Ollama assistance for PowerShell and Windows Terminal
 
-**Українська** | [English](README.en.md) | [C# module: EN](AOT/README.md) · [UK](AOT/README.uk.md)
+[Ukrainian](README.uk.md) | **English** | [C# binary module](AOT/README.md)
 
-[![PowerShell](https://img.shields.io/badge/PowerShell-7%2B%20%7C%205.1-blue?logo=powershell&logoColor=white)](https://github.com/PowerShell/PowerShell)
-[![Windows Terminal](https://img.shields.io/badge/Windows%20Terminal-Fragment%20Extension-black?logo=windows-terminal&logoColor=white)](https://github.com/microsoft/terminal)
-[![C# module](https://img.shields.io/badge/C%23%20module-.NET%2010-purple?logo=dotnet&logoColor=white)](AOT/README.md)
-[![Ollama](https://img.shields.io/badge/Ollama-Local%20by%20default-purple?logo=ollama&logoColor=white)](https://ollama.com)
-[![Privacy](https://img.shields.io/badge/Privacy-Configurable-green)](#межі-безпеки-та-приватності-агентного-режиму)
+TerminalAI is a Windows PowerShell module that sends command-generation and chat requests to a configured Ollama endpoint. It provides one-shot command generation, an interactive assistant, error diagnosis, script generation, Windows Terminal integration, safety checks before execution, and an optional Claude Code agent launcher backed by Ollama.
 
-**TerminalAI** — це розширення для **Windows Terminal** та консолі **PowerShell**, яке інтегрує великі мовні моделі через **Ollama** (`qwen2.5-coder`, `granite4.2`, `qwen3.5` тощо) безпосередньо у ваш командний рядок.
-
-TerminalAI працює локально за замовчуванням при налаштуванні з локальною кінцевою точкою Ollama (`http://localhost:11434`). За стандартної конфігурації запити надсилаються локальній Ollama за адресою `http://localhost:11434`. Адресу `OllamaUrl` можна змінити, а агентний режим запускає окремо встановлений Claude Code CLI, тому фактична приватність і межі даних залежать від конфігурації цих компонентів. Скомпільований допоміжний модуль .NET 10 (керований C#-модуль) пришвидшує локальну обробку, але час відповіді моделі залежить від Ollama, моделі та обладнання.
+TerminalAI is local by default when configured with a local Ollama endpoint (`http://localhost:11434`). The default model is `qwen2.5-coder:7b`. The built-in installer and application interfaces, including status, help, menu, and error text, are English-only. The `Language` setting accepts `en` or `uk` as the requested language for model-generated prose responses such as answers, explanations, diagnoses, and interactive chat replies; it does not localize the UI. Because `OllamaUrl` is user-configurable and agent mode delegates to an external Claude Code CLI, actual privacy and data boundaries depend on how these endpoints and tools are configured.
 
 > [!IMPORTANT]
-> Згенеровані моделлю команди є недовіреним введенням (untrusted input). Завжди ретельно переглядайте їх перед виконанням. Перевірки AST та симуляція WhatIf є захисними бар'єрами (safety guardrails), а НЕ безпековою пісочницею (security sandbox). TerminalAI перевіряє синтаксис PowerShell, класифікує ризик і вимагає підтвердження для операцій високого ризику або невизначених дій.
+> Generated commands are untrusted input. Review them before execution. AST checks and WhatIf previews are safety guardrails, NOT a security sandbox. TerminalAI parses PowerShell syntax, classifies risk, and requires confirmation for high-risk or unresolved operations.
 
----
+## Requirements
 
-## 📑 Зміст
+TerminalAI installs as four independent products, each with its own requirements. Shared across all of them: **OS:** Windows 10 (20H2+) or Windows 11; installing for the current user needs no special rights, while `-Scope AllUsers` requires Administrator (except for the Ollama product, which installs at the machine level regardless of that flag).
 
-1. [Ключові переваги](#-ключові-переваги)
-2. [Системні вимоги](#-системні-вимоги)
-3. [Швидкий старт та варіанти встановлення](#-швидкий-старт-та-варіанти-встановлення)
-4. [Огляд функціоналу](#-огляд-функціоналу)
-   - [1. Інлайн-генерація за гарячими клавішами (F2 / Ctrl+G)](#1-інлайн-генерація-за-гарячими-клавішами-f2--ctrlg)
-   - [2. Інтерактивна команда `ai` / `??`](#2-інтерактивна-команда-ai---)
-   - [3. Автоматичне виправлення помилок (`ai-fix`)](#3-автоматичне-виправлення-помилок-ai-fix)
-   - [4. Генератор виробничих скриптів (`ai-script`)](#4-генератор-виробничих-скриптів-ai-script)
-   - [5. Інтерактивний діалоговий помічник (`ai-chat` / `ai-assistant`)](#5-інтерактивний-діалоговий-помічник-ai-chat--ai-assistant)
-   - [6. Автономний агентний режим Claude Code (`ai-agent`)](#6-автономний-агентний-режим-claude-code-ai-agent)
-   - [7. Скомпільований допоміжний модуль .NET 10 (`aif` / `ai-fast`)](#7-скомпільований-допоміжний-модуль-net-10-aif--ai-fast)
-   - [8. Комплексна системна діагностика (`ai-doctor`)](#8-комплексна-системна-діагностика-ai-doctor)
-   - [9. Порівняння ролей: `ai` vs `aif` vs `ai-chat` vs `ai-agent`](#9-порівняння-ролей-ai-vs-aif-vs-ai-chat-vs-ai-agent)
-   - [10. Інтеграція у Windows Terminal (Extensions & Split-Pane)](#10-інтеграція-у-windows-terminal-extensions--split-pane)
-5. [Архітектура безпеки: AST Engine, Security Gate та Санітизація](#-архітектура-безпеки-ast-engine-security-gate-та-санітизація)
-6. [Керування конфігурацією, шрифтами та мовою](#-керування-конфігурацією-шрифтами-та-мовою)
-7. [Як прискорити роботу моделей (Рекомендації)](#-як-прискорити-роботу-моделей-рекомендації)
-8. [Архітектура: Робота з Ollama через HTTP vs CLI vs In-Process](#-архітектура-робота-з-ollama-через-http-vs-cli-vs-in-process)
-9. [Архітектура проєкту](#-архітектура-проєкту)
-10. [Діагностика та усунення несправностей](#-діагностика-та-усунення-несправностей)
-11. [Деінсталяція](#-деінсталяція)
-12. [Статус ліцензії](#-статус-ліцензії)
-
----
-
-## 🌟 Ключові переваги
-
-- **🔒 Локально за замовчуванням при налаштуванні з локальною кінцевою точкою Ollama:** Не потребує хмарного API-ключа для основних команд; фактична приватність залежить від значення `OllamaUrl` та налаштувань зовнішнього Claude Code CLI.
-- **⚡ Інлайн-автодоповнення з живим таймером:** Натисніть **`F2`** або **`Ctrl+G`** — рядок із коментарем миттєво перетворюється на анімований спінер із відліком секунд (`# [AI ⠋ 2s] ...`), а потім на готову команду.
-- **🌐 Повна підтримка будь-яких мовних розкладок:** Обробники клавіш оптимізовані під українську та англійську розкладки (`Ctrl+G` / `Ctrl+п`, `Ctrl+Alt+A`).
-- **🔤 Бездоганний UTF-8:** Більше жодних спотворень кирилиці або знаків запитання `??????` у консолі.
-- **🎯 Керовані параметри генерації:** Температура та контекст передаються через HTTP-запит, а AST-перевірка зменшує ризик синтаксичних помилок і небезпечного виконання.
-- **🧩 Розширення Windows Terminal:** Інтеграція через JSON Fragment Extension без обов'язкової зміни `settings.json`.
-
----
-
-## 💻 Системні вимоги
-
-TerminalAI встановлюється як чотири окремі продукти, і кожен має свої вимоги. Спільне для всіх: **ОС:** Windows 10 (20H2+) або Windows 11; встановлення для поточного користувача не потребує прав адміністратора, а `-Scope AllUsers` вимагає Run as Administrator (крім продукту Ollama, який ставиться на рівні системи незалежно від цього прапорця).
-
-| Продукт | Оболонка | Додаткові вимоги |
+| Product | Shell | Additional requirements |
 | :--- | :--- | :--- |
-| **Core** — модуль PowerShell (`ai`, `ai-fix`, `ai-script`, `ai-chat`, `ai-doctor`) | PowerShell 7+ (pwsh) — *рекомендовано*, або Windows PowerShell 5.1 | — |
-| **Ollama** — виявлення/встановлення Ollama, аналіз обладнання, завантаження моделі | будь-яка з вищезгаданих | Інтернет для першого завантаження (через winget або офіційний інсталятор); кілька ГБ вільного місця під модель; GPU корисний, але не обов'язковий |
-| **Aot** — скомпільований допоміжний модуль .NET 10 (`aif` / `ai-fast`) | лише PowerShell 7+ | сумісне середовище .NET 10; на Windows PowerShell 5.1 продукт автоматично пропускається, бо .NET Framework 4.8 не завантажує збірку .NET 10 |
-| **WindowsTerminal** — Fragment Extension, дії команд, спліт-панель | будь-яка з вищезгаданих | встановлений [Windows Terminal](https://aka.ms/terminal) 1.18+ |
+| **Core** — the PowerShell module (`ai`, `ai-fix`, `ai-script`, `ai-chat`, `ai-doctor`) | PowerShell 7+ (pwsh) recommended, or Windows PowerShell 5.1 | — |
+| **Ollama** — detects/installs Ollama, checks hardware, pulls a model | either of the above | Internet access for the first download (via winget or the official installer); a few GB of free disk space per model; a GPU helps but is not required |
+| **Aot** — compiled .NET 10 helper (`aif` / `ai-fast`) | PowerShell 7+ only | a compatible .NET 10 runtime; automatically skipped on Windows PowerShell 5.1, since .NET Framework 4.8 cannot load a .NET 10 assembly |
+| **WindowsTerminal** — fragment extension, command-palette actions, split pane | either of the above | [Windows Terminal](https://aka.ms/terminal) 1.18+ installed |
 
-- **Рекомендована модель Ollama:** `qwen2.5-coder:7b` (або `qwen2.5-coder:3b` для слабших GPU)
-- **Для `ai-agent` (необов'язково, інсталятор його не ставить):** окремо встановлений Claude Code CLI
+- Recommended Ollama model: `qwen2.5-coder:7b` (or `qwen2.5-coder:3b` on weaker GPUs)
+- Optional, not installed by this installer: a separately installed Claude Code CLI for `ai-agent`
 
----
+## 📦 Quick Start & Installation Options
 
-## 📦 Швидкий старт та варіанти встановлення
+### 1. Primary: Built GitHub Release (Recommended)
 
-### 1. Основний спосіб: Зібраний реліз GitHub (Рекомендовано)
+Download the pre-built versioned release archive:
 
-Рекомендований спосіб встановлення — використання готового релізного архіву:
-
-- **Завантажити:** [**TerminalAI-v0.1.0-preview1-win-x64.zip**](https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/releases/download/v0.1.0-preview1/TerminalAI-v0.1.0-preview1-win-x64.zip)
-- **Сторінка релізу:** [GitHub Releases v0.1.0-preview1](https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/releases/tag/v0.1.0-preview1)
+- **Download:** [**TerminalAI-v0.1.0-preview1-win-x64.zip**](https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/releases/download/v0.1.0-preview1/TerminalAI-v0.1.0-preview1-win-x64.zip)
+- **Release Page:** [GitHub Releases v0.1.0-preview1](https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/releases/tag/v0.1.0-preview1)
 
 > [!IMPORTANT]
-> Use the assets listed under Releases to install TerminalAI. GitHub’s automatically generated Source code archives are not installers.  
-> *(Для встановлення TerminalAI використовуйте активи, перелічені в розділі Releases. Автоматично створені GitHub архіви Source code не є інсталяторами.)*
+> Use the assets listed under Releases to install TerminalAI. GitHub’s automatically generated Source code archives are not installers.
 
-#### Кроки встановлення:
-1. Завантажте `TerminalAI-v0.1.0-preview1-win-x64.zip` за посиланням вище та розпакуйте його вміст у локальну папку.
-2. Відкрийте PowerShell (`pwsh` або `powershell.exe`) у розпакованому каталозі та запустіть інсталятор:
+#### Installation Steps:
+1. Download `TerminalAI-v0.1.0-preview1-win-x64.zip` from the release link above and extract it to a local folder.
+2. Open PowerShell (`pwsh` or `powershell.exe`) in the extracted directory and run the installer:
    ```powershell
    pwsh -ExecutionPolicy Bypass -File .\Install-TerminalAi.ps1
    ```
-   *(Для Windows PowerShell 5.1 виконайте `powershell.exe -ExecutionPolicy Bypass -File .\Install-TerminalAi.ps1`)*
-3. За замовчуванням інсталятор ставить усі чотири продукти автоматично:
-   - Перевірить з'єднання з локальною Ollama (`http://localhost:11434`) та виявить активні моделі.
-   - Зареєструє модуль `TerminalAI` у системному каталозі `$env:PSModulePath`.
-   - Додасть маркований блок автоімпорту до `$PROFILE` і збереже файл у UTF-8 з BOM.
-   - Зареєструє **Fragment Extension** у каталозі Windows Terminal (`%LOCALAPPDATA%\Microsoft\Windows Terminal\Fragments\TerminalAI`).
+   *(For Windows PowerShell 5.1, run `powershell.exe -ExecutionPolicy Bypass -File .\Install-TerminalAi.ps1`)*
+3. By default, the installer deploys all four products automatically:
+   - Verifies connectivity with local Ollama (`http://localhost:11434`) and detects installed models.
+   - Registers the `TerminalAI` module in `$env:PSModulePath`.
+   - Adds a marked auto-import block to `$PROFILE` (saved in UTF-8 with BOM).
+   - Deploys the **Fragment Extension** to Windows Terminal (`%LOCALAPPDATA%\Microsoft\Windows Terminal\Fragments\TerminalAI`).
 
-   Потрібен лише один продукт (наприклад, тільки модуль PowerShell без Ollama чи Windows Terminal)? Використайте `-Products`, як показано нижче.
-4. Перезавантажте сесію терміналу або виконайте:
+   Need only a specific product? Use the `-Products` parameter described below.
+4. Reload your terminal profile or run:
    ```powershell
    . $PROFILE
    ```
 
 ---
 
-### 2. Майбутні канали дистрибуції (В процесі модерації)
+### 2. Upcoming Package Channels (Submission in Progress)
 
 > [!NOTE]
-> Наведені нижче канали пакетного встановлення наразі проходять процес публікації та модерації. Вони ще не доступні для безпосереднього завантаження.
+> The following channels are currently undergoing submission and review. They are not yet live for direct installation.
 
-- **WinGet (Windows Package Manager — Очікується)**:
+- **WinGet (Windows Package Manager — Upcoming)**:
   ```powershell
-  # Очікується - маніфест подано до microsoft/winget-pkgs:
+  # Upcoming - manifest submitted to microsoft/winget-pkgs:
   # winget install TiredRebel.TerminalAI
   ```
-  *Маніфест пакета сформовано та передано на модерацію в офіційний репозиторій спільноти Windows Package Manager.*
+  *The WinGet manifest has been prepared and submitted for inclusion in the Windows Package Manager community repository.*
 
-- **PowerShell Gallery (Очікується)**:
+- **PowerShell Gallery (Upcoming)**:
   ```powershell
-  # Очікується - проходить перевірку перед публікацією:
+  # Upcoming - undergoing gallery publishing verification:
   # Install-Module -Name TerminalAI -Scope CurrentUser
   ```
-  *Пакет підготовлено до публікації в каталозі PowerShell Gallery.*
+  *PowerShell Gallery packaging is prepared and pending release publication.*
 
 ---
 
-### 3. Альтернативні та портативні варіанти
+### 3. Alternative & Portable Options
 
-- **Варіант А: Одноразовий запуск без встановлення (Portable Bootstrapper)**:
-  Для ознайомлення з TerminalAI у тимчасовій сесії пам'яті без внесення змін до профілю `$PROFILE` чи системних каталогів:
+- **Option A: Portable Bootstrapper (Temporary Session)**:
+  For evaluating TerminalAI in a temporary, memory-only session without modifying system profiles or permanent module paths:
   ```powershell
   irm https://raw.githubusercontent.com/TiredRebel/Windows-Terminal-AI-Plugin/main/bootstrap.ps1 | iex
   ```
-  *Завантажує модуль у пам'ять поточної сесії, перевіряє Ollama та модель, налаштовує гарячу клавішу `F2` лише для активної сесії без постійних змін у системі.*  
-  Також доступний автономний запуск у 1 клік через подвійний клік на **`TerminalAI-Portable.cmd`** або нативний бінарник **`terminalai.exe`**.
+  *Loads the module into the current session memory, checks Ollama and active model, registers the `F2` hotkey, and is immediately ready to use for the active session without permanent profile changes.*
 
-- **Варіант Б: Встановлення з вихідного коду Git (Локальний інсталятор)**:
-  Клонуйте репозиторій та запустіть локальний інсталятор:
+  Standalone 1-click execution is also available via **`TerminalAI-Portable.cmd`** or the native executable **`terminalai.exe`**.
+
+- **Option B: Installation from Git Source Repository**:
+  Clone the repository and run the local installer:
   ```powershell
   git clone https://github.com/TiredRebel/Windows-Terminal-AI-Plugin.git
   cd Windows-Terminal-AI-Plugin
   pwsh -ExecutionPolicy Bypass -File .\Install-TerminalAi.ps1
   ```
 
-### Параметри інсталятора
+### Installer options
 
-| Параметр | Призначення |
-| :--- | :--- |
-| `-Products <Core,Ollama,Aot,WindowsTerminal,All>` | Які продукти встановити (можна перелічити кілька через кому). Типово `All` — рівно та поведінка, яку мали попередні версії інсталятора. |
-| `-Scope CurrentUser\|AllUsers` | Встановлення для поточного (типово) або всіх користувачів; `AllUsers` потребує прав адміністратора. |
-| `-Language en\|uk` | Мова інсталятора та інтерфейсу TerminalAI. |
-| `-PreferredModel <name>` | Явно вибрати модель Ollama. |
-| `-SkipOllamaCheck` | Пропустити продукт Ollama (сумісний скорочений запис замість `-Products` без `Ollama`). |
-| `-SkipTerminalConfig` | Пропустити продукт WindowsTerminal (сумісний скорочений запис замість `-Products` без `WindowsTerminal`). |
-| `-AutoConfirm` | Використовувати типові відповіді там, де це підтримується. |
-| `-ModifySettingsJson` | Додатково змінити legacy-список `actions` у `settings.json` після створення резервної копії. |
-| `-CustomProfilePath`, `-CustomModulePath`, `-CustomFragmentPath` | Перевизначити цільові шляхи для контрольованого розгортання або тестів. |
+| Parameter | Meaning |
+| --- | --- |
+| `-Products <Core,Ollama,Aot,WindowsTerminal,All>` | Which products to install (comma-separated for more than one). Defaults to `All` — exactly what earlier installer versions always did. |
+| `-Scope CurrentUser|AllUsers` | Install for the current user (default) or all users. `AllUsers` requires Administrator rights. |
+| `-Language en|uk` | Set the initial requested language for model-generated prose responses. The installer and application interfaces remain English-only. |
+| `-PreferredModel <name>` | Select an Ollama model without using the hardware recommendation. |
+| `-SkipOllamaCheck` | Drop the Ollama product (a compatibility shortcut for `-Products` without `Ollama`). |
+| `-SkipTerminalConfig` | Drop the WindowsTerminal product (a compatibility shortcut for `-Products` without `WindowsTerminal`). |
+| `-AutoConfirm` | Accept installer defaults where supported. |
+| `-ModifySettingsJson` | Also update legacy Windows Terminal `settings.json` actions after creating a backup. |
+| `-CustomProfilePath`, `-CustomModulePath`, `-CustomFragmentPath` | Override destinations, primarily for controlled deployments and tests. |
 
-### Встановлення окремих продуктів
+### Installing individual products
 
-Кожен продукт має власний скрипт у `installers\`, тож його можна (пере)встановити пізніше без запуску всього бандла:
+Each product also ships as its own script under `installers\`, so it can be (re)installed later without running the whole bundle:
 
 ```powershell
-# Тільки модуль PowerShell + Ollama, без Windows Terminal і без C#-модуля:
+# Just the PowerShell module + Ollama, no Windows Terminal and no C# module:
 pwsh -ExecutionPolicy Bypass -File .\Install-TerminalAi.ps1 -Products Core,Ollama
 
-# Те саме, але окремими скриптами:
+# The same, via the standalone scripts:
 pwsh -ExecutionPolicy Bypass -File .\installers\Install-Core.ps1
 pwsh -ExecutionPolicy Bypass -File .\installers\Install-Ollama.ps1
 
-# Додати скомпільований допоміжний модуль .NET 10 (aif) чи інтеграцію з Windows Terminal пізніше,
-# коли Core вже встановлено:
+# Add the compiled .NET 10 helper (aif) or the Windows Terminal integration later,
+# once Core is already installed:
 pwsh -ExecutionPolicy Bypass -File .\installers\Install-Aot.ps1
 pwsh -ExecutionPolicy Bypass -File .\installers\Install-WindowsTerminal.ps1
 ```
 
-Продукти **Aot** і **WindowsTerminal** припускають, що **Core** вже зареєстровано: без нього модуль `TerminalAI` не завантажить допоміжний C#-модуль, а дія спліт-панелі не знайде скрипт асистента за очікуваним шляхом.
+The **Aot** and **WindowsTerminal** products assume **Core** is already registered: without it, the `TerminalAI` module has no compiled helper to load, and the split-pane action has no assistant script to point at.
 
----
+## Command map
 
-## 🛠️ Огляд функціоналу
+| Command | Purpose |
+| --- | --- |
+| `ai` / `??` | Generate one command with the PowerShell implementation. |
+| `aif` / `ai-fast` | Generate one command with the compiled .NET 10 helper on PowerShell 7+. |
+| `ai-fix` / `fix-error` | Diagnose `$global:Error[0]` and propose a corrected command. |
+| `ai-script` | Generate a multi-line PowerShell script and optionally save it. |
+| `ai-chat` / `ai-assistant` | Start the interactive assistant with bounded session history. |
+| `ai-agent` | Launch Claude Code against the configured Ollama endpoint. |
+| `ai-doctor` | Check the installed module, profile, terminal fragment, Ollama, model, safety helpers, and optional agent mode. |
+| `ai-help` | Show built-in help. |
 
-### 1. Інлайн-генерація за гарячими клавішами (`F2` / `Ctrl+G`)
-
-Найшвидший спосіб отримати команду прямо в рядку введення без зайвих кліків:
-
-1. Напишіть у консолі короткий опис завдання з префіксом `#`:
-   ```powershell
-   # показати 5 процесів з найбільшим споживанням процесора
-   ```
-2. Натисніть **`F2`** (або **`Ctrl+G`** / **`Ctrl+Alt+A`**).
-3. Ви побачите анімований живий індикатор виконання:
-   ```powershell
-   # [AI ⠋ 2s] показати 5 процесів з найбільшим...
-   ```
-4. Рядок автоматично заміниться на готовий до виконання код:
-   ```powershell
-   Get-Process | Sort-Object -Property TotalProcessorTime -Descending | Select-Object -First 5 Name, Id, TotalProcessorTime
-   ```
-5. За потреби відредагуйте параметри або натисніть **Enter** для запуску!
-
-> [!TIP]
-> Якщо натиснути `F2` або `Ctrl+G` на порожньому рядку, плагін автоматично вставить шаблон `# [AI Запит]: `, запрошуючи до введення.
-
----
-
-### 2. Інтерактивна команда `ai` / `??`
-
-Для складних запитів, попереднього перегляду, копіювання чи отримання пояснень:
+### One-shot command generation
 
 ```powershell
-ai знайти всі файли більше 100MB змінені за останній тиждень
-```
-*(або скорочений синтаксис: `?? знайти всі файли...`)*
-
-#### Результат у консолі:
-```text
-  ✦ Звертаюсь до Ollama (qwen2.5-coder:7b)...
-
-    ✦ AI Команда • qwen2.5-coder:7b • [ReadOnly] [Low Risk] [WhatIf: Supported]
-    ╭────────────────────────────────────────────────────────────────────────────╮
-    │                                                                            │
-    │  Get-ChildItem -Recurse -File |                                            │
-    │    Where-Object { $_.Length -gt 100MB -and $_.LastWriteTime -gt (Get-Date).AddDays(-7) }│
-    │                                                                            │
-    ╰────────────────────────────────────────────────────────────────────────────╯
-    🎯 Targets: (pipeline input)
-
-    [Enter] Виконати          [C] Скопіювати        [I] Вставити в рядок
-    [S]     Аліаси / Командлети [W] Зберегти у файл   [X] Пояснити код
-    [A]     Текстова відповідь [Esc] Скасувати
+ai "find files larger than 100 MB"
+ai "show listening TCP ports" -Execute
+ai "get the default gateway" -Copy
+ai "find processes using more than 1 GB" -Alias
+ai "explain PowerShell remoting" -Ask
+ai "stop the Spooler service" -Preview
+ai "explain this pipeline" -Explain
+ai "show services" -Model qwen2.5-coder:7b
 ```
 
-#### Керування в інтерактивному меню:
-- **`Enter`** — миттєво виконати згенерований код (безпека контролюється AST Security Gate).
-- **`C`** — скопіювати команду у буфер обміну Windows. Перед копіюванням самостійно перевірте, чи немає в ній секретів.
-- **`I`** — чисто вставити команду у наступний рядок запрошення `PS>` для ручного редагування.
-- **`S`** — перемкнути вигляд команди між лаконічними аліасами (`gci`, `select`, `?`) та канонічними командлетами (`Get-ChildItem`, `Select-Object`, `Where-Object`).
-- **`W`** — зберегти згенерований код або скрипт у файл із кольоровим попереднім переглядом Unified Diff та захистом від випадкового перезапису.
-- **`X`** — згенерувати покрокове технічне пояснення синтаксису, параметрів та безпеки команди.
-- **`A`** — перейти в режим текстової консультації (якщо ви задали концептуальне запитання, а не прохання написати код).
-- **`Esc`** — скасувати дію та повернутися до командного рядка.
+`Invoke-AiCommand` accepts `-Execute` (`-x`, `-y`), `-Copy` (`-c`), `-Alias` (`-a`, `-Short`, `-UseAliases`), `-Explain`, `-Ask` (`-chat`, `-question`), `-Preview` (`-w`, `-WhatIf`), and `-Model`.
 
-#### Прапорці швидкого виконання:
-- `-x` або `-Execute` — виконати команду одразу без виклику меню (з підтвердженням `[y/N]` для команд високого ризику):
-  ```powershell
-  ai перезапустити службу Spooler -x
-  ```
-- `-c` або `-Copy` — згенерувати та відразу скопіювати у буфер обміну:
-  ```powershell
-  ai вивести IP адресу шлюзу -c
-  ```
-- `-a` або `-Alias` — згенерувати команду відразу у компактному форматі з короткими аліасами PowerShell:
-  ```powershell
-  ai знайти процеси з споживанням RAM понад 1GB -a
-  ```
-- `ai` *(без аргументів)* — викликає стильну картку швидкої довідки з прикладами.
+Without a prompt, `ai` shows its quick-reference card. It also recognizes management subcommands such as `help`, `status`, `models`, `model <name>`, `lang <en|uk>`, `font`, `fonts`, `alias`, and `config`; `lang` changes the requested language for model-generated prose, not the application UI.
 
----
+### Inline generation
 
-### 3. Автоматичне виправлення помилок (`ai-fix`)
-
-Якщо попередня команда в терміналі впала з помилкою:
+At a PSReadLine prompt, type a comment describing the command, then press `F2`, `Ctrl+G`, or the configured `Ctrl+Alt+A` chord:
 
 ```powershell
-Get-ChildItem -Path C:\Logs -Filter *.log -Recurse -ExcludeOld
-# Помилка: A parameter cannot be found that matches parameter name 'ExcludeOld'.
+# show the five processes using the most CPU
+```
 
+TerminalAI replaces the input with generated PowerShell code. Review the result before pressing Enter. Shortcut availability depends on PSReadLine and the active console host.
+
+### Error diagnosis
+
+After a failed PowerShell command:
+
+```powershell
 ai-fix
+ai-fix -Model qwen2.5-coder:7b
 ```
 
-**TerminalAI** автоматично зчитає текст останньої команди з історії та системний об'єкт винятку `$Error[0]`, пояснить причину помилки зрозумілою мовою та запропонує виправлений варіант із меню дій.
+The diagnostic request includes the latest PowerShell error message, failed input line, and script location when available. Treat those values as data that will be sent to the configured Ollama endpoint.
 
----
-
-### 4. Генератор виробничих скриптів (`ai-script`)
-
-Для генерації повноцінних багаторядкових сценаріїв автоматизації з типізованими параметрами `[CmdletBinding()]`, структурованою обробкою винятків `try { ... } catch { ... }` та інформативним логуванням:
+### Script generation
 
 ```powershell
-ai-script "Архівація папки C:\Data у ZIP з датою в назві та видалення вихідних файлів"
+ai-script "create a disk-space report with error handling"
+ai-script "create a disk-space report" -OutputPath .\Get-DiskReport.ps1 -Edit
 ```
 
-#### Ключові можливості та безпека збереження:
-- 🛡️ **Збереження через `Save-AiScriptFile`:** Нормалізація шляху, перевірка наявного файлу та автоматичне створення відсутніх каталогів. Шлях не обмежується робочим каталогом, тому перевіряйте його перед записом.
-- 🔍 **Інтерактивний перегляд змін (Unified Diff Preview):** Якщо цільовий файл уже існує, плагін не перезаписує його сліпо, а виводить кольоровий рядок-за-рядком дифф (`+` додано зеленим, `-` видалено червоним) та запитує підтвердження `[y/N]`.
-- 🔤 **UTF-8 з BOM:** Згенеровані сценарії зберігаються з UTF-8 BOM для сумісності з PowerShell 7+ і Windows PowerShell 5.1; коректне відображення також залежить від шрифту й консольного хоста.
-- 💾 **Гаряча клавіша `[W]` в інтерактивному меню:** Натисніть **`W`** у меню `ai` або `aif`, щоб зберегти запропонований код у файл без повторного виклику команди.
+`New-AiScript` accepts `-Description` (position 0), `-OutputPath`, `-Edit`, and `-Model`. Existing files are compared and require confirmation before overwrite; non-interactive overwrite is blocked. New files are written as UTF-8 with BOM. `ai-script` does not expose a `-Force` parameter.
 
-#### Параметри `ai-script`:
-| Параметр | Аліаси | Опис |
-| :--- | :--- | :--- |
-| `-Description <string[]>` | *(Позиційний 0)* | Текстовий опис завдання для генерації скрипта |
-| `-OutputPath <шлях>` | — | Шлях до вихідного файлу `.ps1` |
-| `-Edit` | — | Відкрити збережений скрипт у VS Code або Блокноті після запису |
-| `-Model <name>` | — | Модель Ollama для цього виклику |
-
-```powershell
-# Приклад: генерація сценарію моніторингу дисків з прямим збереженням
-ai-script "Моніторинг вільного місця на всіх логічних дисках та надсилання алерту" -OutputPath ./Monitor-Disks.ps1 -Edit
-```
-
----
-
-### 5. Інтерактивний діалоговий помічник (`ai-chat` / `ai-assistant`)
-
-Для складних технічних консультацій, покрокового проектування архітектури, аналізу коду або безперервного діалогу запустіть повноцінний REPL-сеанс помічника:
+## Interactive assistant
 
 ```powershell
 ai-chat
-# або з вибором конкретної моделі:
 ai-chat -Model qwen2.5-coder:7b
 ```
 
-#### Ключові можливості помічника:
-- 🧠 **FIFO-кешування контексту:** Історія діалогу оптимізована за принципом FIFO (First-In, First-Out) з обмеженням кількості повідомлень (`AiChatMaxHistory`), що запобігає переповненню контекстного вікна моделі та падінню швидкості генерації.
-- 🔒 **Автоматичний захист секретів:** Будь-які чутливі маркери (API-токени, Bearer-ключі, паролі) автоматично маскуються перед збереженням в історію діалогу або копіюванням у буфер обміну.
-- ⚡ **Інтерактивне виконання (`/run`):** Безпечний запуск згенерованого коду прямо з діалогу з контролем через AST Security Gate.
-- ⌨️ **Tab-автодоповнення:** Повна підтримка Tab для всіх слеш-команд та встановлених локальних моделей Ollama.
+The assistant sends conversation history to Ollama's `/api/chat` endpoint. It sanitizes recognized secret patterns before storing messages and keeps a bounded FIFO history. Redaction is pattern-based and cannot guarantee detection of every secret.
 
-#### Повний довідник слеш-команд `ai-chat` (13 команд):
+| Slash command | Action |
+| --- | --- |
+| `/help`, `/?` | Show assistant help. |
+| `/models` | List models reported by Ollama. |
+| `/model <name>` | Change the model for this session. |
+| `/lang <en|uk>` | Change the requested language for model-generated chat replies; `permanent` also persists it in the Windows user environment. |
+| `/context` | Show history usage. |
+| `/reset` | Clear conversation history. |
+| `/inspect [clear]` | Show diagnostic context; `clear` removes the recorded last error. |
+| `/run` | Send the latest code block through the PowerShell execution gate. |
+| `/read <path>` | Add a local text file to the conversation context, subject to size checks. |
+| `/copy` | Copy the latest code block; inspect it for secrets first. |
+| `/save [path.ps1]` | Save the latest code block using overwrite protection. |
+| `/clear` | Clear the screen without clearing history. |
+| `/exit` | End the assistant session. |
 
-| Команда | Аргументи | Опис |
-| :--- | :--- | :--- |
-| `/help`, `/?` | — | Показати детальну інтерактивну картку довідки з переліком усіх команд |
-| `/run` | — | Безпечно виконати останній згенерований блок коду з перевіркою AST Gate та підтвердженням |
-| `/read <path>` | `<шлях_до_файлу>` | Зчитати локальний файл, перевірити його розмір та додати його вміст до контексту бесіди |
-| `/models` | — | Переглянути список локально завантажених моделей Ollama, їхні розміри та параметри |
-| `/model <name>` | `<назва_моделі>` | Перемкнути активну модель «на льоту» (підтримує Tab-автодоповнення) |
-| `/lang <uk\|en>` | `[permanent]` | Змінити мову сесії; прапорець `permanent` зберігає мову в `config.json` та системному середовищі |
-| `/context` | — | Показати статус пам'яті: кількість збережених реплік, зайняті токени та ліміт контексту |
-| `/inspect` | `[clear]` | Провести діагностику консолі (версія PS, ОС, модель, остання системна помилка); `clear` скидає помилку |
-| `/copy` | — | Скопіювати останній згенерований блок коду в буфер обміну Windows; перед копіюванням перевірте його на секрети |
-| `/save` | `[шлях.ps1]` | Зберегти останній код у файл `.ps1` через безпечний механізм з Unified Diff та UTF-8 BOM |
-| `/reset` | — | Повністю очистити історію діалогу та скинути контекст помічника |
-| `/clear` | — | Очистити екран термінала зі збереженням пам'яті та контексту бесіди |
-| `/exit`, `/quit` | — | Завершити сеанс асистента та повернутися до стандартної консолі PowerShell |
+## Optional agent mode
 
----
-
-### 6. Автономний агентний режим Claude Code (`ai-agent`)
-
-TerminalAI надає команду `ai-agent` (`Invoke-AiAgent`), яка запускає **Claude Code CLI** з `ANTHROPIC_BASE_URL`, спрямованим на налаштований endpoint Ollama. За замовчуванням використовується локальний сервер; CLI очікує Anthropic-сумісний Messages API (`/v1/messages`):
+`ai-agent` starts an installed Claude Code executable with `ANTHROPIC_BASE_URL` pointed at the configured Ollama URL and uses a separate data directory, `~/.terminal-ai/claude` by default.
 
 ```powershell
-# Перевірити готовність системи та оточення до запуску агента:
 ai-agent -CheckOnly
-
-# Запустити агента для виконання автономного інженерного завдання:
-ai-agent "проаналізуй git diff, знайди потенційні баги та запусти тести"
-
-# Відновити попередню незавершену сесію у поточному каталозі:
+ai-agent "inspect the current git diff and run relevant tests"
+ai-agent -WorkingDir C:\src\project -Model qwen2.5-coder:7b
 ai-agent -Resume
-
-# Одноразовий неінтерактивний вивід у stdout (для скриптів та конвеєрів):
-ai-agent -Print "поясни архітектуру проекту"
+ai-agent -Print "summarize this project"
 ```
 
-#### Параметри `ai-agent`:
-| Параметр | Аліаси | Тип | Опис |
-| :--- | :--- | :---: | :--- |
-| `-Prompt <string[]>` | *(Позиційний 0)* | `string[]` | Завдання або інструкція для автономного виконання агентом |
-| `-WorkingDir <path>` | — | `string` | Робочий каталог агентної сесії |
-| `-Resume` | — | `switch` | Відновити попередню сесію Claude Code у поточному робочому каталозі |
-| `-Print` | — | `switch` | Неінтерактивний режим: агент виконує запит, друкує результат у stdout і завершує роботу |
-| `-CheckOnly` | — | `switch` | Діагностика Claude Code CLI, endpoint Ollama, моделі та робочого каталогу без запуску агента |
-| `-Model <name>` | — | `string` | Перевизначити модель для агентної сесії (за замовчуванням береться з `config.json`) |
-| `-ConfirmTrust` | `-Force`, `-y`, `-Yes` | `switch` | Пропустити запит TerminalAI про довіру до каталогу; власні дозволи Claude Code залишаються активними |
+`Invoke-AiAgent` accepts `-Prompt`, `-Model`, `-WorkingDir`, `-Resume`, `-Print`, `-ConfirmTrust` (aliases: `-Force`, `-y`, `-Yes`), and `-CheckOnly`. `-ConfirmTrust` skips TerminalAI's launch prompt; Claude Code retains its own permission model.
 
-#### Межі безпеки та приватності агентного режиму:
-- 🔒 **Ollama endpoint:** TerminalAI задає `ANTHROPIC_BASE_URL` зі значення `OllamaUrl`; за замовчуванням це локальна адреса. Перевірка готовності тестує `/api/tags` і `/api/show`, але не виконує пробний запит до `/v1/messages`.
-- 🛡️ **Ізольована конфігурація:** Усі сесії, налаштування та кеш зберігаються у відокремленому каталозі `~/.terminal-ai/claude`, не зачіпаючи та не пошкоджуючи глобальний профіль `~/.claude`.
-- 🚫 **Оточення дочірнього процесу:** TerminalAI задає Ollama-токен, встановлює `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` і видаляє вибрані сторонні API-ключі. Це зменшує небажаний зовнішній трафік, але не є незалежною гарантією поведінки окремо встановленого Claude Code CLI.
-- ⚠️ **Повноваження робочого каталогу:** Агент може читати й змінювати файли та запускати інструменти відповідно до власної моделі дозволів Claude Code. Перевіряйте каталог і запит перед підтвердженням запуску.
-- 🩺 **Інтегрована діагностика:** Стан агентного середовища автоматично валідується утилітою `ai-doctor` (перевірка 9).
+TerminalAI also sets `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` and removes selected ambient provider keys in the child process. These settings reduce unintended external traffic but are not an independent guarantee about every behavior of the separately installed Claude Code CLI.
 
----
+## Compiled .NET 10 helper command path
 
-### 7. Скомпільований допоміжний модуль .NET 10 (`aif` / `ai-fast`)
-
-Для PowerShell 7+ TerminalAI містить керований бінарний модуль .NET 10 (**TerminalAI.Aot**), який надає альтернативну реалізацію генерації, AST-аналізу, шлюзу виконання, буфера обміну та збереження файлів. Проєкт націлений на `net10.0`, збирається як стандартна керована DLL і не містить конфігурації компіляції NativeAOT.
-
-Він доступний через коротку команду **`aif`** (або `Invoke-AiCommandFast`):
+On PowerShell 7+, the main module dynamically loads `TerminalAI.Aot.dll` (a managed .NET 10 C# binary module) and exports `Invoke-AiCommandFast` as `aif` and `ai-fast`.
 
 ```powershell
-aif знайти великі логи в папці C:\Logs та заархівувати
+aif "find large log files"
+aif "restart the Spooler service" -Execute
+aif "how do PowerShell pipelines stream objects?" -Ask
+aif agent "inspect git status"
 ```
 
-#### Архітектурні особливості керованого C#-модуля .NET 10:
-- ⚡ **Скомпільована реалізація:** Локальна обробка виконується у C#; загальний час відповіді все одно визначається моделлю, Ollama та обладнанням.
-- 🛡️ **C# AST-аналізатор (`AotCommandAstAnalyzer`):** Використовує `System.Management.Automation.Language.Parser` для категоризації команд, операцій видалення, змін конфігурації, динамічних викликів і невизначених цілей.
-- 🚪 **Автономний Execution Gate (`AotExecutionGate`):** C#-реалізація перевірки ризиків, безпечного перегляду `WhatIf` та інтерактивного підтвердження, захищена від збоїв PowerShell-скриптів.
-- 📋 **Буфер обміну Windows (`AotClipboard`):** Робота з Win32 API та санітизація відомих шаблонів чутливих даних (`AotSecretSanitizer`).
-- 📝 **Безпечний запис сценаріїв (`AotScriptSafety`):** Пряме створення файлів з кодуванням UTF-8 BOM та вбудованим рушієм кольорового розрахунку відмінностей (`AotDiffRenderer`).
+The C# project targets `net10.0`. Despite the historical `AOT` directory and assembly name, the project currently builds a standard managed DLL with `dotnet build`; it does not define a NativeAOT publish configuration. See the [C# component guide](AOT/README.md).
 
-#### Повний перелік параметрів `aif` / `Invoke-AiCommandFast`:
-| Параметр | Аліаси | Опис |
-| :--- | :--- | :--- |
-| `-Prompt <string>` | *(Позиційний 0)* | Текстовий запит для генерації команди |
-| `-Execute` | `-x`, `-y` | Негайне виконання команди після генерації через `AotExecutionGate` |
-| `-Copy` | `-c` | Скопіювати згенеровану команду в буфер обміну з санітизацією секретів |
-| `-Alias` | `-a` | Згенерувати команду з короткими аліасами (`gci`, `select`, `?`) |
-| `-Explain` | — | Вивести структуроване пояснення синтаксису команди |
-| `-Ask` | `-chat`, `-question` | Отримати текстову консультаційну відповідь замість коду |
-| `-Agent` | `-Autonomous` | Безпечно делегувати завдання автономному агенту `ai-agent` |
-| `-SavePath <шлях>` | `-Save`, `-OutFile` | Зберегти згенерований код у файл через механізм безпеки AOT |
-| `-Force` | `-f` | Перезаписати файл без інтерактивного запиту підтвердження |
-| `-ConfirmInput <str>` | — | Програмна передача підтвердження введення (для автоматизованого тестування) |
+## Safety model
 
-> 💡 Детальна технічна документація, внутрішня архітектура класів C# та результати тестів наведені в окремому документі: [AOT Documentation](AOT/README.md).
-> Українська версія: [AOT Documentation — UK](AOT/README.uk.md).
+Generated commands are untrusted input. Always review them before execution. Both command paths parse generated PowerShell before execution. AST checks and WhatIf previews are safety guardrails, NOT a security sandbox. The analyzers inspect nested commands, aliases, parameters, literal or unresolved targets, dynamic invocation, and splatting. They use nine categories:
 
----
+`ReadOnly`, `SystemChange`, `Deletion`, `NetworkChange`, `ServiceOrProcess`, `Registry`, `DiskOrPartition`, `DynamicOrUnknown`, and `ExternalProgram`.
 
-### 8. Комплексна системна діагностика (`ai-doctor`)
+Risk levels are `Low`, `Medium`, `High`, and `Critical`. Syntax errors are blocked. High, critical, dynamic, and unresolved operations require explicit confirmation. `-Preview` is available only where the involved PowerShell commands support `ShouldProcess`; TerminalAI does not append `-WhatIf` to arbitrary external programs.
 
-Для швидкої діагностики стану системи, виявлення проблем з конфігурацією, зв'язком з Ollama чи розширенням Windows Terminal використовуйте команду:
+Secret sanitization covers recognized API keys, bearer tokens, password-like arguments, and private-key blocks before selected display, history, or clipboard operations. It is a defense-in-depth filter, not a substitute for reviewing generated commands and removing sensitive input.
+
+## Configuration
+
+Configuration is stored in `~/.terminal-ai/config.json`, or under the directory specified by `TERMINAL_AI_CONFIG_DIR`. `TERMINAL_AI_LANG` takes precedence for the requested model-response language. Built-in UI and status/error messages remain English.
 
 ```powershell
-ai-doctor
-# або повне ім'я:
-Test-TerminalAiInstallation
+Get-TerminalAiConfig
+Set-TerminalAiConfig -Model qwen2.5-coder:7b -Temperature 0.2
+Set-TerminalAiConfig -OllamaUrl http://localhost:11434 -TimeoutSeconds 120
+Set-TerminalAiLanguage -Language uk
+Set-TerminalAiLanguage -Language en -Permanent
 ```
 
-`ai-doctor` перевіряє середовище PowerShell, реєстрацію модуля, блок імпорту в профілі, Windows Terminal Fragment, доступність Ollama, наявність активної моделі, AST Security Gate, санітизацію секретів і доступність Claude Code CLI. Вивід залежить від поточного середовища; для програмної обробки використовуйте:
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `OllamaUrl` | `http://localhost:11434` | Ollama base URL. |
+| `Model` | `qwen2.5-coder:7b` | Default generation and chat model. |
+| `Language` | `en` | Requested language for model-generated prose responses (`en` or `uk`); it does not localize application text. |
+| `Font` | `Cascadia Code` | Preferred Windows Terminal font. |
+| `Temperature` | `0.2` | Default sampling temperature where a command does not override it. |
+| `TimeoutSeconds` | `120` | HTTP request timeout. |
+| `HotkeyChord` | `Ctrl+Alt+A` | Configured inline shortcut. |
+| `AutoCopy` | `false` | Copy behavior preference. |
+| `ShowExplanation` | `true` | Explanation display preference. |
+| `UseAliases` | `false` | Prefer short PowerShell aliases. |
+| `AgentModel` | `qwen2.5-coder:7b` | Default model for `ai-agent`. |
+| `ClaudeExecutable` | empty | Optional explicit Claude Code path. |
+| `AgentDataDirectory` | empty | Optional agent configuration directory override. |
+
+## Windows Terminal integration
+
+By default the installer copies `terminalai.json` to a Windows Terminal fragment directory without editing `settings.json`. The fragment defines four profiles and four actions for `ai`, `ai-fix`, `ai-script`, and an assistant split pane. Use `-ModifySettingsJson` only for the legacy action-injection path; the installer backs up the file first.
+
+Font commands read and update Windows Terminal settings:
 
 ```powershell
-Test-TerminalAiInstallation -PassThru
-```
-
-Якщо будь-який компонент не працює (наприклад, Ollama зупинена або модель не завантажена), `ai-doctor` надасть чіткі покрокові рекомендації щодо усунення несправності.
-
----
-
-### 9. Порівняння ролей: `ai` vs `aif` vs `ai-chat` vs `ai-agent`
-
-Плагін чітко розмежовує інструменти під різні завдання та робочі процеси:
-
-| Критерій | `ai` / `??` / `F2` (Інлайн) | `aif` (C#-модуль .NET 10) | `ai-chat` (Інтерактивний REPL) | `ai-agent` (Автономний Агент) |
-| :--- | :--- | :--- | :--- | :--- |
-| **Основне призначення** | Одноразова генерація команди | Генерація зі скомпільованою локальною обробкою | Консультації, проектування, довгі бесіди | Автономна розробка, правка файлів, тести |
-| **Рушій виконання** | PowerShell Script (`TerminalAI.psm1`) | Керована C# DLL (`net10.0`) | PowerShell REPL Session | Claude Code CLI |
-| **Затримка запуску** | Залежить від сесії PowerShell | Менше скриптової обробки; інференс не пришвидшується | Одноразовий запуск REPL | Залежить від запуску Claude Code |
-| **Контекст бесіди** | Без збереження (Single-shot) | Без збереження (Single-shot) | Багатокрокова пам'ять з FIFO-лімітом | Повноцінні сесії розробки (`-Resume`) |
-| **Безпека виконання** | AST Security Execution Gate | Вбудований C# `AotExecutionGate` | Інтерактивна команда `/run` + AST Gate | Вбудований механізм дозволів Claude Code |
-| **Доступ до файлів** | Згенеровані команди можуть працювати з файлами після підтвердження | Збереження через `AotScriptSafety`; виконані команди мають права поточної сесії | Команди `/read`, `/save` і `/run` | Доступ визначається дозволами Claude Code та поточного користувача |
-| **Рекомендовано для** | Щоденної роботи в терміналі | Скриптів, CI/CD та швидких гарячих клавіш| Вивчення PowerShell, написання коду | Комплексного рефакторингу та дебагу |
-
----
-
-### 10. Інтеграція у Windows Terminal (Extensions & Split-Pane)
-
-Завдяки валідованій схемі нативного фрагмента `terminalai.json`, плагін інтегрується безпосередньо в інтерфейс Windows Terminal:
-
-1. **Fragment Extension:** Інсталятор копіює `terminalai.json` до каталогу фрагментів Windows Terminal, не змінюючи `settings.json` за замовчуванням.
-2. **Палітра команд (`Ctrl+Shift+P`):**
-   - Натисніть `Ctrl+Shift+P` та введіть `AI:`:
-     - `AI: Ask Ollama (ai)`
-     - `AI: Fix last error (ai-fix)`
-     - `AI: Generate script (ai-script)`
-     - `AI: Open assistant in split pane`
-3. **Бічна панель асистента (Split-Pane):**
-   Відкриває вертикальну панель (40% ширини вікна) з інтерактивним діалоговим помічником поруч із вашою робочою консоллю.
-
----
-
-## 🛡️ Архітектура безпеки: AST Engine, Security Gate та Санітизація
-
-> [!IMPORTANT]
-> Згенеровані моделлю команди є недовіреним введенням (untrusted input). Завжди ретельно переглядайте їх перед виконанням. Перевірки AST Engine та безпечна симуляція WhatIf є захисними бар'єрами (safety guardrails), а НЕ безпековою пісочницею (security sandbox).
-
-Виконання коду, згенерованого великими мовними моделями, пов'язане з ризиком деструктивних дій або синтаксичних галюцинацій. Прості регулярні вирази (RegEx) неефективні для аналізу PowerShell через підтримку блоків коду, підвиразів `$(...)`, конвеєрів та аліасів.
-
-У **TerminalAI** реалізовано дворівневу архітектуру безпеки на базі офіційного синтаксичного парсера PowerShell (`System.Management.Automation.Language.Parser`):
-
-### 1. 9 функціональних категорій команд:
-Кожна згенерована команда аналізується за деревом AST і відноситься до однієї або кількох категорій:
-1. `ReadOnly` — безпечне зчитування даних (`Get-ChildItem`, `Get-Process`, `Test-Path`).
-2. `SystemChange` — створення або зміна системного стану.
-3. `Deletion` — видалення чи очищення даних.
-4. `NetworkChange` — зміна мережевих налаштувань.
-5. `ServiceOrProcess` — зупинка, перезапуск або зміна служб і процесів.
-6. `Registry` — зміна реєстру Windows.
-7. `DiskOrPartition` — операції з дисками, розділами й томами.
-8. `DynamicOrUnknown` — динамічні виклики, невідомі команди або невизначені цілі.
-9. `ExternalProgram` — запуск зовнішньої програми.
-
-### 2. 4 рівні ризику (Risk Tiers):
-- 🟢 **`Low` (Низький):** Виключно читання та інформаційні запити. Виконуються безпечно за натисканням **`Enter`**.
-- 🟡 **`Medium` (Середній):** Зміни системного стану, невідомі статичні операції або зовнішні програми. Показуються в картці ризику; точна вимога підтвердження залежить від аналізу.
-- 🟠 **`High` (Високий):** Видалення файлів, зупинка системних служб, зміна параметрів середовища. Вимагає обов'язкового явного підтвердження `[y/N]` з переліком виявлених цілей.
-- 🔴 **`Critical` (Критичний):** Операції з дисками або розділами. Вимагає явного підтвердження; синтаксично некоректний код блокується.
-
-### 3. Безпечна симуляція змін (`WhatIf` Preview):
-Плагін аналізує підтримку механізму `SupportsShouldProcess`. Якщо всі команди, що змінюють стан, підтримують `WhatIf`, доступний попередній перегляд. Для довільних сторонніх виконуваних файлів (`.exe`) додавання `-WhatIf` блокується.
-
-### 4. Маскування секретів (Secret Sanitization):
-Функція `Protect-AiSecretData` (PowerShell) та `AotSecretSanitizer` (C#) розпізнають відомі шаблони секретів перед окремими операціями з історією, відображенням або буфером обміну:
-- Токени авторизації: `Bearer eyJ...`
-- API-ключі: `AIza...`, `ghp_...`, `sk-ant-...`
-- Паролі та секретні рядки у параметрах команд: `-Password`, `ConvertTo-SecureString`
-Розпізнані значення замінюються маркерами `[REDACTED]`. Це шаблонний фільтр, який не гарантує виявлення кожного можливого секрету; стандартні PowerShell-команди `ai -Copy` та `/copy` копіюють згенерований блок без додаткової санітизації.
-
----
-
-## ⚙️ Керування конфігурацією, шрифтами та мовою
-
-Файл конфігурації зберігається у: `~/.terminal-ai/config.json`.
-
-| Поле | Типове значення | Призначення |
-| :--- | :--- | :--- |
-| `OllamaUrl` | `http://localhost:11434` | Базова адреса Ollama. |
-| `Model` | `qwen2.5-coder:7b` | Модель для генерації та чату. |
-| `Language` | `en` | Мова інтерфейсу (`en` або `uk`). |
-| `Font` | `Cascadia Code` | Бажаний шрифт Windows Terminal. |
-| `Temperature` | `0.2` | Типова температура для викликів, які не перевизначають її. |
-| `TimeoutSeconds` | `120` | Тайм-аут HTTP-запиту. |
-| `HotkeyChord` | `Ctrl+Alt+A` | Налаштована інлайн-комбінація клавіш. |
-| `AutoCopy` | `false` | Параметр автоматичного копіювання. |
-| `ShowExplanation` | `true` | Параметр відображення пояснення. |
-| `UseAliases` | `false` | Використовувати короткі аліаси PowerShell. |
-| `AgentModel` | `qwen2.5-coder:7b` | Модель для `ai-agent`. |
-| `ClaudeExecutable` | порожньо | Необов'язковий явний шлях до Claude Code. |
-| `AgentDataDirectory` | порожньо | Необов'язковий окремий каталог даних агента. |
-
-Змінна середовища `TERMINAL_AI_CONFIG_DIR` перевизначає каталог конфігурації, а `TERMINAL_AI_LANG` має пріоритет для мови інтерфейсу.
-
-### 1. Перегляд поточної інформації про систему:
-```powershell
-ai status
-# або: ai which model / ai info
-```
-Виводить стильну картку з активною моделлю, активним шрифтом Windows Terminal, URL-адресою Ollama, гарячою клавішею та поточною мовою.
-
-### 2. Керування шрифтами Windows Terminal:
-TerminalAI вміє автоматично зчитувати налаштування `settings.json` вашого Windows Terminal, фільтрувати моноширинні шрифти програмування та змінювати їх на льоту:
-```powershell
-# Переглянути доступні моноширинні кодингові шрифти:
 ai fonts
-# або: Show-TerminalAiFonts
-
-# Змінити шрифт терміналу (застосовується миттєво без перезапуску):
 ai font "Cascadia Code"
-ai font "JetBrainsMonoNL Nerd Font Mono"
-
-# Змінити шрифт разом із бажаним кеглем (розміром):
 Set-TerminalAiFont -Font "Cascadia Code" -Size 13
 ```
 
-### 3. Перемикання мови інтерфейсу (Українська / English):
-Усі картки, меню дій (`[Enter]`, `[C]`, `[I]`, `[X]`), швидка довідка та системні пояснення повністю білінгвальні:
-```powershell
-# Переглянути поточну мову:
-ai lang
-
-# Змінити мову:
-ai lang en
-ai lang uk
-
-# Встановити мову як ПОСТІЙНУ (за замовчуванням зберігається у config.json + $env:TERMINAL_AI_LANG):
-ai lang permanent uk
-ai lang permanent en
-
-# Або через прямі командлети / аліаси:
-ai-lang-permanent uk
-ai-lang-default en
-Set-TerminalAiLanguage -Language uk -Permanent
-Set-TerminalAiDefaultLanguage uk
-
-# Всередині діалогового агента ai-chat:
-/lang permanent uk
-/lang permanent en
-```
-
-> [!TIP]
-> Команда з параметром `permanent` фіксує мову одразу на двох рівнях: у файлі конфігурації `~/.terminal-ai/config.json` та в системній змінній середовища користувача Windows (`$env:TERMINAL_AI_LANG`), тому обрана мова зберігається між перезавантаженнями та діє в усіх терміналах.
-
-### 4. Перегляд та перемикання моделей Ollama:
-```powershell
-# Список моделей у локальній Ollama:
-ai models
-# або: Show-TerminalAiModels
-
-# Змінити активну модель:
-ai model qwen2.5-coder:7b
-# або: Set-TerminalAiConfig -Model "qwen2.5-coder:7b"
-```
-
-### 5. Перегляд повної конфігурації:
-```powershell
-ai config
-# або: Get-TerminalAiConfig
-```
-
----
-
-## ⚡ Як прискорити роботу моделей (Рекомендації)
-
-Фактична швидкість залежить від моделі, квантування, контексту, CPU/GPU та стану кешу Ollama. Репозиторій не містить відтворюваного бенчмарка, тому фіксовані значення затримки не гарантуються.
-
-- Оберіть модель, яка вміщується у доступну RAM/VRAM.
-- Для коротких PowerShell-команд почніть із `qwen2.5-coder:7b` або меншої сумісної моделі.
-- Перевірте, що Ollama бачить модель, перш ніж оцінювати швидкість:
-
-```bash
-ollama list
-ollama pull qwen2.5-coder:7b
-ai model qwen2.5-coder:7b
-```
-
-TerminalAI передає `keep_alive = "1h"` у запитах генерації. Це просить Ollama залишити модель завантаженою між викликами; фактична поведінка залежить від версії та конфігурації Ollama.
-
----
-
-## 🔬 Архітектура: Робота з Ollama через HTTP vs CLI vs In-Process
-
-TerminalAI не запускає `ollama run`. PowerShell-реалізація викликає `/api/generate` для одноразових запитів і `/api/chat` для помічника; C#-реалізація викликає `/api/generate`. За замовчуванням використовується loopback-адреса `localhost:11434`, але `OllamaUrl` можна змінити, тому документація не припускає, що кожне розгортання є локальним.
-
-HTTP дає структурований JSON, явні параметри запиту, тайм-аут і повторне використання з'єднань. Завантаження моделі та керування пам'яттю залишаються відповідальністю Ollama.
-
----
-
-## 🧱 Архітектура проєкту
+## Architecture
 
 ```text
 Install-TerminalAi.ps1
-  -> встановлює TerminalAI.psd1 / TerminalAI.psm1 і допоміжні сценарії
-  -> записує ~/.terminal-ai/config.json
-  -> додає маркований блок імпорту до профілю
-  -> розгортає terminalai.json
+  -> installs TerminalAI.psd1 / TerminalAI.psm1 and companion scripts
+  -> writes ~/.terminal-ai/config.json
+  -> adds a marked profile import block
+  -> deploys terminalai.json
 
 TerminalAI.psm1
-  -> TerminalAiConfig.ps1       конфігурація, мова та шрифти
-  -> TerminalAiAssistant.ps1    інтерактивна сесія /api/chat
-  -> TerminalAiAgent.ps1        запуск необов'язкового Claude Code CLI
-  -> Ollama /api/generate       одноразова генерація
-  -> AST analyzer + gate        перевірка перед виконанням
-  -> TerminalAI.Aot.dll         необов'язковий C#-шлях у PowerShell 7+
+  -> TerminalAiConfig.ps1       configuration, response language, fonts
+  -> TerminalAiAssistant.ps1    interactive /api/chat session
+  -> TerminalAiAgent.ps1        optional Claude Code launcher
+  -> Ollama /api/generate       one-shot generation
+  -> AST analyzer and gate      pre-execution inspection
+  -> TerminalAI.Aot.dll         optional PowerShell 7 C# command path
 ```
 
-PowerShell- і C#-реалізації використовують спільну конфігурацію та підтримують основні сценарії, але залишаються окремими реалізаціями. Паритет потрібно підтверджувати тестами.
+The PowerShell and C# paths share the configuration file and major user workflows, but they are separate implementations. Behavior parity should be verified by tests rather than assumed.
 
----
+## Verification and development
 
-## 🔧 Діагностика та усунення несправностей
+Syntax check:
 
-### 1. Помилка з'єднання з Ollama (`Timeout` або `Connection refused`):
-- Переконайтеся, що Ollama запущена:
-  ```powershell
-  ollama list
-  ```
-- Якщо служба зупинена, запустіть її командою: `ollama serve`.
-
-### 2. Замість літер з'являються знаки запитання `??????`:
-- Переконайтеся, що в консолі увімкнено UTF-8 кодування:
-  ```powershell
-  [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-  $OutputEncoding = [System.Text.Encoding]::UTF8
-  ```
-  *(Інсталятор `Install-TerminalAi.ps1` прописує ці рядки у ваш `$PROFILE` автоматично)*.
-
-### 3. Гаряча клавіша не реагує:
-- Якщо ви змінили налаштування, оновіть сесію в поточному вікні:
-  ```powershell
-  Import-Module TerminalAI -Force
-  ```
-- Спробуйте **`F2`** — вона не залежить від активної мовної розкладки. Доступність обробника все одно залежить від PSReadLine і консольного хоста.
-
-### 4. Комплексний запуск тестів розширення:
-Для перевірки всіх систем розширення запустіть вбудований тест:
 ```powershell
-pwsh -ExecutionPolicy Bypass -File .\Test-TerminalAi.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\check_syntax.ps1
 ```
 
-> [!CAUTION]
-> Набір `tests/P2-MultiUserStability.Tests.ps1` використовує тимчасові шляхи профілю, модуля та фрагмента, але ранні виклики інсталятора не задають `TERMINAL_AI_CONFIG_DIR` і можуть оновити реальний `~/.terminal-ai/config.json`. Перед запуском зробіть резервну копію або задайте окремий каталог конфігурації.
+Deterministic root checks, with live Ollama calls skipped:
 
----
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\Test-TerminalAi.ps1
+```
 
-## 🗑️ Деінсталяція
+Add `-RunLiveTests` only when Ollama is running and model inference is intentionally in scope.
 
-Якщо ви бажаєте повністю видалити розширення та відновити попередні конфігурації:
+Focused suites:
+
+```powershell
+Get-ChildItem .\tests\*.Tests.ps1 | ForEach-Object { pwsh -NoProfile -File $_.FullName }
+Get-ChildItem .\AOT\tests\*.Tests.ps1 | ForEach-Object { pwsh -NoProfile -File $_.FullName }
+```
+
+Build the C# component:
+
+```powershell
+dotnet build .\AOT\TerminalAI.Aot.csproj -c Release
+```
+
+The post-build target copies the DLL to the repository root. A loaded DLL may remain locked by an existing PowerShell process; validate a new build in a fresh `pwsh -NoProfile` session.
+
+## Troubleshooting
+
+Run the built-in diagnostics first:
+
+```powershell
+ai-doctor
+Test-TerminalAiInstallation -PassThru
+```
+
+- **Ollama cannot be reached:** run `ollama list`, then `ollama serve` if necessary; confirm `OllamaUrl`.
+- **The model is missing:** run `ollama pull <model>` or select an installed model with `ai model <name>`.
+- **A shortcut does not respond:** use a PSReadLine-capable interactive host and reload with `Import-Module TerminalAI -Force`.
+- **Cyrillic is rendered incorrectly:** use a Unicode font and set `[Console]::InputEncoding`, `[Console]::OutputEncoding`, and `$OutputEncoding` to UTF-8.
+- **The C# command is unavailable:** use PowerShell 7+, verify the root DLL exists, and check the module import diagnostics.
+- **Agent mode is unavailable:** run `ai-agent -CheckOnly`; verify the Claude Code executable, Ollama, selected model, and working directory.
+
+## Uninstall
 
 ```powershell
 pwsh -ExecutionPolicy Bypass -File .\Uninstall-TerminalAi.ps1
 ```
-Скрипт автоматично:
-- Видалить файли модуля з `$env:PSModulePath`.
-- Очистить блок завантаження з вашого `$PROFILE`.
-- Видалить зареєстрований фрагмент розширення з Windows Terminal.
-- Збереже конфігурацію `~/.terminal-ai` за замовчуванням.
 
-Для видалення конфігурації також використайте:
+The uninstaller removes the installed module directory, the marked profile block, and the Windows Terminal fragment for the selected scope. It preserves `~/.terminal-ai` by default. To remove configuration too:
 
 ```powershell
 pwsh -ExecutionPolicy Bypass -File .\Uninstall-TerminalAi.ps1 -PurgeConfig
 ```
 
----
+Use `-Scope AllUsers` from an elevated PowerShell session for an all-users installation.
 
-## 📄 Статус ліцензії
+## License status
 
-TerminalAI розповсюджується під ліцензією [MIT](LICENSE).
+TerminalAI is released under the [MIT License](LICENSE).

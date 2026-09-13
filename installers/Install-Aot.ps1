@@ -33,7 +33,7 @@ if (-not (Assert-TerminalAiScopeAdmin -Scope $Scope -IsUkrainian $isUk)) { retur
 
 $projectDir = if ($PSScriptRoot) { Split-Path -Parent $PSScriptRoot } else { Get-Location }
 
-$step = if ($isUk) { "▶ Розгортання скомпільованого C#-модуля (aif)..." } else { "▶ Deploying compiled C# accelerator module (aif)..." }
+$step = "▶ Deploying compiled C# accelerator module (aif)..."
 Write-Host $step -ForegroundColor Yellow
 
 $moduleDestinations = Get-TerminalAiModuleDestinations -Scope $Scope -CustomModulePath $CustomModulePath
@@ -51,7 +51,7 @@ foreach ($destModuleDir in $moduleDestinations) {
         if (Test-Path $staleHelp) {
             Remove-Item -Path $staleHelp -Force -ErrorAction Ignore
         }
-        $msgSkip = if ($isUk) { "   ℹ Пропущено для Windows PowerShell 5.1 (потрібен PowerShell 7+ з .NET 10): $destModuleDir" } else { "   ℹ Skipped for Windows PowerShell 5.1 (PowerShell 7+ with .NET 10 required): $destModuleDir" }
+        $msgSkip = "   ℹ Skipped for Windows PowerShell 5.1 (PowerShell 7+ with .NET 10 required): $destModuleDir"
         Write-Host $msgSkip -ForegroundColor DarkGray
         continue
     }
@@ -66,7 +66,7 @@ foreach ($destModuleDir in $moduleDestinations) {
     }
 
     if (-not (Test-Path $aotDllPath)) {
-        $msgMissing = if ($isUk) { "   ⚠ TerminalAI.Aot.dll не знайдено в $projectDir; спершу зберіть або додайте бінарник (див. AOT/README.md)." } else { "   ⚠ TerminalAI.Aot.dll was not found in $projectDir; build or place the binary first (see AOT/README.md)." }
+        $msgMissing = "   ⚠ TerminalAI.Aot.dll was not found in $projectDir; build or place the binary first (see AOT/README.md)."
         Write-Host $msgMissing -ForegroundColor DarkYellow
         continue
     }
@@ -91,7 +91,7 @@ foreach ($destModuleDir in $moduleDestinations) {
                 $global:Error.RemoveAt(0)
             }
             $msgLocked = if ($isUk) {
-                "   ℹ TerminalAI.Aot.dll використовується активним процесом; збережено поточну збірку."
+                "   ℹ TerminalAI.Aot.dll is in use by an active process; the current build was retained."
             } else {
                 "   ℹ TerminalAI.Aot.dll is in use by an active session; retained existing binary."
             }
@@ -119,6 +119,6 @@ foreach ($destModuleDir in $moduleDestinations) {
         }
     }
 
-    $msgDone = if ($isUk) { "   ✔ C#-модуль розгорнуто у: $destModuleDir" } else { "   ✔ C# module deployed to: $destModuleDir" }
+    $msgDone = "   ✔ C# module deployed to: $destModuleDir"
     Write-Host $msgDone -ForegroundColor Green
 }

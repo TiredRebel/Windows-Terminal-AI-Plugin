@@ -22,7 +22,7 @@ if (-not $PSBoundParameters.ContainsKey('Language') -and $env:TERMINAL_AI_LANG -
 }
 $isUk = ($Language -eq "uk")
 
-$msgStarting = if ($isUk) { "`nВидалення розширення TerminalAI ($Scope)..." } else { "`nRemoving TerminalAI extension ($Scope)..." }
+$msgStarting = "`nRemoving TerminalAI extension ($Scope)..."
 Write-Host $msgStarting -ForegroundColor Yellow
 
 if ($Scope -eq "AllUsers") {
@@ -34,7 +34,7 @@ if ($Scope -eq "AllUsers") {
     } catch { }
 
     if (-not $isAdmin) {
-        $msgAdmin = if ($isUk) { "[TerminalAI] Видалення для всіх користувачів (-Scope AllUsers) вимагає прав адміністратора (Run as Administrator)." } else { "[TerminalAI] Uninstallation for all users (-Scope AllUsers) requires Administrator privileges (Run as Administrator)." }
+        $msgAdmin = "[TerminalAI] Uninstallation for all users (-Scope AllUsers) requires Administrator privileges (Run as Administrator)."
         Write-Error $msgAdmin
         return
     }
@@ -61,7 +61,7 @@ foreach ($baseRoot in $candidateRoots) {
     $destModuleDir = Join-Path $baseRoot "TerminalAI"
     if (Test-Path $destModuleDir) {
         Remove-Item -Path $destModuleDir -Recurse -Force -ErrorAction SilentlyContinue
-        $msgMod = if ($isUk) { "✔ Каталог модуля видалено: $destModuleDir" } else { "✔ Module directory removed: $destModuleDir" }
+        $msgMod = "✔ Module directory removed: $destModuleDir"
         Write-Host $msgMod -ForegroundColor Green
     }
 }
@@ -86,7 +86,7 @@ if ($targetProfile -and (Test-Path $targetProfile)) {
         $backupFile = "$targetProfile.bak." + (Get-Date -Format "yyyyMMdd_HHmmss")
         try {
             Copy-Item -Path $targetProfile -Destination $backupFile -Force
-            $msgBak = if ($isUk) { "✔ Створено резервну копію профілю перед деінсталяцією: $backupFile" } else { "✔ Profile backup created before uninstallation: $backupFile" }
+            $msgBak = "✔ Profile backup created before uninstallation: $backupFile"
             Write-Host $msgBak -ForegroundColor DarkGray
         } catch { }
 
@@ -96,7 +96,7 @@ if ($targetProfile -and (Test-Path $targetProfile)) {
         if ($cleanContent -ne $profileContent) {
             $enc = New-Object System.Text.UTF8Encoding($true)
             [System.IO.File]::WriteAllText($targetProfile, $cleanContent.TrimEnd() + "`n", $enc)
-            $msgProfileClean = if ($isUk) { "✔ Видалено блок ініціалізації TerminalAI з $targetProfile" } else { "✔ Removed TerminalAI initialization block from $targetProfile" }
+            $msgProfileClean = "✔ Removed TerminalAI initialization block from $targetProfile"
             Write-Host $msgProfileClean -ForegroundColor Green
         }
     }
@@ -118,11 +118,11 @@ foreach ($wtSettingsFile in $wtSettingsCandidates) {
                 $wtJson.actions = @($filteredActions)
                 $newSettingsJson = $wtJson | ConvertTo-Json -Depth 10
                 Set-Content -Path $wtSettingsFile -Value $newSettingsJson -Encoding UTF8
-                $msgWt = if ($isUk) { "✔ Очищено дії AI з $wtSettingsFile" } else { "✔ Cleaned up AI actions from $wtSettingsFile" }
+                $msgWt = "✔ Cleaned up AI actions from $wtSettingsFile"
                 Write-Host $msgWt -ForegroundColor Green
             }
         } catch {
-            $warnWt = if ($isUk) { "Помилка при очищенні ${wtSettingsFile}: $_" } else { "Error cleaning up ${wtSettingsFile}: $_" }
+            $warnWt = "Error cleaning up ${wtSettingsFile}: $_"
             Write-Warning $warnWt
         }
     }
@@ -139,7 +139,7 @@ $fragDir = if ($CustomFragmentPath) {
 
 if (Test-Path $fragDir) {
     Remove-Item -Path $fragDir -Recurse -Force -ErrorAction SilentlyContinue
-    $msgFrag = if ($isUk) { "✔ Видалено Fragment Extension з $fragDir" } else { "✔ Removed Fragment Extension from $fragDir" }
+    $msgFrag = "✔ Removed Fragment Extension from $fragDir"
     Write-Host $msgFrag -ForegroundColor Green
 }
 
@@ -148,15 +148,15 @@ $cfgDir = if ($env:TERMINAL_AI_CONFIG_DIR) { $env:TERMINAL_AI_CONFIG_DIR } else 
 if ($PurgeConfig) {
     if (Test-Path $cfgDir) {
         Remove-Item -Path $cfgDir -Recurse -Force -ErrorAction SilentlyContinue
-        $msgCfgDel = if ($isUk) { "✔ Видалено директорію конфігурації: $cfgDir" } else { "✔ Removed configuration directory: $cfgDir" }
+        $msgCfgDel = "✔ Removed configuration directory: $cfgDir"
         Write-Host $msgCfgDel -ForegroundColor Green
     }
 } else {
     if (Test-Path $cfgDir) {
-        $msgCfgPreserved = if ($isUk) { "ℹ Конфігурацію збережено у $cfgDir (використовуйте -PurgeConfig для повного видалення)." } else { "ℹ Configuration preserved at $cfgDir (use -PurgeConfig to remove completely)." }
+        $msgCfgPreserved = "ℹ Configuration preserved at $cfgDir (use -PurgeConfig to remove completely)."
         Write-Host $msgCfgPreserved -ForegroundColor DarkCyan
     }
 }
 
-$msgDone = if ($isUk) { "Деінсталяцію завершено.`n" } else { "Uninstallation complete.`n" }
+$msgDone = "Uninstallation complete.`n"
 Write-Host $msgDone -ForegroundColor Green

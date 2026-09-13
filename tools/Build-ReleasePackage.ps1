@@ -59,8 +59,8 @@ $filesToStage = @(
 )
 
 # Optional docs
-if (Test-Path (Join-Path $projectDir "README.en.md")) {
-    $filesToStage += "README.en.md"
+if (Test-Path (Join-Path $projectDir "README.uk.md")) {
+    $filesToStage += "README.uk.md"
 }
 
 foreach ($f in $filesToStage) {
@@ -205,9 +205,9 @@ PackageUrl: https://github.com/TiredRebel/Windows-Terminal-AI-Plugin
 License: MIT
 LicenseUrl: https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/blob/main/LICENSE
 Copyright: (c) 2026 TiredRebel. All rights reserved.
-ShortDescription: Локальний за замовчуванням AI-помічник для Windows Terminal та PowerShell на базі Ollama.
+ShortDescription: Local-by-default AI assistance for Windows Terminal and PowerShell, powered by Ollama.
 Description: |-
-  TerminalAI — це локальний за замовчуванням AI-асистент для Windows Terminal та PowerShell на базі Ollama. Він забезпечує генерацію команд, синтез скриптів, виправлення помилок та скомпільований модуль-помічник .NET 10.
+  TerminalAI is local-by-default AI assistance for Windows Terminal and PowerShell, powered by Ollama. It provides command generation, script synthesis, error correction, and a compiled .NET 10 helper module.
 Tags:
   - ai
   - ollama
@@ -216,7 +216,7 @@ Tags:
   - powershell
   - copilot
   - llm
-  - штучний-інтелект
+  - artificial-intelligence
 ReleaseNotesUrl: https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/releases/tag/v$Version
 ManifestType: locale
 ManifestVersion: 1.9.0

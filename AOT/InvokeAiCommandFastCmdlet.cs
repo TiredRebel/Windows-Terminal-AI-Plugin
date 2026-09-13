@@ -57,7 +57,7 @@ public class InvokeAiCommandFastCmdlet : PSCmdlet
         var activeModel = string.IsNullOrWhiteSpace(Model) ? cfg.Model : Model;
         var fullPrompt = string.Join(" ", Prompt).Trim();
 
-        // 0. Делегування автономному агенту (Cycle 10)
+        // Delegate to the autonomous agent
         var isAgentPrompt = fullPrompt.StartsWith("agent ", StringComparison.OrdinalIgnoreCase) || fullPrompt.Equals("agent", StringComparison.OrdinalIgnoreCase);
         if (Agent.IsPresent || isAgentPrompt)
         {
@@ -66,16 +66,16 @@ public class InvokeAiCommandFastCmdlet : PSCmdlet
             return;
         }
 
-        // 1. Дефект: коли промпт порожній -> показуємо швидку довідку замість обов'язкового запиту
+        // Show quick help when the prompt is empty
         if (string.IsNullOrWhiteSpace(fullPrompt))
         {
             ShowHelpTopic("all", isUk);
             return;
         }
 
-        // 2. Підтримка команд допомоги та навчальних посібників: aif help [topic]
+        // Support help topics
         var lowerPrompt = fullPrompt.ToLowerInvariant();
-        var helpMatch = Regex.Match(fullPrompt, @"^(?:help|довідка|допомога)(?:\s+(all|shortcuts|models|examples|workflow|config))?\s*$", RegexOptions.IgnoreCase);
+        var helpMatch = Regex.Match(fullPrompt, @"^(?:help)(?:\s+(all|shortcuts|models|examples|workflow|config))?\s*$", RegexOptions.IgnoreCase);
         if (helpMatch.Success)
         {
             var topic = helpMatch.Groups[1].Success ? helpMatch.Groups[1].Value.ToLowerInvariant() : "all";
@@ -89,61 +89,61 @@ public class InvokeAiCommandFastCmdlet : PSCmdlet
             return;
         }
 
-        if (lowerPrompt is "shortcuts" or "гарячі клавіші" or "клавіші")
+        if (lowerPrompt is "shortcuts")
         {
             ShowHelpTopic("shortcuts", isUk);
             return;
         }
 
-        if (lowerPrompt is "examples" or "приклади")
+        if (lowerPrompt is "examples")
         {
             ShowHelpTopic("examples", isUk);
             return;
         }
 
-        if (lowerPrompt is "workflow" or "робота")
+        if (lowerPrompt is "workflow")
         {
             ShowHelpTopic("workflow", isUk);
             return;
         }
 
-        // 3. Статус та системна інформація
-        if (Regex.IsMatch(lowerPrompt, @"^(?:which|what)\s+model|яка\s+модель|яку\s+модель|current\s+model|status|info|інфо|статус"))
+        // System status
+        if (Regex.IsMatch(lowerPrompt, @"^(?:which|what)\s+model|current\s+model|status|info"))
         {
             ShowStatus(cfg, isUk);
             return;
         }
 
-        // 4. Список моделей
-        if (lowerPrompt is "models" or "--models" or "-m" or "моделі")
+        // List models
+        if (lowerPrompt is "models" or "--models" or "-m")
         {
             ShowModels(cfg, isUk);
             return;
         }
 
-        // 5. Зміна активної моделі: ai-fast model <name>
+        // Change the active model
         var modelMatch = Regex.Match(fullPrompt, @"^(?:set-model|use-model|use|model)\s+([A-Za-z0-9.:_\-\/]+)$", RegexOptions.IgnoreCase);
         if (modelMatch.Success)
         {
             var newModel = modelMatch.Groups[1].Value.Trim();
             cfg.Model = newModel;
             cfg.Save();
-            var msg = isUk ? $"Активну модель успішно змінено на '{newModel}'!" : $"Active model successfully changed to '{newModel}'!";
+            var msg = $"Active model successfully changed to '{newModel}'!";
             Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, $"\n    ✔ {msg}\n");
             return;
         }
 
-        // 6. Перегляд та зміна мови
-        if (lowerPrompt is "lang" or "language" or "--lang" or "-l" or "мова")
+        // View and change language
+        if (lowerPrompt is "lang" or "language" or "--lang" or "-l")
         {
             ShowLanguageInfo(cfg, isUk);
             return;
         }
 
-        var langMatch = Regex.Match(fullPrompt, @"^(?:set-lang|lang|language|мова)(?:\s+(?:permanent|save|default|--permanent|-p|постійно))?\s+(uk|ua|en)$", RegexOptions.IgnoreCase);
+        var langMatch = Regex.Match(fullPrompt, @"^(?:set-lang|lang|language)(?:\s+(?:permanent|save|default|--permanent|-p))?\s+(uk|ua|en)$", RegexOptions.IgnoreCase);
         if (!langMatch.Success)
         {
-            langMatch = Regex.Match(fullPrompt, @"^(?:set-lang|lang|language|мова)\s+(uk|ua|en)(?:\s+(?:permanent|save|default|--permanent|-p|постійно))?$", RegexOptions.IgnoreCase);
+            langMatch = Regex.Match(fullPrompt, @"^(?:set-lang|lang|language)\s+(uk|ua|en)(?:\s+(?:permanent|save|default|--permanent|-p))?$", RegexOptions.IgnoreCase);
         }
         if (langMatch.Success)
         {
@@ -151,64 +151,64 @@ public class InvokeAiCommandFastCmdlet : PSCmdlet
             var newLang = rawLang == "ua" ? "uk" : rawLang;
             cfg.Language = newLang;
             cfg.Save();
-            var msg = newLang == "uk" ? "Мову інтерфейсу успішно змінено на Українську (uk)!" : "Interface language successfully changed to English (en)!";
+            var msg = newLang == "uk" ? "Model response language changed to Ukrainian (uk)!" : "Model response language changed to English (en)!";
             Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, $"\n    ✔ {msg}\n");
             return;
         }
 
-        // 7. Конфігурація: ai-fast config
+        // Configuration
         if (lowerPrompt is "config" or "--config" or "-c")
         {
             ShowConfig(cfg);
             return;
         }
 
-        // 7.1. Керування режимом аліасів: ai-fast alias [on|off]
-        if (lowerPrompt is "alias" or "aliases" or "--alias" or "-a" or "аліас" or "аліаси")
+        // Manage alias mode
+        if (lowerPrompt is "alias" or "aliases" or "--alias" or "-a")
         {
-            var statusStr = cfg.UseAliases ? (isUk ? "УВІМКНЕНО (gps, gci, select, ?, %)" : "ENABLED (gps, gci, select, ?, %)") : (isUk ? "ВИМКНЕНО (повні командлети)" : "DISABLED (full cmdlets)");
-            Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"\n    ✦ {(isUk ? "Режим коротких аліасів" : "Short aliases mode")}: {statusStr}");
-            Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, $"    💡 {(isUk ? "Увімкнути:  aif alias on   |   Вимкнути: aif alias off" : "Enable:  aif alias on   |   Disable: aif alias off")}\n");
+            var statusStr = cfg.UseAliases ? "ENABLED (gps, gci, select, ?, %)" : "DISABLED (full cmdlets)";
+            Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"\n    ✦ Short aliases mode: {statusStr}");
+            Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, "    💡 Enable:  aif alias on   |   Disable: aif alias off\n");
             return;
         }
 
-        if (Regex.IsMatch(lowerPrompt, @"^(?:alias|aliases|аліас|аліаси)\s+(?:on|1|true|enable|увімк|увімкнути)$") ||
-            lowerPrompt is "use-aliases" or "use aliases" or "використовувати аліаси" or "увімкнути аліаси")
+        if (Regex.IsMatch(lowerPrompt, @"^(?:alias|aliases)\s+(?:on|1|true|enable)$") ||
+            lowerPrompt is "use-aliases" or "use aliases")
         {
             cfg.UseAliases = true;
             cfg.Save();
-            var msg = isUk ? "Режим коротких аліасів PowerShell успішно УВІМКНЕНО (за замовчуванням: gps, gci, select, ?, %)" : "PowerShell short aliases mode successfully ENABLED (defaulting to: gps, gci, select, ?, %)";
+            var msg = "PowerShell short aliases mode successfully ENABLED (defaulting to: gps, gci, select, ?, %)";
             Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, $"\n    ✔ {msg}\n");
             return;
         }
 
-        if (Regex.IsMatch(lowerPrompt, @"^(?:alias|aliases|аліас|аліаси)\s+(?:off|0|false|disable|вимк|вимкнути)$") ||
-            lowerPrompt is "no-aliases" or "no aliases" or "не використовувати аліаси" or "вимкнути аліаси")
+        if (Regex.IsMatch(lowerPrompt, @"^(?:alias|aliases)\s+(?:off|0|false|disable)$") ||
+            lowerPrompt is "no-aliases" or "no aliases")
         {
             cfg.UseAliases = false;
             cfg.Save();
-            var msg = isUk ? "Режим коротких аліасів PowerShell ВИМКНЕНО (використовуються повні імена командлетів)" : "PowerShell short aliases mode DISABLED (using full cmdlet names)";
+            var msg = "PowerShell short aliases mode DISABLED (using full cmdlet names)";
             Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, $"\n    ✔ {msg}\n");
             return;
         }
 
-        // 8. Якщо явно запитано текстову відповідь (-Ask)
+        // Handle an explicit text response request
         if (Ask)
         {
             ShowAnswer(cfg, activeModel, fullPrompt, isUk);
             return;
         }
 
-        // 9. Генерація PowerShell команди
+        // Generate a PowerShell command
         var preferAliases = Alias.IsPresent || cfg.UseAliases;
-        var naturalAliasMatch = Regex.Match(fullPrompt, @"(?:\s*[\(\[]?\s*(?:використовувати|використовуй|з|зі)\s+аліас(?:ами|и)?\s*[\)\]]?|\s*[\(\[]?\s*(?:use|with)\s+alias(?:es)?\s*[\)\]]?|\s*[\(\[]?\s*скорочен(?:і|ними|ими)\s+команд(?:ами|и)?\s*[\)\]]?)$", RegexOptions.IgnoreCase);
+        var naturalAliasMatch = Regex.Match(fullPrompt, @"(?:\s*[\(\[]?\s*(?:use|with)\s+alias(?:es)?\s*[\)\]]?)$", RegexOptions.IgnoreCase);
         if (naturalAliasMatch.Success)
         {
             preferAliases = true;
             fullPrompt = fullPrompt.Substring(0, naturalAliasMatch.Index).Trim();
         }
 
-        var connectingText = isUk ? $"Звертаюсь до Ollama ({activeModel})..." : $"Connecting to Ollama ({activeModel})...";
+        var connectingText = $"Connecting to Ollama ({activeModel})...";
         Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"\n  ✦ {connectingText}");
 
         var sw = Stopwatch.StartNew();
@@ -234,7 +234,7 @@ Rules:
         }
         catch (Exception ex)
         {
-            var errPrefix = isUk ? "[TerminalAI.AOT] Помилка Ollama:" : "[TerminalAI.AOT] Ollama error:";
+            var errPrefix = "[TerminalAI.AOT] Ollama error:";
             Host.UI.WriteErrorLine($"{errPrefix} {ex.Message}");
             return;
         }
@@ -250,15 +250,15 @@ Rules:
             command = PowerShellAliasConverter.ToShortAliases(command);
         }
 
-        // AST валідація та перевірка ризиків
+        // Validate the AST and assess risk
         var astAnalysis = ValidateAndInspectAst(command, isUk);
 
-        // Рендеринг картки з таймером відклику
+        // Render the result card with latency
         RenderCard(command, activeModel, sw.ElapsedMilliseconds, isUk, astAnalysis);
 
         if (!astAnalysis.IsValid)
         {
-            var blockedText = isUk ? "    ✖ Виконання команди неможливе через синтаксичну помилку.\n" : "    ✖ Command execution is blocked due to syntax errors.\n";
+            var blockedText = "    ✖ Command execution is blocked due to syntax errors.\n";
             Host.UI.WriteLine(ConsoleColor.Red, Host.UI.RawUI.BackgroundColor, blockedText);
             return;
         }
@@ -266,7 +266,7 @@ Rules:
         if (Copy || cfg.AutoCopy)
         {
             CopyToClipboard(command);
-            Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, isUk ? "    ✔ Скопійовано в буфер обміну!\n" : "    ✔ Copied to clipboard!\n");
+            Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, "    ✔ Copied to clipboard!\n");
         }
 
         if (!string.IsNullOrWhiteSpace(SavePath))
@@ -288,7 +288,7 @@ Rules:
             return;
         }
 
-        // Меню дій з можливістю перемикання аліасів
+        // Action menu with alias toggling
         while (true)
         {
             RenderMenu(isUk, preferAliases);
@@ -302,14 +302,14 @@ Rules:
             if (action == MenuAction.Copy)
             {
                 CopyToClipboard(command);
-                Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, isUk ? "    ✔ Скопійовано в буфер обміну!\n" : "    ✔ Copied to clipboard!\n");
+                Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, "    ✔ Copied to clipboard!\n");
                 break;
             }
             if (action == MenuAction.Insert)
             {
                 CopyToClipboard(command);
                 Win32Console.DelayedPaste(200);
-                Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, isUk ? "    ✔ Команду вставлено у рядок введення!\n" : "    ✔ Command inserted into input line!\n");
+                Host.UI.WriteLine(ConsoleColor.Green, Host.UI.RawUI.BackgroundColor, "    ✔ Command inserted into input line!\n");
                 break;
             }
             if (action == MenuAction.Explain)
@@ -335,7 +335,7 @@ Rules:
             }
             if (action == MenuAction.Save)
             {
-                var promptSave = isUk ? "    Введіть шлях для збереження скрипту (.ps1): " : "    Enter file path to save script (.ps1): ";
+                var promptSave = "    Enter file path to save script (.ps1): ";
                 Host.UI.Write(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, promptSave);
                 var targetPath = Console.ReadLine()?.Trim();
                 if (!string.IsNullOrWhiteSpace(targetPath))
@@ -344,13 +344,13 @@ Rules:
                 }
                 else
                 {
-                    Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, isUk ? "    Збереження скасовано.\n" : "    Save canceled.\n");
+                    Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, "    Save canceled.\n");
                 }
                 break;
             }
             if (action == MenuAction.Cancel)
             {
-                Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, isUk ? "    Скасовано.\n" : "    Canceled.\n");
+                Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, "    Canceled.\n");
                 break;
             }
         }
@@ -370,7 +370,7 @@ Rules:
 
     private void ShowExplanation(AiConfig cfg, string model, string command, bool isUk)
     {
-        var statusText = isUk ? "Формую детальне пояснення команди..." : "Generating detailed command explanation...";
+        var statusText = "Generating detailed command explanation...";
         Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"\n  ✦ {statusText}");
 
         var langInstruction = isUk ? "Respond strictly in Ukrainian language." : "Respond in English.";
@@ -382,7 +382,7 @@ Rules:
             var explanation = OllamaClient.GenerateRawAsync(cfg.OllamaUrl, model, userPrompt, explainSystemPrompt, 0.3, cfg.TimeoutSeconds, isUk).GetAwaiter().GetResult();
             if (!string.IsNullOrWhiteSpace(explanation))
             {
-                var title = isUk ? "Пояснення команди" : "Command Explanation";
+                var title = "Command Explanation";
                 Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"\n    ✦ {title}:");
                 Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    " + new string('─', 66));
                 foreach (var line in explanation.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None))
@@ -394,14 +394,14 @@ Rules:
         }
         catch (Exception ex)
         {
-            var errPrefix = isUk ? "[TerminalAI.AOT] Помилка пояснення:" : "[TerminalAI.AOT] Explanation error:";
+            var errPrefix = "[TerminalAI.AOT] Explanation error:";
             Host.UI.WriteErrorLine($"{errPrefix} {ex.Message}");
         }
     }
 
     private void ShowAnswer(AiConfig cfg, string model, string question, bool isUk)
     {
-        var statusText = isUk ? $"Формую відповідь через {model}..." : $"Generating answer via {model}...";
+        var statusText = $"Generating answer via {model}...";
         Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"\n  ✦ {statusText}");
 
         var langInstruction = isUk ? "Respond strictly in Ukrainian language." : "Respond in English.";
@@ -412,7 +412,7 @@ Rules:
             var answer = OllamaClient.GenerateRawAsync(cfg.OllamaUrl, model, question, askSystemPrompt, 0.3, cfg.TimeoutSeconds, isUk).GetAwaiter().GetResult();
             if (!string.IsNullOrWhiteSpace(answer))
             {
-                var cardTitle = isUk ? "AI Відповідь" : "AI Answer";
+                var cardTitle = "AI Answer";
                 Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"\n    ✦ {cardTitle} • {model}");
                 Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    " + new string('─', 66));
                 foreach (var line in answer.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None))
@@ -424,7 +424,7 @@ Rules:
         }
         catch (Exception ex)
         {
-            var errPrefix = isUk ? "[TerminalAI.AOT] Помилка відповіді:" : "[TerminalAI.AOT] Answer error:";
+            var errPrefix = "[TerminalAI.AOT] Answer error:";
             Host.UI.WriteErrorLine($"{errPrefix} {ex.Message}");
         }
     }
@@ -435,9 +435,9 @@ Rules:
         if (!analysis.IsValid)
         {
             Host.UI.WriteLine(ConsoleColor.Red, Host.UI.RawUI.BackgroundColor, "\n    ┌─────────────────────────────────────────────────────────────┐");
-            Host.UI.WriteLine(ConsoleColor.Red, Host.UI.RawUI.BackgroundColor, isUk ? "    │          ✖  TERMINAL AI AOT GATE: СИНТАКСИЧНА ПОМИЛКА       │" : "    │          ✖  TERMINAL AI AOT GATE: SYNTAX ERROR              │");
+            Host.UI.WriteLine(ConsoleColor.Red, Host.UI.RawUI.BackgroundColor, "    │          ✖  TERMINAL AI AOT GATE: SYNTAX ERROR              │");
             Host.UI.WriteLine(ConsoleColor.Red, Host.UI.RawUI.BackgroundColor, "    └─────────────────────────────────────────────────────────────┘");
-            var blockMsg = isUk ? "    Виконання заблоковано через синтаксичні помилки в команді:" : "    Command execution BLOCKED due to syntax errors:";
+            var blockMsg = "    Command execution BLOCKED due to syntax errors:";
             Host.UI.WriteLine(ConsoleColor.DarkYellow, Host.UI.RawUI.BackgroundColor, blockMsg);
             foreach (var err in analysis.ParseErrors)
             {
@@ -453,18 +453,18 @@ Rules:
         {
             if (cmd.CommandType == "Unknown" && Regex.IsMatch(cmd.CommandName, @"^[A-Za-z]+-[A-Za-z0-9]+$"))
             {
-                var warnTitle = isUk ? "Попередження" : "Warning";
-                var warnMsg = isUk ? $"Команду не знайдено в сесії PowerShell: '{cmd.CommandName}'" : $"Command not found in PowerShell session: '{cmd.CommandName}'";
-                var warnHint = isUk ? "(Ймовірно, модель вигадала неіснуючий командлет)" : "(Likely model hallucinated a cmdlet)";
+                var warnTitle = "Warning";
+                var warnMsg = $"Command not found in PowerShell session: '{cmd.CommandName}'";
+                var warnHint = "(Likely model hallucinated a cmdlet)";
 
                 Host.UI.WriteLine(ConsoleColor.DarkYellow, Host.UI.RawUI.BackgroundColor, $"    ⚠ [{warnTitle}] {warnMsg}");
                 Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, $"      {warnHint}\n");
             }
             if (cmd.InvalidParameters.Count > 0)
             {
-                var warnTitle = isUk ? "Невідомі параметри" : "Invalid Parameters";
+                var warnTitle = "Invalid Parameters";
                 var invalidList = string.Join(", -", cmd.InvalidParameters);
-                var warnMsg = isUk ? $"Виявлено невідомі параметри для '{cmd.CommandName}': -{invalidList}" : $"Unknown parameters detected for '{cmd.CommandName}': -{invalidList}";
+                var warnMsg = $"Unknown parameters detected for '{cmd.CommandName}': -{invalidList}";
                 Host.UI.WriteLine(ConsoleColor.DarkYellow, Host.UI.RawUI.BackgroundColor, $"    ⚠ [{warnTitle}] {warnMsg}\n");
             }
         }
@@ -494,38 +494,10 @@ Rules:
         {
             case "shortcuts":
             {
-                var title = isUk ? "Довідник аліасів, скорочень та клавіш" : "Shortcuts, Aliases & Keybindings Guide";
+                var title = "Shortcuts, Aliases & Keybindings Guide";
                 Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"    ✦ Terminal AI Fast (AOT) • {title}");
                 Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╭" + new string('─', bw) + "╮");
                 RenderHelpLine("", ConsoleColor.White, bw);
-                if (isUk)
-                {
-                    RenderHelpLine("1. ГОЛОВНІ АЛІАСИ:", ConsoleColor.Cyan, bw);
-                    RenderHelpLine("   aif <запит>    Швидкий бінарний модуль C# (нативний AOT)", ConsoleColor.White, bw);
-                    RenderHelpLine("   ai <запит>     Стандартний модуль PowerShell", ConsoleColor.White, bw);
-                    RenderHelpLine("   ?? <запит>     Короткий синонім для генерації", ConsoleColor.White, bw);
-                    RenderHelpLine("   F2             Інлайн-генерація команди прямо у рядку PSReadLine", ConsoleColor.Yellow, bw);
-                    RenderHelpLine("   ai-fix         Діагностика та автоматичне виправлення останньої помилки", ConsoleColor.White, bw);
-                    RenderHelpLine("   ai-script      Генератор комплексних багаторядкових .ps1 сценаріїв", ConsoleColor.White, bw);
-                    RenderHelpLine("   ai-chat        Інтерактивний агент зі слеш-командами та Tab", ConsoleColor.White, bw);
-                    RenderHelpLine("", ConsoleColor.White, bw);
-                    RenderHelpLine("2. КОРОТКІ ПРАПОРЦІ:", ConsoleColor.Cyan, bw);
-                    RenderHelpLine("   -x, -y         Виконати згенеровану команду відразу (-Execute)", ConsoleColor.Yellow, bw);
-                    RenderHelpLine("   -c             Скопіювати команду відразу в буфер обміну (-Copy)", ConsoleColor.Yellow, bw);
-                    RenderHelpLine("   -Explain       Згенерувати детальне структуроване пояснення коду", ConsoleColor.Magenta, bw);
-                    RenderHelpLine("   -Ask, -chat    Отримати текстову відповідь/консультацію замість коду", ConsoleColor.Blue, bw);
-                    RenderHelpLine("", ConsoleColor.White, bw);
-                    RenderHelpLine("3. КЛАВІШІ В ІНТЕРАКТИВНОМУ МЕНЮ (після генерації):", ConsoleColor.Cyan, bw);
-                    RenderHelpLine("   [Enter]        Виконати згенеровану команду в поточній сесії", ConsoleColor.Green, bw);
-                    RenderHelpLine("   [C] / [c]      Скопіювати в буфер обміну", ConsoleColor.Yellow, bw);
-                    RenderHelpLine("   [I] / [i]      Вставити команду в рядок введення терміналу", ConsoleColor.Cyan, bw);
-                    RenderHelpLine("   [S] / [s]      Перемкнути між короткими аліасами та повними командлетами", ConsoleColor.DarkYellow, bw);
-                    RenderHelpLine("   [X] / [x]      Пояснити синтаксис та безпеку команди", ConsoleColor.Magenta, bw);
-                    RenderHelpLine("   [A] / [a]      Отримати розгорнуту текстову відповідь", ConsoleColor.Blue, bw);
-                    RenderHelpLine("   [W] / [w]      Зберегти скрипт у файл з безпечним unified diff", ConsoleColor.DarkGreen, bw);
-                    RenderHelpLine("   [Esc]          Скасувати", ConsoleColor.DarkGray, bw);
-                }
-                else
                 {
                     RenderHelpLine("1. PRIMARY ALIASES:", ConsoleColor.Cyan, bw);
                     RenderHelpLine("   aif <prompt>   Ultra-fast compiled C# binary module (Native AOT)", ConsoleColor.White, bw);
@@ -560,25 +532,10 @@ Rules:
 
             case "models":
             {
-                var title = isUk ? "Керівництво по моделях Ollama для розробки" : "Ollama Coding Models Guide";
+                var title = "Ollama Coding Models Guide";
                 Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"    ✦ Terminal AI Fast (AOT) • {title}");
                 Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╭" + new string('─', bw) + "╮");
                 RenderHelpLine("", ConsoleColor.White, bw);
-                if (isUk)
-                {
-                    RenderHelpLine("РЕКОМЕНДОВАНІ ЛОКАЛЬНІ МОДЕЛІ ДЛЯ POWERSHELL:", ConsoleColor.Cyan, bw);
-                    RenderHelpLine("  • qwen2.5-coder:7b   [~4.4GB VRAM] ТОП для PowerShell 7, скриптів і CLI", ConsoleColor.Green, bw);
-                    RenderHelpLine("  • granite4.2:8b      [~5.0GB VRAM] Модель від IBM, чудова для системних задач", ConsoleColor.White, bw);
-                    RenderHelpLine("  • deepseek-coder:6.7b[~4.0GB VRAM] Швидка кодер-модель з високою точністю", ConsoleColor.White, bw);
-                    RenderHelpLine("  • qwen2.5-coder:1.5b [~1.2GB VRAM] Надшвидка легка модель для CPU/ноутбуків", ConsoleColor.Yellow, bw);
-                    RenderHelpLine("", ConsoleColor.White, bw);
-                    RenderHelpLine("КОМАНДИ КЕРУВАННЯ МОДЕЛЯМИ:", ConsoleColor.Cyan, bw);
-                    RenderHelpLine("  aif models              Переглянути список встановлених моделей", ConsoleColor.White, bw);
-                    RenderHelpLine("  aif model <назва>       Миттєво змінити активну модель", ConsoleColor.White, bw);
-                    RenderHelpLine("  ollama pull <назва>     Завантажити нову модель (напр: ollama pull qwen2.5-coder:7b)", ConsoleColor.DarkGray, bw);
-                    RenderHelpLine("  ollama list             Системний список моделей Ollama", ConsoleColor.DarkGray, bw);
-                }
-                else
                 {
                     RenderHelpLine("RECOMMENDED LOCAL CODING MODELS FOR POWERSHELL:", ConsoleColor.Cyan, bw);
                     RenderHelpLine("  • qwen2.5-coder:7b   [~4.4GB VRAM] Top choice for PowerShell 7 pipelines & CLI", ConsoleColor.Green, bw);
@@ -599,28 +556,10 @@ Rules:
 
             case "examples":
             {
-                var title = isUk ? "Практичні приклади для роботи та автоматизації" : "Practical DevOps & Admin Examples";
+                var title = "Practical DevOps & Admin Examples";
                 Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"    ✦ Terminal AI Fast (AOT) • {title}");
                 Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╭" + new string('─', bw) + "╮");
                 RenderHelpLine("", ConsoleColor.White, bw);
-                if (isUk)
-                {
-                    RenderHelpLine("ФАЙЛИ ТА ПАПКИ:", ConsoleColor.Cyan, bw);
-                    RenderHelpLine("  aif 'знайти файли .log більше 50MB змінені за останні 2 дні'", ConsoleColor.Green, bw);
-                    RenderHelpLine("  aif 'порахувати сумарний розмір папки C:\\Temp у гігабайтах'", ConsoleColor.Green, bw);
-                    RenderHelpLine("  aif 'видалити всі порожні папки рекурсивно' -Explain", ConsoleColor.Green, bw);
-                    RenderHelpLine("", ConsoleColor.White, bw);
-                    RenderHelpLine("ПРОЦЕСИ ТА ДІАГНОСТИКА:", ConsoleColor.Cyan, bw);
-                    RenderHelpLine("  aif 'показати топ 5 процесів за пам'яттю у таблиці з MB'", ConsoleColor.Green, bw);
-                    RenderHelpLine("  aif 'знайти процес який слухає порт 8080'", ConsoleColor.Green, bw);
-                    RenderHelpLine("  aif 'зупинити всі завислі процеси node' -x", ConsoleColor.Green, bw);
-                    RenderHelpLine("", ConsoleColor.White, bw);
-                    RenderHelpLine("МЕРЕЖА ТА СИСТЕМА:", ConsoleColor.Cyan, bw);
-                    RenderHelpLine("  aif 'перевірити доступність 8.8.8.8 на порт 53 через TCP'", ConsoleColor.Green, bw);
-                    RenderHelpLine("  aif 'вивести IP адресу шлюзу та DNS сервери'", ConsoleColor.Green, bw);
-                    RenderHelpLine("  ai-fix  (якщо попередня команда впала з помилкою)", ConsoleColor.Yellow, bw);
-                }
-                else
                 {
                     RenderHelpLine("FILES & DIRECTORIES:", ConsoleColor.Cyan, bw);
                     RenderHelpLine("  aif 'find all .log files larger than 50MB modified in last 2 days'", ConsoleColor.Green, bw);
@@ -644,31 +583,10 @@ Rules:
 
             case "workflow":
             {
-                var title = isUk ? "Посібник інтерактивної роботи в Windows Terminal" : "Interactive Workflow Guide";
+                var title = "Interactive Workflow Guide";
                 Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"    ✦ Terminal AI Fast (AOT) • {title}");
                 Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╭" + new string('─', bw) + "╮");
                 RenderHelpLine("", ConsoleColor.White, bw);
-                if (isUk)
-                {
-                    RenderHelpLine("1. ІНЛАЙН-ГЕНЕРАЦІЯ (Найшвидший спосіб):", ConsoleColor.Cyan, bw);
-                    RenderHelpLine("   • Надрукуйте будь-яку задачу людською мовою прямо у рядку вводу", ConsoleColor.White, bw);
-                    RenderHelpLine("   • Натисніть F2 (або Ctrl+Space) -> текст миттєво заміниться на код", ConsoleColor.Yellow, bw);
-                    RenderHelpLine("", ConsoleColor.White, bw);
-                    RenderHelpLine("2. ІНТЕРАКТИВНЕ МЕНЮ (Безпечний контроль):", ConsoleColor.Cyan, bw);
-                    RenderHelpLine("   • Виконайте: aif 'ваша задача'", ConsoleColor.White, bw);
-                    RenderHelpLine("   • Натисніть [Enter] щоб запустити, [C] щоб скопіювати,", ConsoleColor.White, bw);
-                    RenderHelpLine("     [I] щоб редагувати в консолі, [X] для розбору синтаксису,", ConsoleColor.White, bw);
-                    RenderHelpLine("     [A] для розгорнутої відповіді або [Esc] для відміни.", ConsoleColor.White, bw);
-                    RenderHelpLine("", ConsoleColor.White, bw);
-                    RenderHelpLine("3. АВТОМАТИЧНЕ ВИПРАВЛЕННЯ ПОМИЛОК:", ConsoleColor.Cyan, bw);
-                    RenderHelpLine("   • Якщо попередня команда завершилась з помилкою, введіть: ai-fix", ConsoleColor.Yellow, bw);
-                    RenderHelpLine("   • AI проаналізує стек помилки та запропонує робоче виправлення.", ConsoleColor.White, bw);
-                    RenderHelpLine("", ConsoleColor.White, bw);
-                    RenderHelpLine("4. СКРИПТИ ТА БЕСІДА:", ConsoleColor.Cyan, bw);
-                    RenderHelpLine("   • Створення .ps1 скриптів: ai-script 'архівація логів з ротацією'", ConsoleColor.White, bw);
-                    RenderHelpLine("   • Діалоговий режим розробника: ai-chat (підтримка /help, /model, /clear)", ConsoleColor.White, bw);
-                }
-                else
                 {
                     RenderHelpLine("1. INLINE GENERATION (Fastest method):", ConsoleColor.Cyan, bw);
                     RenderHelpLine("   • Type any goal in plain English directly at the terminal prompt", ConsoleColor.White, bw);
@@ -695,31 +613,10 @@ Rules:
 
             case "config":
             {
-                var title = isUk ? "Налаштування конфігурації Terminal AI" : "Configuration Settings Guide";
+                var title = "Configuration Settings Guide";
                 Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"    ✦ Terminal AI Fast (AOT) • {title}");
                 Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╭" + new string('─', bw) + "╮");
                 RenderHelpLine("", ConsoleColor.White, bw);
-                if (isUk)
-                {
-                    RenderHelpLine("ФАЙЛ КОНФІГУРАЦІЇ:", ConsoleColor.Cyan, bw);
-                    RenderHelpLine("  Розташування: ~/.terminalai/config.json", ConsoleColor.White, bw);
-                    RenderHelpLine("  Перегляд:     aif config   або   ai config", ConsoleColor.Green, bw);
-                    RenderHelpLine("", ConsoleColor.White, bw);
-                    RenderHelpLine("ОСНОВНІ ПАРАМЕТРИ:", ConsoleColor.Cyan, bw);
-                    RenderHelpLine("  • Model        Активна нейромережа (за замовчуванням qwen2.5-coder:7b)", ConsoleColor.White, bw);
-                    RenderHelpLine("  • OllamaUrl    Адреса сервера Ollama (http://localhost:11434)", ConsoleColor.White, bw);
-                    RenderHelpLine("  • Language     Мова інтерфейсу (en або uk)", ConsoleColor.White, bw);
-                    RenderHelpLine("  • Temperature  Креативність генерації (0.2 для точного коду)", ConsoleColor.White, bw);
-                    RenderHelpLine("  • AutoCopy     Автокопіювання коду в буфер (true/false)", ConsoleColor.White, bw);
-                    RenderHelpLine("  • Font         Шрифт Windows Terminal (напр. Cascadia Code NF)", ConsoleColor.White, bw);
-                    RenderHelpLine("  • HotkeyChord  Комбінація клавіш інлайну (F2 або Ctrl+Space)", ConsoleColor.White, bw);
-                    RenderHelpLine("", ConsoleColor.White, bw);
-                    RenderHelpLine("ШВИДКІ КОМАНДИ НАЛАШТУВАННЯ:", ConsoleColor.Cyan, bw);
-                    RenderHelpLine("  aif model <назва>        Змінити активну модель Ollama", ConsoleColor.Yellow, bw);
-                    RenderHelpLine("  aif lang en | uk         Змінити мову інтерфейсу", ConsoleColor.Yellow, bw);
-                    RenderHelpLine("  ai font <назва> [розмір] Змінити шрифт Windows Terminal", ConsoleColor.Yellow, bw);
-                }
-                else
                 {
                     RenderHelpLine("CONFIGURATION FILE:", ConsoleColor.Cyan, bw);
                     RenderHelpLine("  Location: ~/.terminalai/config.json", ConsoleColor.White, bw);
@@ -728,7 +625,7 @@ Rules:
                     RenderHelpLine("KEY SETTINGS:", ConsoleColor.Cyan, bw);
                     RenderHelpLine("  • Model        Active coding model (default: qwen2.5-coder:7b)", ConsoleColor.White, bw);
                     RenderHelpLine("  • OllamaUrl    Ollama server endpoint (http://localhost:11434)", ConsoleColor.White, bw);
-                    RenderHelpLine("  • Language     Interface language (en or uk)", ConsoleColor.White, bw);
+                    RenderHelpLine("  • Language     Model response language (en or uk)", ConsoleColor.White, bw);
                     RenderHelpLine("  • Temperature  Generation determinism (0.2 for strict code)", ConsoleColor.White, bw);
                     RenderHelpLine("  • AutoCopy     Auto-copy generated command to clipboard", ConsoleColor.White, bw);
                     RenderHelpLine("  • Font         Windows Terminal font (e.g. Cascadia Code NF)", ConsoleColor.White, bw);
@@ -736,7 +633,7 @@ Rules:
                     RenderHelpLine("", ConsoleColor.White, bw);
                     RenderHelpLine("QUICK CONFIGURATION COMMANDS:", ConsoleColor.Cyan, bw);
                     RenderHelpLine("  aif model <name>        Switch active Ollama model", ConsoleColor.Yellow, bw);
-                    RenderHelpLine("  aif lang en | uk        Switch interface language", ConsoleColor.Yellow, bw);
+                    RenderHelpLine("  aif lang en | uk        Switch model response language", ConsoleColor.Yellow, bw);
                     RenderHelpLine("  ai font <name> [size]   Configure Windows Terminal font", ConsoleColor.Yellow, bw);
                 }
                 RenderHelpLine("", ConsoleColor.White, bw);
@@ -746,33 +643,11 @@ Rules:
 
             default:
             {
-                // "all" - повна довідка
-                var title = isUk ? "Повний довідник та карта команд" : "Complete Reference & Commands Map";
+                // Complete help
+                var title = "Complete Reference & Commands Map";
                 Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"    ✦ Terminal AI Fast (AOT) • {title}");
                 Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╭" + new string('─', bw) + "╮");
                 RenderHelpLine("", ConsoleColor.White, bw);
-                if (isUk)
-                {
-                    RenderHelpLine("КОМАНДИ МОДУЛЯ:", ConsoleColor.Cyan, bw);
-                    RenderHelpLine("  aif, ai-fast      Швидкий нативний бінарний модуль C# (рекомендовано)", ConsoleColor.White, bw);
-                    RenderHelpLine("  ai, ??            Класичний модуль PowerShell з живим таймером", ConsoleColor.White, bw);
-                    RenderHelpLine("  ai-fix            Автоматичний аналіз та виправлення останньої помилки", ConsoleColor.White, bw);
-                    RenderHelpLine("  ai-script         Генератор готових .ps1 скриптів з коментарями", ConsoleColor.White, bw);
-                    RenderHelpLine("  ai-chat           Інтерактивний асистент зі слеш-командами та історією", ConsoleColor.White, bw);
-                    RenderHelpLine("  F2                Швидка генерація прямо в активному рядку вводу", ConsoleColor.Yellow, bw);
-                    RenderHelpLine("", ConsoleColor.White, bw);
-                    RenderHelpLine("ТЕМАТИЧНІ РОЗДІЛИ ДОВІДКИ:", ConsoleColor.Cyan, bw);
-                    RenderHelpLine("  aif help shortcuts Повний список гарячих клавіш, аліасів та ключів", ConsoleColor.Green, bw);
-                    RenderHelpLine("  aif help models    Вимоги до пам'яті та рекомендації моделей Ollama", ConsoleColor.Green, bw);
-                    RenderHelpLine("  aif help examples  Реальні приклади адміністрування та автоматизації", ConsoleColor.Green, bw);
-                    RenderHelpLine("  aif help workflow  Посібник по роботі з меню, інлайном та помилками", ConsoleColor.Green, bw);
-                    RenderHelpLine("  aif help config    Довідник конфігурації (~/.terminalai/config.json)", ConsoleColor.Green, bw);
-                    RenderHelpLine("", ConsoleColor.White, bw);
-                    RenderHelpLine("ОФІЦІЙНА ДОПОМОГА POWERSHELL:", ConsoleColor.Cyan, bw);
-                    RenderHelpLine("  Get-Help aif -Full        Повна man-сторінка з синтаксисом і типами", ConsoleColor.DarkGray, bw);
-                    RenderHelpLine("  Get-Help aif -Examples    Приклади використання бінарного модуля", ConsoleColor.DarkGray, bw);
-                }
-                else
                 {
                     RenderHelpLine("AVAILABLE COMMANDS:", ConsoleColor.Cyan, bw);
                     RenderHelpLine("  aif, ai-fast      Fast native C# binary module (recommended)", ConsoleColor.White, bw);
@@ -803,14 +678,14 @@ Rules:
 
     private void ShowStatus(AiConfig cfg, bool isUk)
     {
-        var title = isUk ? "Інформація про систему" : "System Information";
-        var lblModel = isUk ? "Активна модель:" : "Active Model:";
-        var lblFont = isUk ? "Шрифт терміналу:" : "Terminal Font:";
-        var lblServer = isUk ? "Локальний сервер:" : "Local Server:";
-        var lblHotkey = isUk ? "Швидке доповнення:" : "Quick Inline:";
-        var lblLang = isUk ? "Основна мова:" : "Language:";
-        var hintModel = isUk ? "Змінити модель:  ai-fast model <назва>" : "Change model:  ai-fast model <name>";
-        var hintLang = isUk ? "Змінити мову:    ai-fast lang uk | en" : "Change lang:   ai-fast lang en | uk";
+        var title = "System Information";
+        var lblModel = "Active Model:";
+        var lblFont = "Terminal Font:";
+        var lblServer = "Local Server:";
+        var lblHotkey = "Quick Inline:";
+        var lblLang = "Model Response Language:";
+        var hintModel = "Change model:  ai-fast model <name>";
+        var hintLang = "Change lang:   ai-fast lang en | uk";
 
         Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"\n    ✦ Terminal AI Fast (AOT) • {title}");
         Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╭──────────────────────────────────────────────────────────────────╮");
@@ -820,16 +695,16 @@ Rules:
         RenderRow(lblFont, string.IsNullOrEmpty(cfg.Font) ? "Default" : cfg.Font, ConsoleColor.Cyan);
         RenderRow(lblServer, cfg.OllamaUrl, ConsoleColor.White);
         RenderRow(lblHotkey, $"{cfg.HotkeyChord} / F2", ConsoleColor.Yellow);
-        RenderRow(lblLang, cfg.Language == "en" ? "en (English)" : "uk (Українська)", ConsoleColor.White);
+        RenderRow(lblLang, cfg.Language == "en" ? "en (English)" : "uk (Ukrainian)", ConsoleColor.White);
 
-        var lblAliases = isUk ? "Аліаси команд:" : "Command Aliases:";
-        var valAliases = cfg.UseAliases ? (isUk ? "Увімкнено (короткі)" : "Enabled (short)") : (isUk ? "Вимкнено (повні)" : "Disabled (full)");
+        var lblAliases = "Command Aliases:";
+        var valAliases = cfg.UseAliases ? "Enabled (short)" : "Disabled (full)";
         RenderRow(lblAliases, valAliases, cfg.UseAliases ? ConsoleColor.Yellow : ConsoleColor.DarkGray);
 
         Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    │                                                                  │");
         Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "    ╰──────────────────────────────────────────────────────────────────╯\n");
 
-        var hintAlias = isUk ? "Перемкнути аліаси: ai-fast alias on | off" : "Toggle aliases:   ai-fast alias on | off";
+        var hintAlias = "Toggle aliases:   ai-fast alias on | off";
         Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, $"    💡 {hintModel}");
         Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, $"    💡 {hintLang}");
         Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, $"    💡 {hintAlias}\n");
@@ -853,18 +728,18 @@ Rules:
             var models = OllamaClient.GetModelsAsync(cfg.OllamaUrl, 15, isUk).GetAwaiter().GetResult();
             if (models.Count == 0)
             {
-                var msg = isUk ? " [TerminalAI] Моделей не знайдено або Ollama не запущена." : " [TerminalAI] No models found or Ollama is not running.";
+                var msg = " [TerminalAI] No models found or Ollama is not running.";
                 Host.UI.WriteLine(ConsoleColor.Yellow, Host.UI.RawUI.BackgroundColor, $"\n   {msg}\n");
                 return;
             }
 
-            var title = isUk ? $"Встановлені моделі Ollama (поточна: {cfg.Model}):" : $"Installed Ollama models (active: {cfg.Model}):";
+            var title = $"Installed Ollama models (active: {cfg.Model}):";
             Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"\n  ✦ {title}\n");
 
-            var colCur = isUk ? "Поточна" : "Active";
-            var colName = isUk ? "Назва" : "Name";
-            var colSize = isUk ? "Розмір (GB)" : "Size (GB)";
-            var colUpd = isUk ? "Оновлено" : "Updated";
+            var colCur = "Active";
+            var colName = "Name";
+            var colSize = "Size (GB)";
+            var colUpd = "Updated";
 
             Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, string.Format("  {0,-10} {1,-32} {2,-14} {3,-20}", colCur, colName, colSize, colUpd));
             Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "  " + new string('─', 78));
@@ -886,7 +761,7 @@ Rules:
         }
         catch (Exception ex)
         {
-            var errPrefix = isUk ? "[TerminalAI.AOT] Помилка отримання списку моделей:" : "[TerminalAI.AOT] Error retrieving models list:";
+            var errPrefix = "[TerminalAI.AOT] Error retrieving models list:";
             Host.UI.WriteErrorLine($"{errPrefix} {ex.Message}");
         }
     }
@@ -896,13 +771,13 @@ Rules:
         Host.UI.WriteLine("");
         if (cfg.Language == "en")
         {
-            Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, "    ✦ Current language: en (English)");
-            Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, "    💡 Switch language:  ai-fast lang uk  |  ai-fast lang en\n");
+            Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, "    ✦ Current model response language: en (English)");
+            Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, "    💡 Switch model response language:  ai-fast lang uk  |  ai-fast lang en\n");
         }
         else
         {
-            Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, "    ✦ Поточна мова: uk (Українська)");
-            Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, "    💡 Змінити мову:     ai-fast lang en  |  ai-fast lang uk\n");
+            Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, "    ✦ Current model response language: uk (Ukrainian)");
+            Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, "    💡 Switch model response language:  ai-fast lang en  |  ai-fast lang uk\n");
         }
     }
 
@@ -996,13 +871,11 @@ Rules:
         string displayCode = hasSecret ? AotSecretSanitizer.Sanitize(code) : code;
 
         var latency = elapsedMs > 0 ? $"{elapsedMs}ms" : "0ms";
-        var title = isUk ? $"AI Команда (AOT • {latency})" : $"AI Command (AOT • {latency})";
+        var title = $"AI Command (AOT • {latency})";
 
         if (hasSecret)
         {
-            var secWarn = isUk
-                ? "    ⚠ [УВАГА] Виявлено конфіденційні дані: автоматично замасковано для безпеки."
-                : "    ⚠ [SECURITY] Sensitive data detected: automatically masked for display.";
+            var secWarn = "    ⚠ [SECURITY] Sensitive data detected: automatically masked for display.";
             Host.UI.WriteLine(ConsoleColor.Yellow, Host.UI.RawUI.BackgroundColor, secWarn);
         }
 
@@ -1072,7 +945,7 @@ Rules:
         Host.UI.Write(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, "]  [Risk: ");
         Host.UI.Write(riskColor, Host.UI.RawUI.BackgroundColor, analysis.OverallRisk.ToString());
         Host.UI.Write(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, "]  [WhatIf: ");
-        Host.UI.Write(analysis.CanPreview ? ConsoleColor.Cyan : ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, analysis.CanPreview ? (isUk ? "Підтримується" : "Supported") : (isUk ? "Недоступно" : "Unavailable"));
+        Host.UI.Write(analysis.CanPreview ? ConsoleColor.Cyan : ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, analysis.CanPreview ? "Supported" : "Unavailable");
         Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, "]");
     }
 
@@ -1081,15 +954,13 @@ Rules:
         if (analysis.Targets != null && analysis.Targets.Count > 0 && !(analysis.Targets.Count == 1 && analysis.Targets[0] == "Unknown target"))
         {
             var targetsDisplay = string.Join(", ", analysis.Targets.Select(AotSecretSanitizer.Sanitize));
-            var tLabel = isUk ? "Цілі" : "Targets";
+            var tLabel = "Targets";
             Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, $"    🎯 {tLabel}: {targetsDisplay}");
         }
 
         if (RequiresElevation(analysis, command) && !IsProcessElevated())
         {
-            var elevWarn = isUk
-                ? "    ⚠ Потрібні права адміністратора (поточна сесія без підвищення прав)."
-                : "    ⚠ Requires Administrator elevation (current session is not elevated).";
+            var elevWarn = "    ⚠ Requires Administrator elevation (current session is not elevated).";
             Host.UI.WriteLine(ConsoleColor.Yellow, Host.UI.RawUI.BackgroundColor, elevWarn);
         }
     }
@@ -1131,14 +1002,14 @@ Rules:
 
     private void RenderMenu(bool isUk, bool preferAliases)
     {
-        var tEnter = isUk ? "Виконати" : "Execute";
-        var tCopy = isUk ? "Скопіювати" : "Copy";
-        var tInsert = isUk ? "Вставити" : "Insert";
-        var tAlias = preferAliases ? (isUk ? "Повні" : "Full") : (isUk ? "Аліаси" : "Alias");
-        var tExplain = isUk ? "Пояснити" : "Explain";
-        var tAsk = isUk ? "Текст" : "Text";
-        var tSave = isUk ? "Зберегти" : "Save";
-        var tCancel = isUk ? "Скасувати" : "Cancel";
+        var tEnter = "Execute";
+        var tCopy = "Copy";
+        var tInsert = "Insert";
+        var tAlias = preferAliases ? "Full" : "Alias";
+        var tExplain = "Explain";
+        var tAsk = "Text";
+        var tSave = "Save";
+        var tCancel = "Cancel";
 
         int termWidth = GetTerminalWidth();
         if (termWidth >= 110)
@@ -1200,16 +1071,9 @@ Rules:
     {
         if (string.IsNullOrWhiteSpace(agentPrompt) || agentPrompt.Equals("help", StringComparison.OrdinalIgnoreCase) || agentPrompt.Equals("--help", StringComparison.OrdinalIgnoreCase))
         {
-            var title = isUk ? "Режим Автономного Агента (Claude Code + Ollama)" : "Autonomous Agent Mode (Claude Code + Ollama)";
+            var title = "Autonomous Agent Mode (Claude Code + Ollama)";
             Host.UI.WriteLine(ConsoleColor.Cyan, Host.UI.RawUI.BackgroundColor, $"\n  ✦ Terminal AI • {title}");
             Host.UI.WriteLine(ConsoleColor.DarkCyan, Host.UI.RawUI.BackgroundColor, "  " + new string('─', 70));
-            if (isUk)
-            {
-                Host.UI.WriteLine(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, "    Команда `aif -Agent <запит>` безпечно делегує автономні задачі агенту Claude Code,");
-                Host.UI.WriteLine(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, "    підключеному до вашої локальної моделі Ollama через протокол Anthropic Messages API.");
-                Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, "    Приклад: aif -Agent 'знайти всі застарілі тимчасові файли та згенерувати звіт'");
-            }
-            else
             {
                 Host.UI.WriteLine(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, "    Command `aif -Agent <prompt>` safely delegates autonomous tasks to Claude Code,");
                 Host.UI.WriteLine(ConsoleColor.White, Host.UI.RawUI.BackgroundColor, "    connected to your local Ollama model via the Anthropic Messages API protocol.");
@@ -1249,10 +1113,8 @@ Rules:
         }
         else
         {
-            var warnTitle = isUk ? "Режим агента недоступний у поточній сесії" : "Agent Mode unavailable in current session";
-            var warnHint = isUk
-                ? "Для використання автономного агента завантажте основний модуль: Import-Module TerminalAI"
-                : "To use autonomous agent mode, load the primary module: Import-Module TerminalAI";
+            var warnTitle = "Agent Mode unavailable in current session";
+            var warnHint = "To use autonomous agent mode, load the primary module: Import-Module TerminalAI";
             Host.UI.WriteLine(ConsoleColor.Yellow, Host.UI.RawUI.BackgroundColor, $"\n    ⚠ [{warnTitle}]");
             Host.UI.WriteLine(ConsoleColor.DarkGray, Host.UI.RawUI.BackgroundColor, $"      {warnHint}\n");
         }

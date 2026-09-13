@@ -1,8 +1,10 @@
 # TerminalAI.Aot — Managed .NET 10 C# Binary Module for PowerShell
 
-**English** | [Українська](README.uk.md) | [Main documentation](../README.en.md)
+**English** | [Ukrainian](README.uk.md) | [Main documentation](../README.md)
 
 Managed .NET 10 C# binary module (compiled .NET 10 helper) for TerminalAI on PowerShell 7+ (`net10.0`). The historical `AOT` name does not mean the current project produces a NativeAOT executable: `TerminalAI.Aot.csproj` builds a standard managed DLL with `dotnet build` and has no NativeAOT (`PublishAot`) configuration.
+
+The built-in UI—including status, help, menus, and error text—is English-only. The shared `Language` setting selects the requested language for model-generated prose from `-Ask` and `-Explain`; it does not localize the module UI or raw command generation.
 
 > [!IMPORTANT]
 > Generated commands are untrusted input. Review them before execution. AST checks and WhatIf previews are safety guardrails, NOT a security sandbox. TerminalAI parses PowerShell syntax, classifies risk, and requires confirmation for high-risk or unresolved operations.
@@ -15,7 +17,7 @@ Managed .NET 10 C# binary module (compiled .NET 10 helper) for TerminalAI on Pow
 - **Persistent HTTP Client**: A shared `HttpClient` backed by `SocketsHttpHandler` reuses connections for Ollama requests.
 - **Direct AST Analysis**: Employs PowerShell 7 native `System.Management.Automation.Language.Parser` directly in C# for instant command structure and parameter verification.
 - **Win32 Direct Interop**: Native P/Invoke for clipboard operations (`OpenClipboard`/`SetClipboardData`) and console scan codes, avoiding child process spawns or shell pipeline overhead.
-- **Shared user contract**: The module reads `~/.terminal-ai/config.json` and supports the main one-shot generation, model, language, safety, save, and agent workflows. Verify parity with the PowerShell path through tests rather than assuming it.
+- **Shared user contract**: The module reads `~/.terminal-ai/config.json` and supports the main one-shot generation, model, response-language, safety, save, and agent workflows. Verify parity with the PowerShell path through tests rather than assuming it.
 
 ---
 
@@ -110,7 +112,7 @@ The current test run is the source of truth; this document intentionally does no
 ### Parameter Reference:
 | Parameter | Aliases | Type | Description |
 | :--- | :--- | :---: | :--- |
-| `[Prompt]` | *(Positional 0)* | `string[]` | Natural language request, subcommand (`models`, `model <name>`, `lang <en\|uk>`, `status`, `config`, `help`), or `agent <task>`. |
+| `[Prompt]` | *(Positional 0)* | `string[]` | Natural language request, subcommand (`models`, `model <name>`, `lang <en\|uk>`, `status`, `config`, `help`), or `agent <task>`. The `lang` subcommand selects the requested language for model-generated prose. |
 | `-Execute` | `-x`, `-y` | `switch` | Execute generated command immediately without interactive menu (subject to security gate). |
 | `-Copy` | `-c` | `switch` | Copy generated command directly to clipboard with secret sanitization. |
 | `-Alias` | `-a`, `-Short`, `-UseAliases` | `switch` | Generate compact pipelines using standard short aliases (e.g. `gps`, `gci`, `select`, `?`). |
@@ -156,24 +158,24 @@ aif "refactor module logging" -Agent
 # 10. Subcommands & management
 aif models                     # List installed Ollama models
 aif model qwen2.5-coder:7b     # Switch active model
-aif lang uk                    # Switch language to Ukrainian
-aif lang en                    # Switch language to English
+aif lang uk                    # Request Ukrainian model-generated prose responses
+aif lang en                    # Request English model-generated prose responses
 aif status                     # View active model, endpoint, language, and font
 aif config                     # View raw JSON configuration
 aif help                       # View quick reference card
 ```
 
 ### Interactive Menu Hotkeys (after generation):
-| Hotkey | English Action | Українська дія | Description |
-| :---: | :--- | :--- | :--- |
-| **`[Enter]`** | Execute | Виконати | Executes command in current session (enforces security gate) |
-| **`[C]`** | Copy | Скопіювати | Copies sanitized command to system clipboard via Win32 API |
-| **`[I]`** | Insert | Вставити в рядок | Inserts command cleanly into next prompt line for manual editing |
-| **`[S]`** | Toggle Aliases | Перемкнути аліаси | Toggles between short aliases (`gci`, `gps`) and full cmdlet names |
-| **`[W]`** | Save | Зберегти у файл | Prompts for path and saves script with colorized Unified Diff preview |
-| **`[X]`** | Explain | Пояснити код | Generates technical explanation of syntax, flags, and safety |
-| **`[A]`** | Ask Text | Текстова відповідь | Switches to conversational text consultation |
-| **`[Esc]`** | Cancel | Скасувати | Cancels menu and cleanly returns to prompt |
+| Hotkey | Action | Description |
+| :---: | :--- | :--- |
+| **`[Enter]`** | Execute | Executes command in current session (enforces security gate) |
+| **`[C]`** | Copy | Copies sanitized command to system clipboard via Win32 API |
+| **`[I]`** | Insert | Inserts command cleanly into next prompt line for manual editing |
+| **`[S]`** | Toggle Aliases | Toggles between short aliases (`gci`, `gps`) and full cmdlet names |
+| **`[W]`** | Save | Prompts for path and saves script with colorized Unified Diff preview |
+| **`[X]`** | Explain | Generates technical explanation of syntax, flags, and safety |
+| **`[A]`** | Ask Text | Switches to conversational text consultation |
+| **`[Esc]`** | Cancel | Cancels menu and cleanly returns to prompt |
 
 ---
 

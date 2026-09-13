@@ -54,7 +54,7 @@ $installersDir = Join-Path $projectDir "installers"
 
 . (Join-Path $installersDir "InstallerCommon.ps1")
 
-$title = if ($isUk) { "   Встановлення TerminalAI (Windows Terminal & Ollama AI)   " } else { "   Installing TerminalAI (Windows Terminal & Ollama AI)   " }
+$title = "   Installing TerminalAI (Windows Terminal & Ollama AI)   "
 Write-Host "`n═══════════════════════════════════════════════════════════════" -ForegroundColor Cyan
 Write-Host $title -ForegroundColor Cyan
 Write-Host "═══════════════════════════════════════════════════════════════`n" -ForegroundColor Cyan
@@ -75,7 +75,7 @@ $orderedProducts = @("Core", "Ollama", "Aot", "WindowsTerminal") | Where-Object 
 }
 
 if (-not $orderedProducts) {
-    $msgNothing = if ($isUk) { "Не вибрано жодного продукту для встановлення (-Products)." } else { "No product selected for installation (-Products)." }
+    $msgNothing = "No product selected for installation (-Products)."
     Write-Warning $msgNothing
     return
 }
@@ -87,7 +87,7 @@ if ($needsAdminCheck -and -not (Assert-TerminalAiScopeAdmin -Scope $Scope -IsUkr
     return
 }
 
-$lblPlan = if ($isUk) { "Продукти для встановлення: " } else { "Products to install: " }
+$lblPlan = "Products to install: "
 Write-Host "$lblPlan$($orderedProducts -join ', ')`n" -ForegroundColor DarkCyan
 
 foreach ($product in $orderedProducts) {
@@ -117,17 +117,17 @@ foreach ($product in $orderedProducts) {
 if ($orderedProducts -contains "Core") {
     if ($isUk) {
         Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor Cyan
-        Write-Host "             Встановлення завершено успішно!                  " -ForegroundColor Green
+        Write-Host "             Installation completed successfully!             " -ForegroundColor Green
         Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor Cyan
-        Write-Host "Як почати користуватися прямо зараз:" -ForegroundColor Yellow
-        Write-Host "  1. Перезавантажте сесію або виконайте:  . `$PROFILE" -ForegroundColor White
-        Write-Host "  2. Спробуйте в терміналі:" -ForegroundColor White
-        Write-Host "     • ai знайти всі великі файли в поточній папці" -ForegroundColor DarkCyan
-        Write-Host "     • ai-fix   (якщо попередня команда викликала помилку)" -ForegroundColor DarkCyan
-        Write-Host "     • ai-script `"архівація та логування`"" -ForegroundColor DarkCyan
-        Write-Host "     • Напишіть у рядку '# створити zip архів' і натисніть Ctrl+Alt+A" -ForegroundColor DarkCyan
+        Write-Host "Get started now:" -ForegroundColor Yellow
+        Write-Host "  1. Restart the session or run:  . `$PROFILE" -ForegroundColor White
+        Write-Host "  2. Try these commands:" -ForegroundColor White
+        Write-Host "     • ai find all large files in the current folder" -ForegroundColor DarkCyan
+        Write-Host "     • ai-fix   (if the previous command failed)" -ForegroundColor DarkCyan
+        Write-Host "     • ai-script `"archiving and logging`"" -ForegroundColor DarkCyan
+        Write-Host "     • Type '# create a zip archive' at the prompt and press Ctrl+Alt+A" -ForegroundColor DarkCyan
         if ($orderedProducts -contains "WindowsTerminal") {
-            Write-Host "  3. У Windows Terminal натисніть Ctrl+Shift+P і шукайте 'AI:'`n" -ForegroundColor White
+            Write-Host "  3. In Windows Terminal, press Ctrl+Shift+P and search for 'AI:'`n" -ForegroundColor White
         } else {
             Write-Host "" -ForegroundColor White
         }
@@ -149,6 +149,6 @@ if ($orderedProducts -contains "Core") {
         }
     }
 } else {
-    $msgDone = if ($isUk) { "✔ Продукт(и) встановлено: $($orderedProducts -join ', ')`n" } else { "✔ Installed product(s): $($orderedProducts -join ', ')`n" }
+    $msgDone = "✔ Installed product(s): $($orderedProducts -join ', ')`n"
     Write-Host $msgDone -ForegroundColor Green
 }

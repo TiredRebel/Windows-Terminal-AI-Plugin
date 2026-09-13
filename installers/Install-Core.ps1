@@ -34,12 +34,12 @@ $projectDir = if ($PSScriptRoot) { Split-Path -Parent $PSScriptRoot } else { Get
 
 $manifestPath = Join-Path $projectDir "TerminalAI.psd1"
 if (-not (Test-Path $manifestPath)) {
-    $msgNoPsd = if ($isUk) { "Не знайдено TerminalAI.psd1 у $projectDir" } else { "TerminalAI.psd1 not found in $projectDir" }
+    $msgNoPsd = "TerminalAI.psd1 not found in $projectDir"
     Write-Error $msgNoPsd
     return
 }
 
-$step = if ($isUk) { "▶ Реєстрація модуля PowerShell ($Scope)..." } else { "▶ Registering PowerShell module ($Scope)..." }
+$step = "▶ Registering PowerShell module ($Scope)..."
 Write-Host $step -ForegroundColor Yellow
 
 $moduleDestinations = Get-TerminalAiModuleDestinations -Scope $Scope -CustomModulePath $CustomModulePath
@@ -57,7 +57,7 @@ foreach ($destModuleDir in $moduleDestinations) {
         }
     }
 
-    $msgSynced = if ($isUk) { "   ✔ Модуль успішно синхронізовано з: $destModuleDir" } else { "   ✔ Module successfully synchronized to: $destModuleDir" }
+    $msgSynced = "   ✔ Module successfully synchronized to: $destModuleDir"
     Write-Host $msgSynced -ForegroundColor Green
 }
 
@@ -70,7 +70,7 @@ $targetProfile = if ($CustomProfilePath) {
     if ($PROFILE.CurrentUserCurrentHost) { $PROFILE.CurrentUserCurrentHost } else { $PROFILE }
 }
 
-$stepProfile = if ($isUk) { "▶ Оновлення профілю PowerShell ($targetProfile)..." } else { "▶ Updating PowerShell profile ($targetProfile)..." }
+$stepProfile = "▶ Updating PowerShell profile ($targetProfile)..."
 Write-Host $stepProfile -ForegroundColor Yellow
 
 $startMarker = "# >>> TerminalAI Initialization >>>"
@@ -94,7 +94,7 @@ if ($profileExists) {
     $backupFile = "$targetProfile.bak." + (Get-Date -Format "yyyyMMdd_HHmmss")
     try {
         Copy-Item -Path $targetProfile -Destination $backupFile -Force
-        $msgBak = if ($isUk) { "   ✔ Створено резервну копію профілю: $backupFile" } else { "   ✔ Created profile backup: $backupFile" }
+        $msgBak = "   ✔ Created profile backup: $backupFile"
         Write-Host $msgBak -ForegroundColor DarkGray
     } catch { }
 
@@ -107,21 +107,21 @@ if ($profileExists) {
 
     if ($profileContent -match '(?ms)# >>> TerminalAI Initialization >>>.*?# <<< TerminalAI Initialization <<<') {
         $newProfileContent = [regex]::Replace($profileContent, '(?ms)# >>> TerminalAI Initialization >>>.*?# <<< TerminalAI Initialization <<<', $blockContent)
-        $msgUpdBlock = if ($isUk) { "   ✔ Оновлено наявний блок TerminalAI у $targetProfile" } else { "   ✔ Updated existing TerminalAI block in $targetProfile" }
+        $msgUpdBlock = "   ✔ Updated existing TerminalAI block in $targetProfile"
         Write-Host $msgUpdBlock -ForegroundColor DarkGreen
     } elseif ($profileContent -match '(?ms)\r?\n?# TerminalAI[^\r\n]*\r?\n?Import-Module\s+TerminalAI[^\r\n]*') {
         $newProfileContent = [regex]::Replace($profileContent, '(?ms)\r?\n?# TerminalAI[^\r\n]*\r?\n?Import-Module\s+TerminalAI[^\r\n]*', "`n$blockContent")
-        $msgLegacyUpd = if ($isUk) { "   ✔ Оновлено застарілий виклик Import-Module на маркований блок у $targetProfile" } else { "   ✔ Updated legacy Import-Module call to marked block in $targetProfile" }
+        $msgLegacyUpd = "   ✔ Updated legacy Import-Module call to marked block in $targetProfile"
         Write-Host $msgLegacyUpd -ForegroundColor Green
     } else {
         $separator = if ($profileContent.Length -gt 0 -and -not $profileContent.EndsWith("`n")) { "`n`n" } else { "`n" }
         $newProfileContent = $profileContent + $separator + $blockContent
-        $msgAddBlock = if ($isUk) { "   ✔ Додано маркований блок TerminalAI у $targetProfile" } else { "   ✔ Added marked TerminalAI block to $targetProfile" }
+        $msgAddBlock = "   ✔ Added marked TerminalAI block to $targetProfile"
         Write-Host $msgAddBlock -ForegroundColor Green
     }
 } else {
     $newProfileContent = $blockContent
-    $msgNewProf = if ($isUk) { "   ✔ Створено новий профіль з маркованим блоком: $targetProfile" } else { "   ✔ Created new profile with marked block: $targetProfile" }
+    $msgNewProf = "   ✔ Created new profile with marked block: $targetProfile"
     Write-Host $msgNewProf -ForegroundColor Green
 }
 

@@ -73,22 +73,22 @@ public static class Win32Console
 
             if (!ctrl && !alt)
             {
-                if (k == ConsoleKey.C || ch is 'c' or 'C' or 'с' or 'С')
+                if (k == ConsoleKey.C || ch is 'c' or 'C')
                     return MenuAction.Copy;
 
-                if (k == ConsoleKey.I || ch is 'i' or 'I' or 'і' or 'І' or 'ш' or 'Ш')
+                if (k == ConsoleKey.I || ch is 'i' or 'I')
                     return MenuAction.Insert;
 
-                if (k == ConsoleKey.X || ch is 'x' or 'X' or 'х' or 'Х' or 'ч' or 'Ч')
+                if (k == ConsoleKey.X || ch is 'x' or 'X')
                     return MenuAction.Explain;
 
-                if (k == ConsoleKey.A || ch is 'a' or 'A' or 'а' or 'А' or 'ф' or 'Ф')
+                if (k == ConsoleKey.A || ch is 'a' or 'A')
                     return MenuAction.Ask;
 
-                if (k == ConsoleKey.S || ch is 's' or 'S' or 'ы' or 'Ы')
+                if (k == ConsoleKey.S || ch is 's' or 'S')
                     return MenuAction.ShortAlias;
 
-                if (k == ConsoleKey.W || ch is 'w' or 'W' or 'в' or 'В')
+                if (k == ConsoleKey.W || ch is 'w' or 'W')
                     return MenuAction.Save;
             }
         }
