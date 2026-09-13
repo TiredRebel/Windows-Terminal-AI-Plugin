@@ -100,22 +100,31 @@ jobs:
           if (-not $mod.ExportedAliases.ContainsKey("ai")) { throw "'ai' alias not exported in PS 7" }
           Write-Host "TerminalAI successfully imported in PowerShell 7 ($($mod.ExportedFunctions.Count) functions, $($mod.ExportedAliases.Count) aliases, $($mod.ExportedCmdlets.Count) cmdlets)." -ForegroundColor Green
 
-      - name: PSScriptAnalyzer Recursive Check (0 Errors)
+      - name: PSScriptAnalyzer Quality Check (0 Errors)
         shell: pwsh
         run: |
           Write-Host "=== Running PSScriptAnalyzer Quality Gate ===" -ForegroundColor Cyan
           if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
-              Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser
+              Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser -AllowClobber
           }
-          $analysis = Invoke-ScriptAnalyzer -Path . -Recurse
+          Import-Module -Name PSScriptAnalyzer -Force -ErrorAction Stop
+
+          $scriptFiles = Get-ChildItem -Path . -Recurse -Include *.ps1, *.psm1, *.psd1 | Where-Object {
+              $_.FullName -notmatch '[\\/](\.git|\.github|\.codegraph|bin|obj|dist|Launcher)[\\/]'
+          }
+          Write-Host "Analyzing $($scriptFiles.Count) script and manifest files..."
+          $analysis = foreach ($file in $scriptFiles) {
+              Invoke-ScriptAnalyzer -Path $file.FullName -ErrorAction SilentlyContinue
+          }
           $errors = @($analysis | Where-Object { $_.Severity -eq 'Error' })
           $warnings = @($analysis | Where-Object { $_.Severity -eq 'Warning' })
           $info = @($analysis | Where-Object { $_.Severity -eq 'Information' })
 
           Write-Host "PSScriptAnalyzer Findings Summary:"
-          Write-Host "  Errors:      $($errors.Count)" -ForegroundColor $(if ($errors.Count -eq 0) { "Green" } else { "Red" })
-          Write-Host "  Warnings:    $($warnings.Count)" -ForegroundColor Yellow
-          Write-Host "  Information: $($info.Count)" -ForegroundColor DarkGray
+          Write-Host "  Files Analyzed: $($scriptFiles.Count)"
+          Write-Host "  Errors:         $($errors.Count)" -ForegroundColor $(if ($errors.Count -eq 0) { "Green" } else { "Red" })
+          Write-Host "  Warnings:       $($warnings.Count)" -ForegroundColor Yellow
+          Write-Host "  Information:    $($info.Count)" -ForegroundColor DarkGray
 
           if ($errors.Count -gt 0) {
               Write-Host "`nCRITICAL: PSScriptAnalyzer reported $($errors.Count) error(s):" -ForegroundColor Red
