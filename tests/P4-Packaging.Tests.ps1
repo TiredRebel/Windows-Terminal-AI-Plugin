@@ -17,6 +17,9 @@ $origConfigDir = $env:TERMINAL_AI_CONFIG_DIR
 $origLang = $env:TERMINAL_AI_LANG
 $testTempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("TerminalAiTest_P4_" + [System.Guid]::NewGuid().ToString("N"))
 $testConfigDir = Join-Path $testTempRoot "config"
+$dirtyMarker = Join-Path $projectRoot (".terminalai-p4-dirty-" + [System.Guid]::NewGuid().ToString("N"))
+$installerManifest = Join-Path $projectRoot "manifests\t\TiredRebel\TerminalAI\0.1.0-preview2\TiredRebel.TerminalAI.installer.yaml"
+$installerManifestBytes = [System.IO.File]::ReadAllBytes($installerManifest)
 New-Item -ItemType Directory -Path $testConfigDir -Force | Out-Null
 $env:TERMINAL_AI_CONFIG_DIR = $testConfigDir
 
@@ -118,6 +121,7 @@ Assert-Fixture "FIX-P4-04" "Staged package manifest passes Test-ModuleManifest" 
 }
 
 Assert-Fixture "FIX-P4-04A" "Public Gallery publication rejects dirty working trees" {
+    [System.IO.File]::WriteAllText($dirtyMarker, "test-only")
     $galleryScript = Join-Path $projectRoot "tools\Publish-TerminalAiGallery.ps1"
     $dirtyStaging = Join-Path $testTempRoot "PublicDirtyGallery"
     $rejected = $false
@@ -145,7 +149,7 @@ Assert-Fixture "FIX-P4-06" "Release provenance, docs, source hashes, and WinGet 
     if (-not (Test-Path $zipPath)) { throw "Release zip not found at $zipPath" }
     $realHash = (Get-FileHash -Path $zipPath -Algorithm SHA256).Hash
     
-    $installerYaml = Join-Path $projectRoot "manifests\t\TiredRebel\TerminalAI\0.1.0-preview2\TiredRebel.TerminalAI.installer.yaml"
+    $installerYaml = $installerManifest
     if (-not (Test-Path $installerYaml)) { throw "Installer YAML not found at $installerYaml" }
     
     $yamlContent = Get-Content $installerYaml -Raw
@@ -274,6 +278,8 @@ Write-Host "------------------------------------------------------------`n"
 
 } finally {
     # Guaranteed cleanup of isolated test environment
+    [System.IO.File]::WriteAllBytes($installerManifest, $installerManifestBytes)
+    Remove-Item -LiteralPath $dirtyMarker -Force -ErrorAction SilentlyContinue
     $env:TERMINAL_AI_CONFIG_DIR = $origConfigDir
     $env:TERMINAL_AI_LANG = $origLang
     if ($testTempRoot -and (Test-Path $testTempRoot)) {
