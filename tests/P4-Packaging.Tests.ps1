@@ -49,13 +49,13 @@ try {
 
 # --- 1. PowerShell Gallery Manifest Validation ---
 
-Assert-Fixture "FIX-P4-01" "TerminalAI.psd1 passes Test-ModuleManifest cleanly (0.1.0-preview1)" {
+Assert-Fixture "FIX-P4-01" "TerminalAI.psd1 passes Test-ModuleManifest cleanly (0.1.0-preview2)" {
     $manifestPath = Join-Path $projectRoot "TerminalAI.psd1"
     $mod = Test-ModuleManifest -Path $manifestPath -ErrorAction Stop
     if ($mod.Name -ne "TerminalAI") { throw "Expected module name TerminalAI, got $($mod.Name)" }
     if ($mod.Version -ne [version]"0.1.0") { throw "Expected version 0.1.0, got $($mod.Version)" }
     $prerelease = $mod.PrivateData.PSData.Prerelease
-    if ($prerelease -ne "preview1") { throw "Expected Prerelease preview1, got '$prerelease'" }
+    if ($prerelease -ne "preview2") { throw "Expected Prerelease preview2, got '$prerelease'" }
 }
 
 Assert-Fixture "FIX-P4-02" "TerminalAI.psd1 declares all required PSGallery metadata fields" {
@@ -79,10 +79,28 @@ Assert-Fixture "FIX-P4-03" "Publish-TerminalAiGallery stages pure package withou
     if (-not (Test-Path $galleryScript)) { throw "Publish-TerminalAiGallery.ps1 missing" }
     
     $testStaging = Join-Path $testTempRoot "TestStaging_P4"
-    & $galleryScript -StagingPath $testStaging -DryRun -Force | Out-Null
+    $rootDllBefore = (Get-FileHash (Join-Path $projectRoot "TerminalAI.Aot.dll") -Algorithm SHA256).Hash
+    & $galleryScript -StagingPath $testStaging -DryRun -Force -AllowUnsigned | Out-Null
+    $rootDllAfter = (Get-FileHash (Join-Path $projectRoot "TerminalAI.Aot.dll") -Algorithm SHA256).Hash
+    if ($rootDllBefore -ne $rootDllAfter) { throw "Gallery staging modified tracked root AOT DLL." }
+    $galleryProv = Get-Content (Join-Path $testStaging "GALLERY-PROVENANCE.json") -Raw | ConvertFrom-Json
+    if ($galleryProv.commit -ne ((& git -C $projectRoot rev-parse HEAD).Trim())) { throw "Gallery provenance commit mismatch." }
+    $stagedDll = Join-Path $testStaging "TerminalAI.Aot.dll"
+    if ($galleryProv.artifactHashes.'TerminalAI.Aot.dll' -ne (Get-FileHash $stagedDll -Algorithm SHA256).Hash) { throw "Gallery staged DLL hash mismatch." }
     
     $stagedFiles = Get-ChildItem -Path $testStaging -Recurse -File
-    if ($stagedFiles.Count -lt 9) { throw "Expected at least 9 staged files, got $($stagedFiles.Count)" }
+    if ($stagedFiles.Count -lt 12) { throw "Expected at least 12 staged files, got $($stagedFiles.Count)" }
+    foreach ($required in @("README.uk.md","docs\TECHNICAL.md","AOT\README.md","AOT\README.uk.md","LICENSE")) { if (-not (Test-Path (Join-Path $testStaging $required))) { throw "Missing staged documentation: $required" } }
+    foreach ($readme in @("README.md","README.uk.md","AOT\README.md","AOT\README.uk.md")) {
+        $base = Split-Path (Join-Path $testStaging $readme)
+        foreach ($match in [regex]::Matches((Get-Content (Join-Path $testStaging $readme) -Raw), '\[[^]]+\]\(([^)#]+)(?:#[^)]+)?\)')) {
+            $target = $match.Groups[1].Value
+            if ($target -notmatch '^(?i:https?://|mailto:)') {
+                $resolved = Join-Path $base $target
+                if (-not (Test-Path $resolved)) { throw "Broken staged README link: $readme -> $target" }
+            }
+        }
+    }
     
     # Verify zero dev files
     $devFiles = $stagedFiles | Where-Object { $_.Name -like "*.Tests.ps1" -or $_.Name -like "*.cs" -or $_.Name -like "*.csproj" }
@@ -92,32 +110,42 @@ Assert-Fixture "FIX-P4-03" "Publish-TerminalAiGallery stages pure package withou
 Assert-Fixture "FIX-P4-04" "Staged package manifest passes Test-ModuleManifest" {
     $galleryScript = Join-Path $projectRoot "tools\Publish-TerminalAiGallery.ps1"
     $testStaging = Join-Path $testTempRoot "TestStaging_P4_Val"
-    & $galleryScript -StagingPath $testStaging -DryRun -Force | Out-Null
+    & $galleryScript -StagingPath $testStaging -DryRun -Force -AllowUnsigned | Out-Null
     
     $stagedPsd1 = Join-Path $testStaging "TerminalAI.psd1"
     $stagedInfo = Test-ModuleManifest -Path $stagedPsd1 -ErrorAction Stop
     if ($stagedInfo.ExportedFunctions.Count -lt 30) { throw "Staged manifest exported functions incomplete" }
 }
 
+Assert-Fixture "FIX-P4-04A" "Public Gallery publication rejects dirty working trees" {
+    $galleryScript = Join-Path $projectRoot "tools\Publish-TerminalAiGallery.ps1"
+    $dirtyStaging = Join-Path $testTempRoot "PublicDirtyGallery"
+    $rejected = $false
+    try { & $galleryScript -StagingPath $dirtyStaging -Force -AllowUnsigned -NuGetApiKey "test-only-key" -ErrorAction Stop } catch { $rejected = $_.Exception.Message -match "clean git tree" }
+    if (-not $rejected) { throw "Public Gallery path did not reject dirty working tree." }
+}
+
 # --- 3. Release Package & Cryptographic Integrity ---
 
-Assert-Fixture "FIX-P4-05" "Release zip package exists and has valid archive contents" {
-    $zipPath = Join-Path $projectRoot "dist\TerminalAI-v0.1.0-preview1-win-x64.zip"
-    if (-not (Test-Path $zipPath)) {
-        & (Join-Path $projectRoot "tools\Build-ReleasePackage.ps1") -Version "0.1.0-preview1" | Out-Null
-    }
+Assert-Fixture "FIX-P4-05" "Release zip is freshly rebuilt in isolated output and ignores stale archive" {
+    $buildOut = Join-Path $testTempRoot "release"
+    New-Item -ItemType Directory -Path $buildOut -Force | Out-Null
+    $zipPath = Join-Path $buildOut "TerminalAI-v0.1.0-preview2-win-x64.zip"
+    [IO.File]::WriteAllText($zipPath, "stale preview2 archive")
+    & (Join-Path $projectRoot "tools\Build-ReleasePackage.ps1") -Version "0.1.0-preview2" -OutputDir $buildOut -AllowUnsigned -AllowDirty | Out-Null
     if (-not (Test-Path $zipPath)) { throw "Release zip not found at $zipPath" }
     
     $zipItem = Get-Item $zipPath
     if ($zipItem.Length -lt 50KB) { throw "Release zip is suspiciously small: $($zipItem.Length) bytes" }
 }
 
-Assert-Fixture "FIX-P4-06" "Release zip SHA-256 matches WinGet installer manifest checksum" {
-    $zipPath = Join-Path $projectRoot "dist\TerminalAI-v0.1.0-preview1-win-x64.zip"
+Assert-Fixture "FIX-P4-06" "Release provenance, docs, source hashes, and WinGet checksum are current" {
+    $buildOut = Join-Path $testTempRoot "release"
+    $zipPath = Join-Path $buildOut "TerminalAI-v0.1.0-preview2-win-x64.zip"
     if (-not (Test-Path $zipPath)) { throw "Release zip not found at $zipPath" }
     $realHash = (Get-FileHash -Path $zipPath -Algorithm SHA256).Hash
     
-    $installerYaml = Join-Path $projectRoot "manifests\t\TiredRebel\TerminalAI\0.1.0-preview1\TiredRebel.TerminalAI.installer.yaml"
+    $installerYaml = Join-Path $projectRoot "manifests\t\TiredRebel\TerminalAI\0.1.0-preview2\TiredRebel.TerminalAI.installer.yaml"
     if (-not (Test-Path $installerYaml)) { throw "Installer YAML not found at $installerYaml" }
     
     $yamlContent = Get-Content $installerYaml -Raw
@@ -128,6 +156,40 @@ Assert-Fixture "FIX-P4-06" "Release zip SHA-256 matches WinGet installer manifes
     if ($realHash.ToUpperInvariant() -ne $manifestHash.ToUpperInvariant()) {
         throw "Hash mismatch! Archive SHA256: $realHash vs Manifest: $manifestHash"
     }
+    $extract = Join-Path $testTempRoot "extract"
+    Expand-Archive $zipPath $extract -Force
+    $prov = Get-Content (Join-Path $extract "RELEASE-PROVENANCE.json") -Raw | ConvertFrom-Json
+    if ($prov.version -ne "0.1.0-preview2") { throw "Wrong provenance version: $($prov.version)" }
+    $head = (& git -C $projectRoot rev-parse HEAD).Trim()
+    if ($prov.commit -ne $head) { throw "Provenance commit mismatch: $($prov.commit) vs $head" }
+    if (-not $prov.dirty) { throw "Candidate test build must identify dirty working-tree content." }
+    foreach ($entry in $prov.artifactHashes.psobject.Properties) {
+        $archived = Join-Path $extract $entry.Name
+        if (-not (Test-Path $archived)) { throw "Artifact missing: $($entry.Name)" }
+        if ((Get-FileHash $archived -Algorithm SHA256).Hash -ne $entry.Value) { throw "Artifact hash mismatch: $($entry.Name)" }
+    }
+    foreach ($entry in $prov.sourceHashes.psobject.Properties) {
+        $relative = $entry.Name -replace '/', '\\'; $source = Join-Path $projectRoot $relative
+        if (-not (Test-Path $source)) { throw "Provenance source missing: $relative" }
+        if ((Get-FileHash $source -Algorithm SHA256).Hash -ne $entry.Value) { throw "Source hash mismatch: $relative" }
+        $archived = Join-Path $extract $relative
+        if (-not (Test-Path $archived)) { throw "Provenance archive file missing: $relative" }
+        if ((Get-FileHash $archived -Algorithm SHA256).Hash -ne $entry.Value) { throw "Archive content hash mismatch: $relative" }
+    }
+    foreach ($required in @("README.uk.md","docs\TECHNICAL.md","AOT\README.md","AOT\README.uk.md","LICENSE")) { if (-not (Test-Path (Join-Path $extract $required))) { throw "Archive missing: $required" } }
+}
+
+Assert-Fixture "FIX-P4-06A" "Unsigned release packaging requires explicit acknowledgement" {
+    $unsignedOut = Join-Path $testTempRoot "unsigned-no-ack"
+    $failedAsExpected = $false
+    try { & (Join-Path $projectRoot "tools\Build-ReleasePackage.ps1") -Version "0.1.0-preview2" -OutputDir $unsignedOut -SkipZip -AllowDirty -ErrorAction Stop } catch { $failedAsExpected = $true }
+    if (-not $failedAsExpected) { throw "Packaging unexpectedly succeeded without -AllowUnsigned or a certificate." }
+}
+
+Assert-Fixture "FIX-P4-06B" "Publishable release packaging rejects dirty working trees" {
+    $failedAsExpected = $false
+    try { & (Join-Path $projectRoot "tools\Build-ReleasePackage.ps1") -Version "0.1.0-preview2" -OutputDir (Join-Path $testTempRoot "dirty-release") -SkipZip -ErrorAction Stop } catch { $failedAsExpected = $_.Exception.Message -match "clean git tree" }
+    if (-not $failedAsExpected) { throw "Dirty-tree release guard did not reject the candidate." }
 }
 
 # --- 4. WinGet Manifest Compliance ---
@@ -135,7 +197,7 @@ Assert-Fixture "FIX-P4-06" "Release zip SHA-256 matches WinGet installer manifes
 Assert-Fixture "FIX-P4-07" "WinGet manifests pass Test-WinGetManifest suite (Schema 1.9.0)" {
     $testScript = Join-Path $projectRoot "tools\Test-WinGetManifest.ps1"
     if (-not (Test-Path $testScript)) { throw "Test-WinGetManifest.ps1 missing" }
-    $out = & $testScript -Version "0.1.0-preview1" *>&1 | Out-String
+    $out = & $testScript *>&1 | Out-String
     if ($out -match "Manifest validation failed|Error" -or $LASTEXITCODE -ne 0) {
         throw "WinGet validation reported errors: $out"
     }
@@ -188,11 +250,10 @@ Assert-Fixture "FIX-P4-10" "Native launcher (terminalai.exe) and batch script ex
     $cmdPath = Join-Path $projectRoot "TerminalAI-Portable.cmd"
     if (-not (Test-Path $cmdPath)) { throw "TerminalAI-Portable.cmd missing" }
     
-    $publishExe = Join-Path $projectRoot "Launcher\bin\Release\net10.0\win-x64\publish\terminalai.exe"
-    $stagingExe = Join-Path $projectRoot "dist\staging\terminalai.exe"
-    if (-not (Test-Path $publishExe) -and -not (Test-Path $stagingExe)) {
-        throw "terminalai.exe missing in Launcher/bin/Release/net10.0/win-x64/publish/ or dist/staging/"
-    }
+    $stagingExe = Join-Path $testTempRoot "release\staging\terminalai.exe"
+    if (-not (Test-Path $stagingExe)) { throw "fresh isolated terminalai.exe missing: $stagingExe" }
+    $provenance = Get-Content (Join-Path $testTempRoot "release\staging\RELEASE-PROVENANCE.json") -Raw | ConvertFrom-Json
+    if ($provenance.artifactHashes.'terminalai.exe' -ne (Get-FileHash $stagingExe -Algorithm SHA256).Hash) { throw "Fresh launcher hash does not match provenance." }
     
     $cmdContent = Get-Content $cmdPath -Raw
     if ($cmdContent -notmatch "bootstrap\.ps1") { throw "cmd launcher does not reference bootstrap.ps1" }

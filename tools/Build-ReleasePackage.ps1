@@ -1,244 +1,77 @@
-﻿# Build-ReleasePackage.ps1 - Builds production release zip and updates WinGet manifests
+# Build-ReleasePackage.ps1 - fresh source build, provenance, ZIP, and WinGet manifests
 [CmdletBinding()]
 param(
-    [string]$Version = "0.1.0-preview1",
+    [string]$Version = "0.1.0-preview2",
     [string]$OutputDir,
+    [string]$CertificateThumbprint,
+    [switch]$AllowUnsigned,
+    [switch]$AllowDirty,
     [switch]$SkipZip
 )
-
 $ErrorActionPreference = "Stop"
-
 $projectDir = (Resolve-Path "$PSScriptRoot\..").Path
-if (-not $OutputDir) {
-    $OutputDir = Join-Path $projectDir "dist"
-}
-
-Write-Host "`n═══════════════════════════════════════════════════════════════" -ForegroundColor Cyan
-Write-Host "   TerminalAI: Release Packaging & WinGet Manifest Generator  " -ForegroundColor Cyan
-Write-Host "═══════════════════════════════════════════════════════════════`n" -ForegroundColor Cyan
-
-# 1. Build and publish launcher if not published
-$launcherPublishDir = Join-Path $projectDir "Launcher\bin\Release\net10.0\win-x64\publish"
-$launcherPublishExe = Join-Path $launcherPublishDir "terminalai.exe"
-if (-not (Test-Path $launcherPublishExe)) {
-    Write-Host "• Publishing self-contained win-x64 launcher executable..." -ForegroundColor Yellow
-    dotnet publish (Join-Path $projectDir "Launcher\TerminalAI.Launcher.csproj") -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true | Out-Null
-}
-
-# Ensure compat location for testing
-$launcherCompatDir = Join-Path $projectDir "Launcher\bin\Release\net10.0"
-if (Test-Path $launcherPublishExe) {
-    Copy-Item -Path $launcherPublishExe -Destination (Join-Path $launcherCompatDir "terminalai.exe") -Force -ErrorAction SilentlyContinue
-}
-
-# 2. Prepare output and staging directories
+if (-not $OutputDir) { $OutputDir = Join-Path $projectDir "dist" }
+$OutputDir = [IO.Path]::GetFullPath($OutputDir)
+$commit = (& git -C $projectDir rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $commit -notmatch '^[0-9a-f]{40}$') { throw "Unable to resolve current git commit." }
+$dirty = @(& git -C $projectDir status --porcelain)
+if ($dirty.Count -gt 0 -and -not $AllowDirty) { throw "Release packaging requires a clean git tree; use -AllowDirty only for local candidate tests." }
+$buildRoot = Join-Path ([IO.Path]::GetTempPath()) ("TerminalAI-release-" + [guid]::NewGuid().ToString("N"))
+$launcherOut = Join-Path $buildRoot "launcher"
+$aotOut = Join-Path $buildRoot "aot"
 $stagingDir = Join-Path $OutputDir "staging"
-if (Test-Path $stagingDir) {
-    Remove-Item -Path $stagingDir -Recurse -Force -ErrorAction SilentlyContinue
-}
-$null = New-Item -ItemType Directory -Path $stagingDir -Force
-
-# 3. Stage runtime files
-Write-Host "1. Staging release artifacts..." -ForegroundColor Yellow
-
-$filesToStage = @(
-    "TerminalAI.psd1",
-    "TerminalAI.psm1",
-    "TerminalAiConfig.ps1",
-    "TerminalAiAssistant.ps1",
-    "TerminalAiAgent.ps1",
-    "TerminalAI.Aot.dll",
-    "TerminalAI.Aot.dll-Help.xml",
-    "terminalai.json",
-    "Install-TerminalAi.ps1",
-    "Uninstall-TerminalAi.ps1",
-    "bootstrap.ps1",
-    "TerminalAI-Portable.cmd",
-    "README.md",
-    "LICENSE"
-)
-
-# Optional docs
-if (Test-Path (Join-Path $projectDir "README.uk.md")) {
-    $filesToStage += "README.uk.md"
-}
-
-foreach ($f in $filesToStage) {
-    $src = Join-Path $projectDir $f
-    if (-not (Test-Path $src)) {
-        throw "Missing required release file: $src"
-    }
-    $dest = Join-Path $stagingDir $f
-    Copy-Item -Path $src -Destination $dest -Force
-    Write-Host "   ✔ Staged: $f" -ForegroundColor DarkGray
-}
-
-# Stage launcher executable from win-x64 publish directory
-if (-not (Test-Path $launcherPublishExe)) {
-    throw "Published launcher executable not found: $launcherPublishExe"
-}
-Copy-Item -Path $launcherPublishExe -Destination (Join-Path $stagingDir "terminalai.exe") -Force
-Write-Host "   ✔ Staged launcher: terminalai.exe (self-contained win-x64)" -ForegroundColor DarkGray
-
-# Stage installers folder
-$installersSrc = Join-Path $projectDir "installers"
-if (Test-Path $installersSrc) {
-    $installersDest = Join-Path $stagingDir "installers"
-    $null = New-Item -ItemType Directory -Path $installersDest -Force
-    Copy-Item -Path "$installersSrc\*" -Destination $installersDest -Recurse -Force
-    Write-Host "   ✔ Staged directory: installers/" -ForegroundColor DarkGray
-}
-
-# 4. Create zip archive
-$zipFileName = "TerminalAI-v$Version-win-x64.zip"
-$zipFilePath = Join-Path $OutputDir $zipFileName
-
-if (-not $SkipZip) {
-    Write-Host "`n2. Compressing release archive: $zipFileName" -ForegroundColor Yellow
-    if (Test-Path $zipFilePath) {
-        Remove-Item -Path $zipFilePath -Force
-    }
-    Compress-Archive -Path "$stagingDir\*" -DestinationPath $zipFilePath -CompressionLevel Optimal
-    Write-Host "   ✔ Archive created successfully." -ForegroundColor Green
-}
-
-# 5. Compute SHA-256 hash and write checksum manifest
-Write-Host "`n3. Computing cryptographic SHA-256 checksum..." -ForegroundColor Yellow
-$hashResult = Get-FileHash -Path $zipFilePath -Algorithm SHA256
-$sha256 = $hashResult.Hash
-Write-Host "   ✔ SHA256: $sha256" -ForegroundColor Green
-
-$checksumFile = Join-Path $OutputDir "SHA256SUMS.txt"
-$checksumContent = "$sha256  $zipFileName`n"
-[System.IO.File]::WriteAllText($checksumFile, $checksumContent, [System.Text.Encoding]::ASCII)
-Write-Host "   ✔ Checksum manifest written to: $checksumFile" -ForegroundColor Green
-
-# 6. Generate / Update WinGet Manifests
-Write-Host "`n4. Generating WinGet Package Manifests (Schema 1.9.0)..." -ForegroundColor Yellow
-$wingetDir = Join-Path $projectDir "manifests\t\TiredRebel\TerminalAI\$Version"
-if (-not (Test-Path $wingetDir)) {
-    $null = New-Item -ItemType Directory -Path $wingetDir -Force
-}
-
-$releaseDownloadUrl = "https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/releases/download/v$Version/$zipFileName"
-
-# A. Version manifest
-$versionYaml = @"
-# Created with WinGet Automation Tooling
-# yaml-language-server: `$schema=https://aka.ms/winget-manifest.version.1.9.0.schema.json
-
-PackageIdentifier: TiredRebel.TerminalAI
-PackageVersion: $Version
-DefaultLocale: en-US
-ManifestType: version
-ManifestVersion: 1.9.0
-"@
-
-# B. Installer manifest
-$installerYaml = @"
-# Created with WinGet Automation Tooling
-# yaml-language-server: `$schema=https://aka.ms/winget-manifest.installer.1.9.0.schema.json
-
-PackageIdentifier: TiredRebel.TerminalAI
-PackageVersion: $Version
-MinimumOSVersion: 10.0.19041.0
-InstallerType: zip
-NestedInstallerType: portable
-NestedInstallerFiles:
-  - RelativeFilePath: terminalai.exe
-    PortableCommandAlias: terminalai
-Installers:
-  - Architecture: x64
-    InstallerUrl: $releaseDownloadUrl
-    InstallerSha256: $sha256
-    UpgradeBehavior: install
-ManifestType: installer
-ManifestVersion: 1.9.0
-"@
-
-# C. Locale en-US manifest
-$localeEnYaml = @"
-# Created with WinGet Automation Tooling
-# yaml-language-server: `$schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
-
-PackageIdentifier: TiredRebel.TerminalAI
-PackageVersion: $Version
-PackageLocale: en-US
-Publisher: TiredRebel
-PublisherUrl: https://github.com/TiredRebel
-PublisherSupportUrl: https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/issues
-PackageName: TerminalAI
-PackageUrl: https://github.com/TiredRebel/Windows-Terminal-AI-Plugin
-License: MIT
-LicenseUrl: https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/blob/main/LICENSE
-Copyright: (c) 2026 TiredRebel. All rights reserved.
-ShortDescription: TerminalAI is a local-by-default AI assistant for Windows Terminal and PowerShell powered by Ollama. Features command generation, script synthesis, error fixing, and compiled .NET 10 helper.
-Description: |-
-  TerminalAI is a local-by-default AI assistant for Windows Terminal and PowerShell powered by Ollama. Features command generation, script synthesis, error fixing, and compiled .NET 10 helper.
-Tags:
-  - ai
-  - ollama
-  - terminal
-  - windows-terminal
-  - powershell
-  - copilot
-  - llm
-  - local-ai
-ReleaseNotesUrl: https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/releases/tag/v$Version
-ManifestType: defaultLocale
-ManifestVersion: 1.9.0
-"@
-
-# D. Locale uk-UA manifest
-$localeUkYaml = @"
-# Created with WinGet Automation Tooling
-# yaml-language-server: `$schema=https://aka.ms/winget-manifest.locale.1.9.0.schema.json
-
-PackageIdentifier: TiredRebel.TerminalAI
-PackageVersion: $Version
-PackageLocale: uk-UA
-Publisher: TiredRebel
-PublisherUrl: https://github.com/TiredRebel
-PublisherSupportUrl: https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/issues
-PackageName: TerminalAI
-PackageUrl: https://github.com/TiredRebel/Windows-Terminal-AI-Plugin
-License: MIT
-LicenseUrl: https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/blob/main/LICENSE
-Copyright: (c) 2026 TiredRebel. All rights reserved.
-ShortDescription: Local-by-default AI assistance for Windows Terminal and PowerShell, powered by Ollama.
-Description: |-
-  TerminalAI is local-by-default AI assistance for Windows Terminal and PowerShell, powered by Ollama. It provides command generation, script synthesis, error correction, and a compiled .NET 10 helper module.
-Tags:
-  - ai
-  - ollama
-  - terminal
-  - windows-terminal
-  - powershell
-  - copilot
-  - llm
-  - artificial-intelligence
-ReleaseNotesUrl: https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/releases/tag/v$Version
-ManifestType: locale
-ManifestVersion: 1.9.0
-"@
-
-$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-
-[System.IO.File]::WriteAllText((Join-Path $wingetDir "TiredRebel.TerminalAI.yaml"), $versionYaml.Trim() + "`n", $utf8NoBom)
-[System.IO.File]::WriteAllText((Join-Path $wingetDir "TiredRebel.TerminalAI.installer.yaml"), $installerYaml.Trim() + "`n", $utf8NoBom)
-[System.IO.File]::WriteAllText((Join-Path $wingetDir "TiredRebel.TerminalAI.locale.en-US.yaml"), $localeEnYaml.Trim() + "`n", $utf8NoBom)
-[System.IO.File]::WriteAllText((Join-Path $wingetDir "TiredRebel.TerminalAI.locale.uk-UA.yaml"), $localeUkYaml.Trim() + "`n", $utf8NoBom)
-
-Write-Host "   ✔ Generated WinGet manifests in: $wingetDir" -ForegroundColor Green
-Write-Host "     • TiredRebel.TerminalAI.yaml" -ForegroundColor DarkGray
-Write-Host "     • TiredRebel.TerminalAI.installer.yaml" -ForegroundColor DarkGray
-Write-Host "     • TiredRebel.TerminalAI.locale.en-US.yaml" -ForegroundColor DarkGray
-Write-Host "     • TiredRebel.TerminalAI.locale.uk-UA.yaml" -ForegroundColor DarkGray
-
-Write-Host "`n═══════════════════════════════════════════════════════════════" -ForegroundColor Cyan
-Write-Host "  Release Package and WinGet Manifests generated successfully! " -ForegroundColor Green
-Write-Host "  ZIP Package: $zipFilePath" -ForegroundColor Cyan
-Write-Host "  Package Size: $([Math]::Round((Get-Item $zipFilePath).Length / 1KB, 1)) KB" -ForegroundColor Cyan
-Write-Host "  SHA-256 Hash: $sha256" -ForegroundColor Cyan
-Write-Host "  Checksum File: $checksumFile" -ForegroundColor Cyan
-Write-Host "═══════════════════════════════════════════════════════════════`n" -ForegroundColor Cyan
+New-Item -ItemType Directory -Path $buildRoot,$launcherOut,$aotOut,$OutputDir -Force | Out-Null
+try {
+    Write-Host "Building TerminalAI $Version from $commit"
+    dotnet build (Join-Path $projectDir "AOT\TerminalAI.Aot.csproj") -c Release -t:Rebuild -p:SkipRootCopy=true -o $aotOut --nologo | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "AOT build failed." }
+    $launcherProject = Join-Path $projectDir "Launcher\TerminalAI.Launcher.csproj"
+    dotnet build $launcherProject -c Release -t:Rebuild -r win-x64 --self-contained true -p:PublishSingleFile=true -o $launcherOut --nologo | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Launcher rebuild failed." }
+    dotnet publish $launcherProject -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true --no-build -o $launcherOut --nologo | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Launcher publish failed." }
+    $aotDll = Join-Path $aotOut "TerminalAI.Aot.dll"; $launcherExe = Join-Path $launcherOut "terminalai.exe"
+    if (-not (Test-Path $aotDll)) { throw "Fresh AOT output missing: $aotDll" }
+    if (-not (Test-Path $launcherExe)) { throw "Fresh launcher output missing: $launcherExe" }
+    if (Test-Path $stagingDir) { Remove-Item $stagingDir -Recurse -Force }
+    New-Item -ItemType Directory -Path $stagingDir -Force | Out-Null
+    $files = @("TerminalAI.psd1","TerminalAI.psm1","TerminalAiConfig.ps1","TerminalAiAssistant.ps1","TerminalAiAgent.ps1","terminalai.json","Install-TerminalAi.ps1","Uninstall-TerminalAi.ps1","bootstrap.ps1","TerminalAI-Portable.cmd","README.md","README.uk.md","LICENSE")
+    foreach ($relative in $files) { $source = Join-Path $projectDir $relative; if (-not (Test-Path $source)) { throw "Missing release file: $relative" }; Copy-Item $source (Join-Path $stagingDir $relative) -Force }
+    Copy-Item $aotDll (Join-Path $stagingDir "TerminalAI.Aot.dll") -Force
+    $help = Join-Path $projectDir "TerminalAI.Aot.dll-Help.xml"; if (Test-Path $help) { Copy-Item $help (Join-Path $stagingDir "TerminalAI.Aot.dll-Help.xml") -Force }
+    Copy-Item $launcherExe (Join-Path $stagingDir "terminalai.exe") -Force
+    $docsDir = Join-Path $stagingDir "docs"; $aotDocsDir = Join-Path $stagingDir "AOT"; New-Item -ItemType Directory -Path $docsDir,$aotDocsDir -Force | Out-Null
+    Copy-Item (Join-Path $projectDir "docs\TECHNICAL.md") (Join-Path $docsDir "TECHNICAL.md") -Force
+    Copy-Item (Join-Path $projectDir "AOT\README.md") (Join-Path $aotDocsDir "README.md") -Force
+    Copy-Item (Join-Path $projectDir "AOT\README.uk.md") (Join-Path $aotDocsDir "README.uk.md") -Force
+    $installersSrc = Join-Path $projectDir "installers"; if (Test-Path $installersSrc) { Copy-Item $installersSrc (Join-Path $stagingDir "installers") -Recurse -Force }
+    $cert = $null
+    if ($CertificateThumbprint) {
+        $normalized = $CertificateThumbprint -replace '\s',''; $cert = Get-ChildItem Cert:\CurrentUser\My,Cert:\LocalMachine\My -CodeSigningCert -ErrorAction SilentlyContinue | Where-Object { $_.Thumbprint -eq $normalized } | Select-Object -First 1
+        if (-not $cert) { throw "Code-signing certificate thumbprint not found: $normalized" }
+        foreach ($binary in @((Join-Path $stagingDir "terminalai.exe"),(Join-Path $stagingDir "TerminalAI.Aot.dll"))) { $signed = Set-AuthenticodeSignature -FilePath $binary -Certificate $cert; if ($signed.Status -ne "Valid") { throw "Signing failed for ${binary}: $($signed.Status)" } }
+        Write-Host "Signed staged EXE/DLL with certificate $($cert.Thumbprint)."
+    } elseif (-not $AllowUnsigned) { throw "No code-signing certificate supplied. Re-run with -CertificateThumbprint or explicit -AllowUnsigned." }
+    else { Write-Host "UNSIGNED: no code-signing certificate supplied; -AllowUnsigned acknowledged." -ForegroundColor Yellow }
+    $artifactHashes = [ordered]@{}
+    $artifactHashes["terminalai.exe"] = (Get-FileHash (Join-Path $stagingDir "terminalai.exe") -Algorithm SHA256).Hash
+    $artifactHashes["TerminalAI.Aot.dll"] = (Get-FileHash (Join-Path $stagingDir "TerminalAI.Aot.dll") -Algorithm SHA256).Hash
+    $sourceHashes = [ordered]@{}
+    foreach ($relative in $files) { $sourceHashes[$relative] = (Get-FileHash (Join-Path $projectDir $relative) -Algorithm SHA256).Hash }
+    $sourceHashes["docs/TECHNICAL.md"] = (Get-FileHash (Join-Path $projectDir "docs\TECHNICAL.md") -Algorithm SHA256).Hash
+    $sourceHashes["AOT/README.md"] = (Get-FileHash (Join-Path $projectDir "AOT\README.md") -Algorithm SHA256).Hash
+    $sourceHashes["AOT/README.uk.md"] = (Get-FileHash (Join-Path $projectDir "AOT\README.uk.md") -Algorithm SHA256).Hash
+    $provenance = [ordered]@{ version=$Version; commit=$commit; dirty=($dirty.Count -gt 0); signed=([bool]$cert); certificateThumbprint=if($cert){$cert.Thumbprint}else{$null}; artifactHashes=$artifactHashes; sourceHashes=$sourceHashes }
+    [IO.File]::WriteAllText((Join-Path $stagingDir "RELEASE-PROVENANCE.json"), (($provenance | ConvertTo-Json -Depth 3) + "`n"), (New-Object Text.UTF8Encoding($false)))
+    if ($SkipZip) { Write-Host "Candidate staging complete; -SkipZip prevents archive/hash/manifest reuse."; return }
+    $zipName = "TerminalAI-v$Version-win-x64.zip"; $zipPath = Join-Path $OutputDir $zipName
+    if (-not $SkipZip) { if (Test-Path $zipPath) { Remove-Item $zipPath -Force }; Compress-Archive -Path (Join-Path $stagingDir "*") -DestinationPath $zipPath -CompressionLevel Optimal }
+    if (-not (Test-Path $zipPath)) { throw "Release ZIP missing: $zipPath" }
+    $sha = (Get-FileHash $zipPath -Algorithm SHA256).Hash; [IO.File]::WriteAllText((Join-Path $OutputDir "SHA256SUMS.txt"), "$sha  $zipName`n", [Text.Encoding]::ASCII)
+    $wingetDir = Join-Path $projectDir "manifests\t\TiredRebel\TerminalAI\$Version"; New-Item -ItemType Directory -Path $wingetDir -Force | Out-Null; $url = "https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/releases/download/v$Version/$zipName"; $utf8 = New-Object Text.UTF8Encoding($false)
+    [IO.File]::WriteAllText((Join-Path $wingetDir "TiredRebel.TerminalAI.yaml"), "# yaml-language-server: `$schema=https://aka.ms/winget-manifest.version.1.9.0.schema.json`nPackageIdentifier: TiredRebel.TerminalAI`nPackageVersion: $Version`nDefaultLocale: en-US`nManifestType: version`nManifestVersion: 1.9.0`n", $utf8)
+    [IO.File]::WriteAllText((Join-Path $wingetDir "TiredRebel.TerminalAI.installer.yaml"), "# yaml-language-server: `$schema=https://aka.ms/winget-manifest.installer.1.9.0.schema.json`nPackageIdentifier: TiredRebel.TerminalAI`nPackageVersion: $Version`nMinimumOSVersion: 10.0.19041.0`nInstallerType: zip`nNestedInstallerType: portable`nNestedInstallerFiles:`n  - RelativeFilePath: terminalai.exe`n    PortableCommandAlias: terminalai`nInstallers:`n  - Architecture: x64`n    InstallerUrl: $url`n    InstallerSha256: $sha`n    UpgradeBehavior: install`nManifestType: installer`nManifestVersion: 1.9.0`n", $utf8)
+    $text = "# yaml-language-server: `$schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json`nPackageIdentifier: TiredRebel.TerminalAI`nPackageVersion: $Version`nPackageLocale: en-US`nPublisher: TiredRebel`nPublisherUrl: https://github.com/TiredRebel`nPackageName: TerminalAI`nPackageUrl: https://github.com/TiredRebel/Windows-Terminal-AI-Plugin`nLicense: MIT`nLicenseUrl: https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/blob/main/LICENSE`nShortDescription: TerminalAI is a local-by-default AI assistant for Windows Terminal and PowerShell powered by Ollama.`nDescription: TerminalAI is a local-by-default AI assistant for Windows Terminal and PowerShell powered by Ollama.`nReleaseNotesUrl: https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/releases/tag/v$Version`nManifestType: defaultLocale`nManifestVersion: 1.9.0`n"
+    [IO.File]::WriteAllText((Join-Path $wingetDir "TiredRebel.TerminalAI.locale.en-US.yaml"), $text, $utf8)
+    Write-Host "ZIP: $zipPath`nSHA256: $sha`nWinGet: $wingetDir"
+} finally { if (Test-Path $buildRoot) { Remove-Item $buildRoot -Recurse -Force -ErrorAction SilentlyContinue } }

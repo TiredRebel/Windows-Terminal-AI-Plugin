@@ -3172,7 +3172,9 @@ if ($hasFastCmdlet) {
     Set-Alias -Name ai-fast -Value Invoke-AiCommand
 }
 
-Register-TerminalAiKeyHandler
+if ($env:TERMINAL_AI_PORTABLE -ne "1") {
+    Register-TerminalAiKeyHandler
+}
 Register-TerminalAiArgumentCompleters
 
 $exportCmdlets = @()

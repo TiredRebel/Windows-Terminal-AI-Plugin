@@ -8,6 +8,8 @@ The installer, status cards, help, menus, and errors are English-only. `Language
 
 `AOT` is a historical path and project identifier. The current project builds a managed .NET 10 DLL with `dotnet build` and does not define `<PublishAot>`.
 
+The public release channel is still the older `v0.1.0-preview1`; preview2 in the repository is an unpublished candidate. Preview binaries are currently unsigned; signing and signature verification remain release gates.
+
 > [!IMPORTANT]
 > Model-generated commands are untrusted input. Review them before execution. AST checks and WhatIf previews are guardrails, not a sandbox. Commands run with the current user's privileges.
 

@@ -94,11 +94,11 @@
     # Private data and tags
     PrivateData = @{
         PSData = @{
-            Prerelease = 'preview1'
+            Prerelease = 'preview2'
             Tags = @('AI', 'Ollama', 'WindowsTerminal', 'PowerShell', 'Copilot', 'LLM', 'LocalAI', 'DotNet10')
             ProjectUri = 'https://github.com/TiredRebel/Windows-Terminal-AI-Plugin'
             LicenseUri = 'https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/blob/main/LICENSE'
-            ReleaseNotes = 'TerminalAI v0.1.0-preview1: Local-by-default Ollama integration, fail-closed AST risk analysis, compiled .NET 10 helper module, multi-user installer, ai-doctor diagnostics, optional Claude Code agent mode.'
+            ReleaseNotes = 'TerminalAI v0.1.0-preview2: fresh source-built package with provenance, documentation-complete archive, local-by-default Ollama integration, fail-closed AST risk analysis, compiled .NET 10 helper module, multi-user installer, ai-doctor diagnostics, optional Claude Code agent mode.'
         }
     }
 }

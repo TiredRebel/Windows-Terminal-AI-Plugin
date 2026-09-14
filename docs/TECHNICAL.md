@@ -31,7 +31,9 @@ pwsh -ExecutionPolicy Bypass -File .\installers\Install-WindowsTerminal.ps1
 
 Install Core before Aot or WindowsTerminal. The main installer preserves that order automatically. Windows PowerShell 5.1 skips the managed .NET 10 helper because it cannot load the `net10.0` assembly.
 
-For a temporary session, `bootstrap.ps1` downloads the versioned GitHub Release asset, imports the module into the current process, checks Ollama and the model, and registers the inline key handler without adding the normal persistent profile block. Inspect remote content before executing a piped script.
+For a temporary session, `bootstrap.ps1` downloads the versioned GitHub Release asset, imports the module into the current process, checks Ollama and the model, and uses process-scoped language selection. Portable mode does not update the current-user profile or existing TerminalAI configuration. Extracted runtime files and other downloads may remain under `$env:TEMP`; inspect remote content before executing a piped script.
+
+The public channel remains the older `v0.1.0-preview1`. Preview2 in this repository is an unpublished candidate and has no public download URL. Preview binaries are currently unsigned; signing and signature verification are release gates.
 
 ## PowerShell command reference
 
@@ -257,6 +259,7 @@ These statuses describe the current documentation baseline and must not be promo
 | Channel | Status | Documented evidence |
 | --- | --- | --- |
 | GitHub Release | `live` | `v0.1.0-preview1` release page and `TerminalAI-v0.1.0-preview1-win-x64.zip` asset |
+| Preview2 candidate | `unpublished` | Repository candidate only; do not create or advertise a download link |
 | WinGet | `pending` | Publication is not confirmed; the proposed identifier is `TiredRebel.TerminalAI` |
 | PowerShell Gallery | `pending` | Publication of module `TerminalAI` is not confirmed |
 

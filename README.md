@@ -51,6 +51,10 @@ The confirmed release channel is GitHub Releases:
 - [Download `TerminalAI-v0.1.0-preview1-win-x64.zip`](https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/releases/download/v0.1.0-preview1/TerminalAI-v0.1.0-preview1-win-x64.zip)
 - [Release notes for `v0.1.0-preview1`](https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/releases/tag/v0.1.0-preview1)
 
+The public channel is still the older `v0.1.0-preview1`. Preview2 in this repository is an unpublished release candidate and has no public download link.
+
+Preview binaries are currently unsigned. Release signing and verification are release gates, not features claimed by this preview.
+
 > [!IMPORTANT]
 > Install from the versioned asset under **Releases**. GitHub's generated source archives are not installers.
 
@@ -79,6 +83,10 @@ irm https://raw.githubusercontent.com/TiredRebel/Windows-Terminal-AI-Plugin/main
 ```
 
 See [Technical and maintainer guide](docs/TECHNICAL.md#installation-details) for every installer option and individual-product commands.
+
+### Temporary portable session
+
+Run `bootstrap.ps1 -Mode Portable` to load the module into the current PowerShell process without updating the current-user profile or existing TerminalAI configuration. Language selection is process-scoped. If the bootstrapper downloads a runtime package, extracted files and other temporary downloads may remain under `$env:TEMP`; remove them when no longer needed.
 
 <!-- sync:commands -->
 ## Commands and workflows

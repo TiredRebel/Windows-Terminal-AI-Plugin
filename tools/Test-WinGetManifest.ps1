@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param(
     [string]$ManifestDir,
-    [string]$Version = "0.1.0-preview1"
+    [string]$Version = "0.1.0-preview2"
 )
 
 $ErrorActionPreference = "Stop"
@@ -23,8 +23,7 @@ if (-not (Test-Path $ManifestDir)) {
 $expectedFiles = @(
     "TiredRebel.TerminalAI.yaml",
     "TiredRebel.TerminalAI.installer.yaml",
-    "TiredRebel.TerminalAI.locale.en-US.yaml",
-    "TiredRebel.TerminalAI.locale.uk-UA.yaml"
+    "TiredRebel.TerminalAI.locale.en-US.yaml"
 )
 
 # 1. Existence check
@@ -67,20 +66,12 @@ if ($locEnContent -notmatch 'ManifestType:\s+defaultLocale') { throw "EN locale 
 if ($locEnContent -notmatch 'ManifestVersion:\s+1\.9\.0') { throw "EN locale manifest missing ManifestVersion: 1.9.0." }
 Write-Host "   ✔ Default locale manifest (en-US) schema valid (1.9.0)." -ForegroundColor Green
 
-# Ukrainian locale manifest
-$locUkContent = Get-Content (Join-Path $ManifestDir "TiredRebel.TerminalAI.locale.uk-UA.yaml") -Raw
-if ($locUkContent -notmatch 'PackageLocale:\s+uk-UA') { throw "UK locale manifest missing PackageLocale: uk-UA." }
-if ($locUkContent -notmatch 'PackageName:\s+TerminalAI') { throw "UK locale manifest missing PackageName." }
-if ($locUkContent -notmatch 'ManifestType:\s+locale') { throw "UK locale manifest missing ManifestType: locale." }
-if ($locUkContent -notmatch 'ManifestVersion:\s+1\.9\.0') { throw "UK locale manifest missing ManifestVersion: 1.9.0." }
-Write-Host "   ✔ Localized manifest (uk-UA) schema valid (1.9.0)." -ForegroundColor Green
-
 # 3. Native WinGet CLI validation (if available)
 Write-Host "`n3. Running official winget validate (if winget is installed)..." -ForegroundColor Yellow
 if (Get-Command winget -ErrorAction SilentlyContinue) {
     try {
         $valOutput = & winget validate --manifest $ManifestDir 2>&1 | Out-String
-        if ($LASTEXITCODE -eq 0 -and ($valOutput -match "validation succeeded|passed|Manifest validation success" -or -not ($valOutput -match "Error:"))) {
+        if ($LASTEXITCODE -eq 0 -and $valOutput -notmatch "(?i)\bError:\s") {
             Write-Host "   ✔ Official winget validate passed:`n$valOutput" -ForegroundColor Green
         } else {
             throw "winget validate failed:`n$valOutput"
@@ -95,4 +86,4 @@ if (Get-Command winget -ErrorAction SilentlyContinue) {
     Write-Host "   • winget executable not detected on host. Static schema validation completed." -ForegroundColor DarkGray
 }
 
-Write-Host "`n✔ All WinGet manifests are 100% valid and ready for submission to winget-pkgs!`n" -ForegroundColor Green
+Write-Host "`n✔ Local WinGet manifest validation passed. Asset reachability, installation, signing, and submission remain separate gates.`n" -ForegroundColor Green

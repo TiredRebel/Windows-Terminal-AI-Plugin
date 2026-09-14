@@ -213,9 +213,9 @@ if ($Mode -eq "Auto") {
         $Mode = "Portable"
     } else {
         $promptMode = if ($isUk) {
-            "Choose a launch mode:`n  [1] Portable  - Start quickly in the current session (no persistent changes to `$PROFILE)`n  [2] Install   - Full installation with Windows Terminal integration`nYour choice [1/2] (default: 1):"
+            "Choose a launch mode:`n  [1] Portable  - Start quickly in the current session (does not update your profile or existing TerminalAI config)`n  [2] Install   - Full installation with Windows Terminal integration`nYour choice [1/2] (default: 1):"
         } else {
-            "Choose execution mode:`n  [1] Portable  - Run directly in current session (zero system footprint, leaves `$PROFILE untouched)`n  [2] Install   - Full installation with Windows Terminal integration`nYour choice [1/2] (default 1):"
+            "Choose execution mode:`n  [1] Portable  - Run directly in current session (does not update your profile or existing TerminalAI config)`n  [2] Install   - Full installation with Windows Terminal integration`nYour choice [1/2] (default 1):"
         }
         Write-Host "`n$promptMode " -ForegroundColor Yellow -NoNewline
         $choice = Read-Host
@@ -263,34 +263,28 @@ if ($Mode -eq "Install") {
         Write-Error "Installer script not found: $installerScript"
     }
 } else {
-    # Mode: Portable (Ephemeral, Zero-Footprint)
-    Write-Host "`n▶ Initializing portable session (zero-footprint)..." -ForegroundColor Cyan
+    # Mode: Portable (process-scoped settings; downloaded files may remain under $env:TEMP)
+    Write-Host "`n▶ Initializing portable session (process-scoped settings)..." -ForegroundColor Cyan
     $psd1 = Join-Path $runtimeDir "TerminalAI.psd1"
     if (-not (Test-Path $psd1)) {
         throw "Module manifest not found at: $psd1"
     }
 
+    # Set language only in this process. The persistent language helper writes config.
+    if ($Language) {
+        $env:TERMINAL_AI_LANG = $Language
+    }
+    $env:TERMINAL_AI_PORTABLE = "1"
+
     Import-Module $psd1 -Force -ErrorAction Stop
 
-    # Set session language
-    if ($Language) {
-        Set-TerminalAiLanguage -Language $Language -ErrorAction SilentlyContinue
-    }
-
     # Register inline hotkey (F2)
-    if (Get-Command Register-TerminalAiKeyHandler -ErrorAction SilentlyContinue) {
-        Register-TerminalAiKeyHandler
-    }
-
-    # Show stylish welcome banner
-    if (Get-Command Show-TerminalAiWelcome -ErrorAction SilentlyContinue) {
-        Show-TerminalAiWelcome
-    }
+    # The module skips its config-backed key-handler registration in portable mode.
 
     $msgActive = if ($isUk) {
-        "✔ TerminalAI is active in the current session with no persistent system changes.`n  Try: ai `"find large files`" or press F2 at the prompt!`n"
+        "✔ TerminalAI is active in the current session. Existing profile and TerminalAI config were not changed.`n  Temporary downloads, if any, may remain under `$env:TEMP`. Try: ai `"find large files`".`n"
     } else {
-        "✔ TerminalAI successfully loaded in current session (zero system footprint).`n  Try: ai `"find large files`" or press F2 inline!`n"
+        "✔ TerminalAI loaded in the current session. Existing profile and TerminalAI config were not changed.`n  Temporary downloads, if any, may remain under `$env:TEMP`. Try: ai `"find large files`".`n"
     }
     Write-Host $msgActive -ForegroundColor Green
 }

@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.9.0.schema.json
+PackageIdentifier: TiredRebel.TerminalAI
+PackageVersion: 0.1.0-preview2
+MinimumOSVersion: 10.0.19041.0
+InstallerType: zip
+NestedInstallerType: portable
+NestedInstallerFiles:
+  - RelativeFilePath: terminalai.exe
+    PortableCommandAlias: terminalai
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/releases/download/v0.1.0-preview2/TerminalAI-v0.1.0-preview2-win-x64.zip
+    InstallerSha256: 89E3D787CBDF7A5D19933B7545A7176305A67D98A2977A6A697B40CF93D3FFA7
+    UpgradeBehavior: install
+ManifestType: installer
+ManifestVersion: 1.9.0

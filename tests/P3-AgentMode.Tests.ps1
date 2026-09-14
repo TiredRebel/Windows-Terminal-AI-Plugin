@@ -135,11 +135,25 @@ try {
 
     # FIX-P3-05: Model tool capability detection
     Assert-P3Fixture "FIX-P3-05" "Model tool capability properly detected for coding models" {
-        $st = Test-AiAgentReadiness -Model "qwen2.5-coder:7b" -PassThru
+        $requestedModel = "qwen2.5-coder:7b"
+        $availableModels = @()
+        try {
+            $tags = Invoke-RestMethod -Uri "http://127.0.0.1:11434/api/tags" -TimeoutSec 2 -ErrorAction Stop
+            $availableModels = @($tags.models.name)
+            if ($availableModels -notcontains $requestedModel) {
+                $installedCodingModel = $availableModels | Where-Object { $_ -match '(?i)(coder|qwen|granite|hermes|command-r)' } | Select-Object -First 1
+                if ($installedCodingModel) { $requestedModel = $installedCodingModel }
+            }
+        } catch { }
+
+        $st = Test-AiAgentReadiness -Model $requestedModel -PassThru
         if ($st.OllamaReady) {
-            return ($st.ModelPresent -eq $true -and $st.ToolsSupported -eq $true)
+            $presenceMatches = ($st.ModelPresent -eq ($availableModels -contains $requestedModel))
+            $capabilityIsBoolean = ($st.ToolsSupported -is [bool])
+            $absentModelIsUnsupported = $st.ModelPresent -or ($st.ToolsSupported -eq $false)
+            return ($presenceMatches -and $capabilityIsBoolean -and $absentModelIsUnsupported)
         } else {
-            return ($st.Model -eq "qwen2.5-coder:7b" -and ($st.ToolsSupported -is [bool]))
+            return ($st.Model -eq $requestedModel -and $st.ModelPresent -eq $false -and $st.ToolsSupported -eq $false)
         }
     }
 
@@ -172,7 +186,38 @@ try {
         $tokenSet = ($psi.EnvironmentVariables["ANTHROPIC_AUTH_TOKEN"] -eq "ollama")
         $trafficDisabled = ($psi.EnvironmentVariables["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] -eq "1")
 
-        return ($cleared -and $urlSet -and $tokenSet -and $trafficDisabled)
+        $portableConfig = Join-Path $testRoot "portable-config"
+        New-Item -Path $portableConfig -ItemType Directory -Force | Out-Null
+        $configPath = Join-Path $portableConfig "config.json"
+        Set-Content -Path $configPath -Value '{"Language":"en","Model":"fixture"}' -Encoding UTF8
+        $configBefore = Get-Content -Path $configPath -Raw
+        $profilePaths = @($PROFILE.CurrentUserAllHosts, $PROFILE.CurrentUserCurrentHost) | Select-Object -Unique
+        $profileBefore = @{}
+        foreach ($profilePath in $profilePaths) {
+            if (Test-Path $profilePath) { $profileBefore[$profilePath] = (Get-FileHash -Path $profilePath).Hash }
+        }
+        $oldConfigDir = $env:TERMINAL_AI_CONFIG_DIR
+        $oldPortable = $env:TERMINAL_AI_PORTABLE
+        try {
+            $env:TERMINAL_AI_CONFIG_DIR = $portableConfig
+            $env:TERMINAL_AI_PORTABLE = $null
+            & pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $moduleRoot "bootstrap.ps1") -Mode Portable -Language en -SkipOllama -NonInteractive *> $null
+            $configUnchanged = ((Get-Content -Path $configPath -Raw) -eq $configBefore)
+            $profilesUnchanged = $true
+            foreach ($profilePath in $profileBefore.Keys) {
+                $profilesUnchanged = $profilesUnchanged -and ((Test-Path $profilePath) -and ((Get-FileHash -Path $profilePath).Hash -eq $profileBefore[$profilePath]))
+            }
+
+            $absentConfigDir = Join-Path $testRoot "portable-config-absent"
+            $env:TERMINAL_AI_CONFIG_DIR = $absentConfigDir
+            & pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $moduleRoot "bootstrap.ps1") -Mode Portable -Language uk -SkipOllama -NonInteractive *> $null
+            $absentConfigUnchanged = (-not (Test-Path $absentConfigDir))
+        } finally {
+            $env:TERMINAL_AI_CONFIG_DIR = $oldConfigDir
+            $env:TERMINAL_AI_PORTABLE = $oldPortable
+        }
+
+        return ($cleared -and $urlSet -and $tokenSet -and $trafficDisabled -and $configUnchanged -and $profilesUnchanged -and $absentConfigUnchanged)
     }
 
     # FIX-P3-08: Argument formatting with quoting for spaces

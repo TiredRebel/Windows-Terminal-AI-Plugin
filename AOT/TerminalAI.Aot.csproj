@@ -10,9 +10,8 @@
     <PackageReference Include="System.Management.Automation" Version="7.6.6" />
   </ItemGroup>
 
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(SkipRootCopy)' != 'true'">
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(MSBuildProjectDirectory)\.." ContinueOnError="true" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="500" />
   </Target>
 
 </Project>
-

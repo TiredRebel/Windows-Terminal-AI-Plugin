@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
+PackageIdentifier: TiredRebel.TerminalAI
+PackageVersion: 0.1.0-preview2
+PackageLocale: en-US
+Publisher: TiredRebel
+PublisherUrl: https://github.com/TiredRebel
+PackageName: TerminalAI
+PackageUrl: https://github.com/TiredRebel/Windows-Terminal-AI-Plugin
+License: MIT
+LicenseUrl: https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/blob/main/LICENSE
+ShortDescription: TerminalAI is a local-by-default AI assistant for Windows Terminal and PowerShell powered by Ollama.
+Description: TerminalAI is a local-by-default AI assistant for Windows Terminal and PowerShell powered by Ollama.
+ReleaseNotesUrl: https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/releases/tag/v0.1.0-preview2
+ManifestType: defaultLocale
+ManifestVersion: 1.9.0

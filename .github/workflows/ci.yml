@@ -133,6 +133,27 @@ jobs:
           }
           Write-Host "PSScriptAnalyzer Error Gate passed (0 errors)." -ForegroundColor Green
 
+      - name: Fresh AOT and launcher build
+        shell: pwsh
+        run: |
+          Write-Host "=== Building AOT helper and launcher from source ===" -ForegroundColor Cyan
+          dotnet build .\AOT\TerminalAI.Aot.csproj -c Release -p:SkipRootCopy=true --nologo
+          if ($LASTEXITCODE -ne 0) { throw "AOT build failed." }
+          dotnet build .\Launcher\TerminalAI.Launcher.csproj -c Release -t:Rebuild -r win-x64 --self-contained true -p:PublishSingleFile=true --nologo
+          if ($LASTEXITCODE -ne 0) { throw "Launcher rebuild failed." }
+          dotnet publish .\Launcher\TerminalAI.Launcher.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true --no-build --nologo
+          if ($LASTEXITCODE -ne 0) { throw "Launcher publish failed." }
+
+      - name: Run all AOT tests
+        shell: pwsh
+        run: |
+          $aotTests = Get-ChildItem .\AOT\tests -Filter '*.Tests.ps1' -File | Sort-Object Name
+          foreach ($test in $aotTests) {
+              Write-Host "=== $($test.Name) ===" -ForegroundColor Cyan
+              pwsh -NoProfile -ExecutionPolicy Bypass -File $test.FullName
+              if ($LASTEXITCODE -ne 0) { throw "$($test.Name) exited with code $LASTEXITCODE" }
+          }
+
       - name: Run Deterministic Core Test Suite (Test-TerminalAi.ps1)
         shell: pwsh
         env:
@@ -204,7 +225,7 @@ jobs:
         run: |
           Write-Host "=== Staging and Auditing Package Content for Zero Dev Leaks ===" -ForegroundColor Cyan
           $stagingDir = Join-Path $env:RUNNER_TEMP "GalleryStagingAudit"
-          & .\tools\Publish-TerminalAiGallery.ps1 -StagingPath $stagingDir -DryRun -Force
+          & .\tools\Publish-TerminalAiGallery.ps1 -StagingPath $stagingDir -DryRun -Force -AllowUnsigned
           
           $stagedFiles = Get-ChildItem -Path $stagingDir -Recurse -File
           Write-Host "Staged $($stagedFiles.Count) files in package:"

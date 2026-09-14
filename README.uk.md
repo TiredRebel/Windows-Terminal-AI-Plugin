@@ -51,6 +51,10 @@ TerminalAI призначений для користувачів Windows, як�
 - [Завантажити `TerminalAI-v0.1.0-preview1-win-x64.zip`](https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/releases/download/v0.1.0-preview1/TerminalAI-v0.1.0-preview1-win-x64.zip)
 - [Нотатки до випуску `v0.1.0-preview1`](https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/releases/tag/v0.1.0-preview1)
 
+Публічним каналом досі є старіший `v0.1.0-preview1`. Preview2 у цьому репозиторії є неопублікованим кандидатом на випуск і не має публічного посилання на завантаження.
+
+Бінарні файли preview наразі не підписані. Підписування та перевірка підпису є воротами випуску, а не функціями цього preview.
+
 > [!IMPORTANT]
 > Для встановлення використовуйте версійний файл у розділі **Releases**. Автоматично створені GitHub архіви вихідного коду не є інсталяторами.
 
@@ -79,6 +83,10 @@ irm https://raw.githubusercontent.com/TiredRebel/Windows-Terminal-AI-Plugin/main
 ```
 
 У [технічному посібнику для супровідників](docs/TECHNICAL.md#installation-details) наведено всі параметри інсталятора та команди для окремих продуктів.
+
+### Тимчасовий портативний сеанс
+
+Запустіть `bootstrap.ps1 -Mode Portable`, щоб завантажити модуль у поточний процес PowerShell без оновлення профілю поточного користувача або наявної конфігурації TerminalAI. Вибір мови діє лише в цьому процесі. Якщо bootstrap завантажує пакет runtime, розпаковані файли та інші тимчасові завантаження можуть залишитися в `$env:TEMP`; видаліть їх, коли вони більше не потрібні.
 
 <!-- sync:commands -->
 ## Команди та робочі сценарії
