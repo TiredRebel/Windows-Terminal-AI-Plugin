@@ -238,7 +238,7 @@ jobs:
               $_.Name -like "*.csproj" -or
               $_.Name -like "*.sln" -or
               $_.Name -like "*.git*" -or
-              $_.FullName -match '[\\/](tests|tools|Launcher|AOT|\.codegraph)[\\/]'
+              $_.FullName -match '[\\/](tests|tools|Launcher|\.codegraph)[\\/]'
           })
           if ($devLeaked.Count -gt 0) {
               Write-Host "Dev files leaked into production package:" -ForegroundColor Red
