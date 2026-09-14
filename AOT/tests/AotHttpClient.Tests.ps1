@@ -202,15 +202,31 @@ Assert-AotFixture "FIX-HC-08" "TimeoutException stays English with the Ukrainian
 
 # FIX-HC-09: Model 404 produces helpful pull advice
 Assert-AotFixture "FIX-HC-09" "HTTP 404 response produces model pull recommendation" {
+    $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+    $client = $stream = $null
     $caught = $false
     try {
-        [TerminalAI.Aot.OllamaClient]::GenerateAsync("http://127.0.0.1:11434", "nonexistent-model-xyz", "test", "test", 0.1, 10, $false).GetAwaiter().GetResult()
+        $listener.Start()
+        $port = ([System.Net.IPEndPoint]$listener.LocalEndpoint).Port
+        $acceptTask = $listener.AcceptTcpClientAsync()
+        $requestTask = [TerminalAI.Aot.OllamaClient]::GenerateAsync("http://127.0.0.1:$port", "nonexistent-model-xyz", "test", "test", 0.1, 10, $false)
+        if (-not $acceptTask.Wait(5000)) { throw "Mock server did not receive the request" }
+        $client = $acceptTask.GetAwaiter().GetResult()
+        $stream = $client.GetStream()
+        $response = [System.Text.Encoding]::ASCII.GetBytes("HTTP/1.1 404 Not Found`r`nContent-Length: 0`r`nConnection: close`r`n`r`n")
+        $stream.Write($response, 0, $response.Length)
+        $stream.Flush()
+        $requestTask.GetAwaiter().GetResult()
     } catch {
         $caught = $true
         $msg = $_.Exception.ToString()
         if (-not ($msg.Contains("was not found in Ollama") -or $msg.Contains("ollama pull"))) {
             throw "Expected 404 model pull recommendation, got: '$msg'"
         }
+    } finally {
+        if ($stream) { $stream.Dispose() }
+        if ($client) { $client.Dispose() }
+        $listener.Stop()
     }
     if (-not $caught) { throw "Expected exception for 404 model" }
 }
