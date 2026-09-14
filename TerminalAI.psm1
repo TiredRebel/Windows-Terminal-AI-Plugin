@@ -303,9 +303,9 @@ function Show-TerminalAiHelp {
             & $renderLine ""
             & {
                 & $renderLine "1. PRIMARY ALIASES:" ([System.ConsoleColor]::Cyan)
-                & $renderLine "   aif <prompt>   Ultra-fast compiled C# binary module (Native AOT)" ([System.ConsoleColor]::White)
+                & $renderLine "   aif <prompt>   Compiled managed .NET 10 helper module" ([System.ConsoleColor]::White)
                 & $renderLine "   ai <prompt>    Standard PowerShell module" ([System.ConsoleColor]::White)
-                & $renderLine "   ?? <prompt>    Short alias for instant command generation" ([System.ConsoleColor]::White)
+                & $renderLine "   ?? <prompt>    Short alias for command generation" ([System.ConsoleColor]::White)
                 & $renderLine "   F2             Inline PSReadLine generation directly in prompt" ([System.ConsoleColor]::Yellow)
                 & $renderLine "   ai-fix         Diagnose and fix the last failed command in session" ([System.ConsoleColor]::White)
                 & $renderLine "   ai-script      Generate complex multi-step .ps1 automation scripts" ([System.ConsoleColor]::White)
@@ -346,7 +346,7 @@ function Show-TerminalAiHelp {
                 & $renderLine ""
                 & $renderLine "MODEL MANAGEMENT COMMANDS:" ([System.ConsoleColor]::Cyan)
                 & $renderLine "  aif models              View list of installed models & active marker" ([System.ConsoleColor]::White)
-                & $renderLine "  aif model <name>        Instantly switch active model" ([System.ConsoleColor]::White)
+                & $renderLine "  aif model <name>        Switch active model" ([System.ConsoleColor]::White)
                 & $renderLine "  ollama pull <name>      Download model (e.g. ollama pull qwen2.5-coder:7b)" ([System.ConsoleColor]::DarkGray)
                 & $renderLine "  ollama list             List all models downloaded locally" ([System.ConsoleColor]::DarkGray)
             }
@@ -397,7 +397,7 @@ function Show-TerminalAiHelp {
                 & $renderLine ""
                 & $renderLine "3. AUTOMATED ERROR RECOVERY:" ([System.ConsoleColor]::Cyan)
                 & $renderLine "   • When any terminal command fails, immediately run: ai-fix" ([System.ConsoleColor]::Yellow)
-                & $renderLine "   • AI analyzes the error stream and offers an instant fix." ([System.ConsoleColor]::White)
+                & $renderLine "   • AI analyzes the error stream and suggests a fix." ([System.ConsoleColor]::White)
                 & $renderLine ""
                 & $renderLine "4. PRODUCTION SCRIPTS & CHAT ASSISTANT:" ([System.ConsoleColor]::Cyan)
                 & $renderLine "   • Multi-step scripts: ai-script 'backup IIS logs with compression'" ([System.ConsoleColor]::White)
@@ -1690,7 +1690,7 @@ function Invoke-AiCommand {
             Write-Host "    ╭────────────────────────────────────────────────────────────────────────╮" -ForegroundColor DarkCyan
             Write-Host "    │                                                                        │" -ForegroundColor DarkCyan
             Write-Host "    │   Primary Commands & Aliases:                                          │" -ForegroundColor Cyan
-            Write-Host "    │     aif <prompt>  or  ai-fast <prompt>    (ultra-fast C# AOT module)   │" -ForegroundColor White
+            Write-Host "    │     aif <prompt>  or  ai-fast <prompt>    (managed .NET 10 helper)     │" -ForegroundColor White
             Write-Host "    │     ?? <prompt>   or  ai <prompt>         (standard PowerShell module) │" -ForegroundColor White
             Write-Host "    │     F2                                    (inline generation in term)  │" -ForegroundColor Yellow
             Write-Host "    │                                                                        │" -ForegroundColor DarkCyan

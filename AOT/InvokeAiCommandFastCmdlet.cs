@@ -500,9 +500,9 @@ Rules:
                 RenderHelpLine("", ConsoleColor.White, bw);
                 {
                     RenderHelpLine("1. PRIMARY ALIASES:", ConsoleColor.Cyan, bw);
-                    RenderHelpLine("   aif <prompt>   Ultra-fast compiled C# binary module (Native AOT)", ConsoleColor.White, bw);
+                    RenderHelpLine("   aif <prompt>   Compiled managed .NET 10 helper module", ConsoleColor.White, bw);
                     RenderHelpLine("   ai <prompt>    Standard PowerShell module", ConsoleColor.White, bw);
-                    RenderHelpLine("   ?? <prompt>    Short alias for instant command generation", ConsoleColor.White, bw);
+                    RenderHelpLine("   ?? <prompt>    Short alias for command generation", ConsoleColor.White, bw);
                     RenderHelpLine("   F2             Inline PSReadLine generation directly in prompt", ConsoleColor.Yellow, bw);
                     RenderHelpLine("   ai-fix         Diagnose and fix the last failed command in session", ConsoleColor.White, bw);
                     RenderHelpLine("   ai-script      Generate complex multi-step .ps1 automation scripts", ConsoleColor.White, bw);
@@ -545,7 +545,7 @@ Rules:
                     RenderHelpLine("", ConsoleColor.White, bw);
                     RenderHelpLine("MODEL MANAGEMENT COMMANDS:", ConsoleColor.Cyan, bw);
                     RenderHelpLine("  aif models              View list of installed models & active marker", ConsoleColor.White, bw);
-                    RenderHelpLine("  aif model <name>        Instantly switch active model", ConsoleColor.White, bw);
+                    RenderHelpLine("  aif model <name>        Switch active model", ConsoleColor.White, bw);
                     RenderHelpLine("  ollama pull <name>      Download model (e.g. ollama pull qwen2.5-coder:7b)", ConsoleColor.DarkGray, bw);
                     RenderHelpLine("  ollama list             List all models downloaded locally", ConsoleColor.DarkGray, bw);
                 }
@@ -600,7 +600,7 @@ Rules:
                     RenderHelpLine("", ConsoleColor.White, bw);
                     RenderHelpLine("3. AUTOMATED ERROR RECOVERY:", ConsoleColor.Cyan, bw);
                     RenderHelpLine("   • When any terminal command fails, immediately run: ai-fix", ConsoleColor.Yellow, bw);
-                    RenderHelpLine("   • AI analyzes the error stream and offers an instant fix.", ConsoleColor.White, bw);
+                    RenderHelpLine("   • AI analyzes the error stream and suggests a fix.", ConsoleColor.White, bw);
                     RenderHelpLine("", ConsoleColor.White, bw);
                     RenderHelpLine("4. PRODUCTION SCRIPTS & CHAT ASSISTANT:", ConsoleColor.Cyan, bw);
                     RenderHelpLine("   • Multi-step scripts: ai-script 'backup IIS logs with compression'", ConsoleColor.White, bw);

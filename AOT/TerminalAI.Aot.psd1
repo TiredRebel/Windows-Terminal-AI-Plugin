@@ -5,7 +5,7 @@
     Author = 'TiredRebel'
     CompanyName = 'TerminalAI'
     Copyright = '(c) 2026. All rights reserved.'
-    Description = 'High-Performance C# Compiled Binary Module for TerminalAI (Zero-allocation, persistent SocketsHttpHandler)'
+    Description = 'Compiled managed .NET 10 helper module for TerminalAI (reuses HTTP connections via SocketsHttpHandler)'
     PowerShellVersion = '7.0'
     CmdletsToExport = @('Invoke-AiCommandFast')
     AliasesToExport = @('ai-fast', 'aif')

@@ -229,6 +229,13 @@ MIIEowIBAAKCAQEA0Y1u5...
         ($gateRes.Executed -eq $true) -and ($streamErrors.Count -eq 0) -and ($null -ne $gateRes.Output)
     }
 
+    # FIX-P1-16: Interactive language persistence modes
+    Assert-P1Fixture "FIX-P1-16" "Assistant passes -Permanent only for permanent language commands" {
+        $assistantContent = Get-Content -LiteralPath (Join-Path $moduleRoot "TerminalAiAssistant.ps1") -Raw
+        $branchPattern = 'if\s*\(\$isPermanent\)\s*\{\s*Set-TerminalAiLanguage\s+-Language\s+\$currentLang\s+-Permanent\s*\|\s*Out-Null\s*\}\s*else\s*\{\s*Set-TerminalAiLanguage\s+-Language\s+\$currentLang\s*\|\s*Out-Null'
+        [regex]::IsMatch($assistantContent, $branchPattern)
+    }
+
 } finally {
     if (Test-Path $testDir) {
         Remove-Item -Path $testDir -Recurse -Force -ErrorAction SilentlyContinue

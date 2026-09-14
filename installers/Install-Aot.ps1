@@ -1,4 +1,4 @@
-﻿# Install-Aot.ps1 - Deploys the compiled C# accelerator module (aif / ai-fast).
+﻿# Install-Aot.ps1 - Deploys the compiled managed .NET 10 helper module (aif / ai-fast).
 # Requires PowerShell 7+ on a compatible .NET 10 runtime; automatically skipped
 # (and cleaned up) on Windows PowerShell 5.1 module paths, since that host runs
 # on .NET Framework 4.8 and cannot load a .NET 10 binary. Requires the Core
@@ -33,7 +33,7 @@ if (-not (Assert-TerminalAiScopeAdmin -Scope $Scope -IsUkrainian $isUk)) { retur
 
 $projectDir = if ($PSScriptRoot) { Split-Path -Parent $PSScriptRoot } else { Get-Location }
 
-$step = "▶ Deploying compiled C# accelerator module (aif)..."
+$step = "▶ Deploying compiled managed .NET 10 helper module (aif)..."
 Write-Host $step -ForegroundColor Yellow
 
 $moduleDestinations = Get-TerminalAiModuleDestinations -Scope $Scope -CustomModulePath $CustomModulePath

@@ -1,195 +1,116 @@
-# TerminalAI — local Ollama assistance for PowerShell and Windows Terminal
+# TerminalAI — Ollama assistance for PowerShell and Windows Terminal
 
-[Ukrainian](README.uk.md) | **English** | [C# binary module](AOT/README.md)
+**English (canonical)** | [Ukrainian](README.uk.md) | [C# helper](AOT/README.md)
 
-TerminalAI is a Windows PowerShell module that sends command-generation and chat requests to a configured Ollama endpoint. It provides one-shot command generation, an interactive assistant, error diagnosis, script generation, Windows Terminal integration, safety checks before execution, and an optional Claude Code agent launcher backed by Ollama.
+TerminalAI is a Windows PowerShell module that sends command-generation and chat requests to a configured Ollama endpoint. It provides command and script drafting, error diagnosis, an interactive assistant, Windows Terminal integration, pre-execution checks, and an optional Claude Code launcher.
 
-TerminalAI is local by default when configured with a local Ollama endpoint (`http://localhost:11434`). The default model is `qwen2.5-coder:7b`. The built-in installer and application interfaces, including status, help, menu, and error text, are English-only. The `Language` setting accepts `en` or `uk` as the requested language for model-generated prose responses such as answers, explanations, diagnoses, and interactive chat replies; it does not localize the UI. Because `OllamaUrl` is user-configurable and agent mode delegates to an external Claude Code CLI, actual privacy and data boundaries depend on how these endpoints and tools are configured.
+The default `OllamaUrl` is the local endpoint `http://localhost:11434`, so core requests are local by default. The endpoint is configurable, and agent mode launches a separately installed Claude Code CLI; review those configurations to understand the actual data boundary. The installer and application UI are English-only. `Language` selects `en` or `uk` for model-generated prose, not the UI.
 
 > [!IMPORTANT]
-> Generated commands are untrusted input. Review them before execution. AST checks and WhatIf previews are safety guardrails, NOT a security sandbox. TerminalAI parses PowerShell syntax, classifies risk, and requires confirmation for high-risk or unresolved operations.
+> Model-generated commands are untrusted input. Review them before execution. AST checks and WhatIf previews are guardrails, not a sandbox. Commands run with the current user's privileges.
 
+<!-- sync:audience -->
+## Who TerminalAI is for
+
+TerminalAI is intended for Windows users who work in PowerShell and can review generated commands, including:
+
+- developers and DevOps engineers who want terminal-based command, script, and troubleshooting assistance;
+- administrators and support engineers who want PowerShell drafts with a visible review step;
+- PowerShell learners who want commands accompanied by explanations;
+- users who prefer a locally configured Ollama workflow for core features.
+
+<!-- sync:advantages -->
+## Advantages
+
+- **Terminal workflow:** generate commands and scripts, diagnose errors, and chat from PowerShell or Windows Terminal.
+- **Local by default:** core requests can stay on the machine when `OllamaUrl` points to local Ollama; no cloud API key is required for those requests.
+- **Review before execution:** parsing, risk classification, confirmation gates, and supported WhatIf previews sit between model output and execution.
+- **Selectable installation:** install all products or choose Core, Ollama, Aot, and WindowsTerminal. Core is required by Aot and WindowsTerminal.
+- **Shell coverage:** Core supports PowerShell 7+ and Windows PowerShell 5.1; the optional compiled helper supports PowerShell 7+ with .NET 10.
+- **Diagnostics:** `ai-doctor` checks the module, profile, terminal integration, Ollama, selected model, safety helpers, and optional agent setup.
+
+<!-- sync:requirements -->
 ## Requirements
 
-TerminalAI installs as four independent products, each with its own requirements. Shared across all of them: **OS:** Windows 10 (20H2+) or Windows 11; installing for the current user needs no special rights, while `-Scope AllUsers` requires Administrator (except for the Ollama product, which installs at the machine level regardless of that flag).
+**OS:** Windows 10 20H2+ or Windows 11. Current-user installation does not require administrator rights; `-Scope AllUsers` does. The Ollama product is installed machine-wide independently of that scope.
 
-| Product | Shell | Additional requirements |
-| :--- | :--- | :--- |
-| **Core** — the PowerShell module (`ai`, `ai-fix`, `ai-script`, `ai-chat`, `ai-doctor`) | PowerShell 7+ (pwsh) recommended, or Windows PowerShell 5.1 | — |
-| **Ollama** — detects/installs Ollama, checks hardware, pulls a model | either of the above | Internet access for the first download (via winget or the official installer); a few GB of free disk space per model; a GPU helps but is not required |
-| **Aot** — compiled .NET 10 helper (`aif` / `ai-fast`) | PowerShell 7+ only | a compatible .NET 10 runtime; automatically skipped on Windows PowerShell 5.1, since .NET Framework 4.8 cannot load a .NET 10 assembly |
-| **WindowsTerminal** — fragment extension, command-palette actions, split pane | either of the above | [Windows Terminal](https://aka.ms/terminal) 1.18+ installed |
+| Product | Shell | Additional requirement |
+| --- | --- | --- |
+| **Core** — `ai`, `ai-fix`, `ai-script`, `ai-chat`, `ai-doctor` | PowerShell 7+ recommended, or Windows PowerShell 5.1 | — |
+| **Ollama** — detection, optional installation, model setup | Either | Internet for the first download; several GB per model; a GPU is optional |
+| **Aot** — managed .NET 10 helper, `aif` / `ai-fast` | PowerShell 7+ | Compatible .NET 10 runtime; Core must already be installed |
+| **WindowsTerminal** — fragment profiles and actions | Either | [Windows Terminal](https://aka.ms/terminal) 1.18+; Core must already be installed |
 
-- Recommended Ollama model: `qwen2.5-coder:7b` (or `qwen2.5-coder:3b` on weaker GPUs)
-- Optional, not installed by this installer: a separately installed Claude Code CLI for `ai-agent`
+The default model is `qwen2.5-coder:7b`; `qwen2.5-coder:3b` is an alternative for systems with less available memory. `ai-agent` additionally requires a separately installed Claude Code CLI.
 
-## 📦 Quick Start & Installation Options
+<!-- sync:install -->
+## Install
 
-### 1. Primary: Built GitHub Release (Recommended)
+The confirmed release channel is GitHub Releases:
 
-Download the pre-built versioned release archive:
-
-- **Download:** [**TerminalAI-v0.1.0-preview1-win-x64.zip**](https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/releases/download/v0.1.0-preview1/TerminalAI-v0.1.0-preview1-win-x64.zip)
-- **Release Page:** [GitHub Releases v0.1.0-preview1](https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/releases/tag/v0.1.0-preview1)
+- [Download `TerminalAI-v0.1.0-preview1-win-x64.zip`](https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/releases/download/v0.1.0-preview1/TerminalAI-v0.1.0-preview1-win-x64.zip)
+- [Release notes for `v0.1.0-preview1`](https://github.com/TiredRebel/Windows-Terminal-AI-Plugin/releases/tag/v0.1.0-preview1)
 
 > [!IMPORTANT]
-> Use the assets listed under Releases to install TerminalAI. GitHub’s automatically generated Source code archives are not installers.
+> Install from the versioned asset under **Releases**. GitHub's generated source archives are not installers.
 
-#### Installation Steps:
-1. Download `TerminalAI-v0.1.0-preview1-win-x64.zip` from the release link above and extract it to a local folder.
-2. Open PowerShell (`pwsh` or `powershell.exe`) in the extracted directory and run the installer:
-   ```powershell
-   pwsh -ExecutionPolicy Bypass -File .\Install-TerminalAi.ps1
-   ```
-   *(For Windows PowerShell 5.1, run `powershell.exe -ExecutionPolicy Bypass -File .\Install-TerminalAi.ps1`)*
-3. By default, the installer deploys all four products automatically:
-   - Verifies connectivity with local Ollama (`http://localhost:11434`) and detects installed models.
-   - Registers the `TerminalAI` module in `$env:PSModulePath`.
-   - Adds a marked auto-import block to `$PROFILE` (saved in UTF-8 with BOM).
-   - Deploys the **Fragment Extension** to Windows Terminal (`%LOCALAPPDATA%\Microsoft\Windows Terminal\Fragments\TerminalAI`).
-
-   Need only a specific product? Use the `-Products` parameter described below.
-4. Reload your terminal profile or run:
-   ```powershell
-   . $PROFILE
-   ```
-
----
-
-### 2. Upcoming Package Channels (Submission in Progress)
-
-> [!NOTE]
-> The following channels are currently undergoing submission and review. They are not yet live for direct installation.
-
-- **WinGet (Windows Package Manager — Upcoming)**:
-  ```powershell
-  # Upcoming - manifest submitted to microsoft/winget-pkgs:
-  # winget install TiredRebel.TerminalAI
-  ```
-  *The WinGet manifest has been prepared and submitted for inclusion in the Windows Package Manager community repository.*
-
-- **PowerShell Gallery (Upcoming)**:
-  ```powershell
-  # Upcoming - undergoing gallery publishing verification:
-  # Install-Module -Name TerminalAI -Scope CurrentUser
-  ```
-  *PowerShell Gallery packaging is prepared and pending release publication.*
-
----
-
-### 3. Alternative & Portable Options
-
-- **Option A: Portable Bootstrapper (Temporary Session)**:
-  For evaluating TerminalAI in a temporary, memory-only session without modifying system profiles or permanent module paths:
-  ```powershell
-  irm https://raw.githubusercontent.com/TiredRebel/Windows-Terminal-AI-Plugin/main/bootstrap.ps1 | iex
-  ```
-  *Loads the module into the current session memory, checks Ollama and active model, registers the `F2` hotkey, and is immediately ready to use for the active session without permanent profile changes.*
-
-  Standalone 1-click execution is also available via **`TerminalAI-Portable.cmd`** or the native executable **`terminalai.exe`**.
-
-- **Option B: Installation from Git Source Repository**:
-  Clone the repository and run the local installer:
-  ```powershell
-  git clone https://github.com/TiredRebel/Windows-Terminal-AI-Plugin.git
-  cd Windows-Terminal-AI-Plugin
-  pwsh -ExecutionPolicy Bypass -File .\Install-TerminalAi.ps1
-  ```
-
-### Installer options
-
-| Parameter | Meaning |
-| --- | --- |
-| `-Products <Core,Ollama,Aot,WindowsTerminal,All>` | Which products to install (comma-separated for more than one). Defaults to `All` — exactly what earlier installer versions always did. |
-| `-Scope CurrentUser|AllUsers` | Install for the current user (default) or all users. `AllUsers` requires Administrator rights. |
-| `-Language en|uk` | Set the initial requested language for model-generated prose responses. The installer and application interfaces remain English-only. |
-| `-PreferredModel <name>` | Select an Ollama model without using the hardware recommendation. |
-| `-SkipOllamaCheck` | Drop the Ollama product (a compatibility shortcut for `-Products` without `Ollama`). |
-| `-SkipTerminalConfig` | Drop the WindowsTerminal product (a compatibility shortcut for `-Products` without `WindowsTerminal`). |
-| `-AutoConfirm` | Accept installer defaults where supported. |
-| `-ModifySettingsJson` | Also update legacy Windows Terminal `settings.json` actions after creating a backup. |
-| `-CustomProfilePath`, `-CustomModulePath`, `-CustomFragmentPath` | Override destinations, primarily for controlled deployments and tests. |
-
-### Installing individual products
-
-Each product also ships as its own script under `installers\`, so it can be (re)installed later without running the whole bundle:
+Extract the archive, open PowerShell in that directory, and run:
 
 ```powershell
-# Just the PowerShell module + Ollama, no Windows Terminal and no C# module:
-pwsh -ExecutionPolicy Bypass -File .\Install-TerminalAi.ps1 -Products Core,Ollama
-
-# The same, via the standalone scripts:
-pwsh -ExecutionPolicy Bypass -File .\installers\Install-Core.ps1
-pwsh -ExecutionPolicy Bypass -File .\installers\Install-Ollama.ps1
-
-# Add the compiled .NET 10 helper (aif) or the Windows Terminal integration later,
-# once Core is already installed:
-pwsh -ExecutionPolicy Bypass -File .\installers\Install-Aot.ps1
-pwsh -ExecutionPolicy Bypass -File .\installers\Install-WindowsTerminal.ps1
+pwsh -ExecutionPolicy Bypass -File .\Install-TerminalAi.ps1
+. $PROFILE
 ```
 
-The **Aot** and **WindowsTerminal** products assume **Core** is already registered: without it, the `TerminalAI` module has no compiled helper to load, and the split-pane action has no assistant script to point at.
+For Windows PowerShell 5.1, replace `pwsh` with `powershell.exe`. The default installs all four products. To select products or the initial model-response language:
 
-## Command map
+```powershell
+pwsh -ExecutionPolicy Bypass -File .\Install-TerminalAi.ps1 -Products Core,Ollama -Language uk
+```
+
+PowerShell Gallery and WinGet availability is not currently confirmed. Do not use their installation commands until the channel is verified. Source checkout and temporary bootstrap options remain available:
+
+```powershell
+git clone https://github.com/TiredRebel/Windows-Terminal-AI-Plugin.git
+cd Windows-Terminal-AI-Plugin
+pwsh -ExecutionPolicy Bypass -File .\Install-TerminalAi.ps1
+
+# Inspect remote content before piping it to PowerShell.
+irm https://raw.githubusercontent.com/TiredRebel/Windows-Terminal-AI-Plugin/main/bootstrap.ps1 | iex
+```
+
+See [Technical and maintainer guide](docs/TECHNICAL.md#installation-details) for every installer option and individual-product commands.
+
+<!-- sync:commands -->
+## Commands and workflows
 
 | Command | Purpose |
 | --- | --- |
 | `ai` / `??` | Generate one command with the PowerShell implementation. |
-| `aif` / `ai-fast` | Generate one command with the compiled .NET 10 helper on PowerShell 7+. |
-| `ai-fix` / `fix-error` | Diagnose `$global:Error[0]` and propose a corrected command. |
+| `aif` / `ai-fast` | Generate one command with the managed .NET 10 helper on PowerShell 7+. |
+| `ai-fix` / `fix-error` | Diagnose the latest PowerShell error and propose a correction. |
 | `ai-script` | Generate a multi-line PowerShell script and optionally save it. |
-| `ai-chat` / `ai-assistant` | Start the interactive assistant with bounded session history. |
-| `ai-agent` | Launch Claude Code against the configured Ollama endpoint. |
-| `ai-doctor` | Check the installed module, profile, terminal fragment, Ollama, model, safety helpers, and optional agent mode. |
+| `ai-chat` / `ai-assistant` | Start the interactive assistant with bounded history. |
+| `ai-agent` | Launch Claude Code against the configured endpoint. |
+| `ai-doctor` | Check the installation and configured services. |
 | `ai-help` | Show built-in help. |
 
-### One-shot command generation
+Examples:
 
 ```powershell
 ai "find files larger than 100 MB"
 ai "show listening TCP ports" -Execute
 ai "get the default gateway" -Copy
-ai "find processes using more than 1 GB" -Alias
-ai "explain PowerShell remoting" -Ask
-ai "stop the Spooler service" -Preview
 ai "explain this pipeline" -Explain
-ai "show services" -Model qwen2.5-coder:7b
-```
-
-`Invoke-AiCommand` accepts `-Execute` (`-x`, `-y`), `-Copy` (`-c`), `-Alias` (`-a`, `-Short`, `-UseAliases`), `-Explain`, `-Ask` (`-chat`, `-question`), `-Preview` (`-w`, `-WhatIf`), and `-Model`.
-
-Without a prompt, `ai` shows its quick-reference card. It also recognizes management subcommands such as `help`, `status`, `models`, `model <name>`, `lang <en|uk>`, `font`, `fonts`, `alias`, and `config`; `lang` changes the requested language for model-generated prose, not the application UI.
-
-### Inline generation
-
-At a PSReadLine prompt, type a comment describing the command, then press `F2`, `Ctrl+G`, or the configured `Ctrl+Alt+A` chord:
-
-```powershell
-# show the five processes using the most CPU
-```
-
-TerminalAI replaces the input with generated PowerShell code. Review the result before pressing Enter. Shortcut availability depends on PSReadLine and the active console host.
-
-### Error diagnosis
-
-After a failed PowerShell command:
-
-```powershell
 ai-fix
-ai-fix -Model qwen2.5-coder:7b
-```
-
-The diagnostic request includes the latest PowerShell error message, failed input line, and script location when available. Treat those values as data that will be sent to the configured Ollama endpoint.
-
-### Script generation
-
-```powershell
-ai-script "create a disk-space report with error handling"
 ai-script "create a disk-space report" -OutputPath .\Get-DiskReport.ps1 -Edit
+ai-doctor
 ```
 
-`New-AiScript` accepts `-Description` (position 0), `-OutputPath`, `-Edit`, and `-Model`. Existing files are compared and require confirmation before overwrite; non-interactive overwrite is blocked. New files are written as UTF-8 with BOM. `ai-script` does not expose a `-Force` parameter.
+At a PSReadLine prompt, type a comment and press `F2`, `Ctrl+G`, or the configured `Ctrl+Alt+A` chord. TerminalAI replaces the line with generated PowerShell. Shortcut availability depends on PSReadLine and the active console host.
 
+`ai-script` protects existing files with a diff and confirmation prompt; it has no `-Force` option. Review every generated path and command before use.
+
+<!-- sync:assistant -->
 ## Interactive assistant
 
 ```powershell
@@ -197,27 +118,26 @@ ai-chat
 ai-chat -Model qwen2.5-coder:7b
 ```
 
-The assistant sends conversation history to Ollama's `/api/chat` endpoint. It sanitizes recognized secret patterns before storing messages and keeps a bounded FIFO history. Redaction is pattern-based and cannot guarantee detection of every secret.
+The assistant uses Ollama's `/api/chat` endpoint, keeps bounded FIFO history, and applies pattern-based redaction before storing conversation messages. Pattern matching cannot detect every secret.
 
 | Slash command | Action |
 | --- | --- |
 | `/help`, `/?` | Show assistant help. |
-| `/models` | List models reported by Ollama. |
-| `/model <name>` | Change the model for this session. |
-| `/lang <en|uk>` | Change the requested language for model-generated chat replies; `permanent` also persists it in the Windows user environment. |
-| `/context` | Show history usage. |
-| `/reset` | Clear conversation history. |
-| `/inspect [clear]` | Show diagnostic context; `clear` removes the recorded last error. |
-| `/run` | Send the latest code block through the PowerShell execution gate. |
-| `/read <path>` | Add a local text file to the conversation context, subject to size checks. |
+| `/models`, `/model <name>` | List or select an Ollama model. |
+| `/lang <en\|uk>` | Save the model-response language to `config.json` and update the current process. |
+| `/lang permanent <en\|uk>`, `/lang-permanent <en\|uk>` | Do the same and also write user-level `TERMINAL_AI_LANG`. |
+| `/context`, `/reset` | Show history use or clear history. |
+| `/inspect [clear]` | Show diagnostic context or clear the recorded last error. |
+| `/run` | Send the latest code block through the execution gate. |
+| `/read <path>` | Add a size-checked local text file to context. |
 | `/copy` | Copy the latest code block; inspect it for secrets first. |
-| `/save [path.ps1]` | Save the latest code block using overwrite protection. |
-| `/clear` | Clear the screen without clearing history. |
-| `/exit` | End the assistant session. |
+| `/save [path.ps1]` | Save the latest code block with overwrite protection. |
+| `/clear`, `/exit` | Clear the screen or end the session. |
 
+<!-- sync:agent -->
 ## Optional agent mode
 
-`ai-agent` starts an installed Claude Code executable with `ANTHROPIC_BASE_URL` pointed at the configured Ollama URL and uses a separate data directory, `~/.terminal-ai/claude` by default.
+`ai-agent` launches a separately installed Claude Code executable. TerminalAI points `ANTHROPIC_BASE_URL` at the configured `OllamaUrl` and uses `~/.terminal-ai/claude` as its default data directory.
 
 ```powershell
 ai-agent -CheckOnly
@@ -227,36 +147,34 @@ ai-agent -Resume
 ai-agent -Print "summarize this project"
 ```
 
-`Invoke-AiAgent` accepts `-Prompt`, `-Model`, `-WorkingDir`, `-Resume`, `-Print`, `-ConfirmTrust` (aliases: `-Force`, `-y`, `-Yes`), and `-CheckOnly`. `-ConfirmTrust` skips TerminalAI's launch prompt; Claude Code retains its own permission model.
+The target must provide the API behavior expected by Claude Code, including `/v1/messages`; readiness checks of Ollama model endpoints do not prove that compatibility. Claude Code keeps its own permissions and may read, modify, or run content allowed by those permissions.
 
-TerminalAI also sets `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` and removes selected ambient provider keys in the child process. These settings reduce unintended external traffic but are not an independent guarantee about every behavior of the separately installed Claude Code CLI.
+<!-- sync:compiled-helper -->
+## Managed .NET 10 helper
 
-## Compiled .NET 10 helper command path
-
-On PowerShell 7+, the main module dynamically loads `TerminalAI.Aot.dll` (a managed .NET 10 C# binary module) and exports `Invoke-AiCommandFast` as `aif` and `ai-fast`.
+On PowerShell 7+, the Core module can load `TerminalAI.Aot.dll` and expose `Invoke-AiCommandFast` as `aif` and `ai-fast`.
 
 ```powershell
 aif "find large log files"
 aif "restart the Spooler service" -Execute
 aif "how do PowerShell pipelines stream objects?" -Ask
-aif agent "inspect git status"
 ```
 
-The C# project targets `net10.0`. Despite the historical `AOT` directory and assembly name, the project currently builds a standard managed DLL with `dotnet build`; it does not define a NativeAOT publish configuration. See the [C# component guide](AOT/README.md).
+`AOT` is a historical path and project identifier. The current `net10.0` project produces a managed DLL with `dotnet build`; it does not define `<PublishAot>`. See the [C# helper guide](AOT/README.md).
 
+<!-- sync:safety -->
 ## Safety model
 
-Generated commands are untrusted input. Always review them before execution. Both command paths parse generated PowerShell before execution. AST checks and WhatIf previews are safety guardrails, NOT a security sandbox. The analyzers inspect nested commands, aliases, parameters, literal or unresolved targets, dynamic invocation, and splatting. They use nine categories:
+Both command paths parse generated PowerShell before execution. The analyzers classify commands into nine categories and four risk levels. Syntax errors are blocked; high, critical, dynamic, and unresolved operations require confirmation.
 
-`ReadOnly`, `SystemChange`, `Deletion`, `NetworkChange`, `ServiceOrProcess`, `Registry`, `DiskOrPartition`, `DynamicOrUnknown`, and `ExternalProgram`.
+WhatIf preview is offered only when the involved PowerShell commands support `ShouldProcess`; TerminalAI does not append `-WhatIf` to arbitrary external programs. Commands still execute in the caller's process with the caller's privileges.
 
-Risk levels are `Low`, `Medium`, `High`, and `Critical`. Syntax errors are blocked. High, critical, dynamic, and unresolved operations require explicit confirmation. `-Preview` is available only where the involved PowerShell commands support `ShouldProcess`; TerminalAI does not append `-WhatIf` to arbitrary external programs.
+Secret handling is pattern-based. The assistant sanitizes recognized patterns before adding messages to its history, and the C# helper sanitizes selected display and clipboard paths. Standard PowerShell `ai -Copy` and assistant `/copy` copy the generated block as-is, so inspect copied content yourself.
 
-Secret sanitization covers recognized API keys, bearer tokens, password-like arguments, and private-key blocks before selected display, history, or clipboard operations. It is a defense-in-depth filter, not a substitute for reviewing generated commands and removing sensitive input.
+<!-- sync:configuration -->
+## Configuration and language
 
-## Configuration
-
-Configuration is stored in `~/.terminal-ai/config.json`, or under the directory specified by `TERMINAL_AI_CONFIG_DIR`. `TERMINAL_AI_LANG` takes precedence for the requested model-response language. Built-in UI and status/error messages remain English.
+Configuration is stored in `~/.terminal-ai/config.json`, or below `TERMINAL_AI_CONFIG_DIR`. `TERMINAL_AI_LANG` takes precedence over the file for the requested model-response language.
 
 ```powershell
 Get-TerminalAiConfig
@@ -266,27 +184,12 @@ Set-TerminalAiLanguage -Language uk
 Set-TerminalAiLanguage -Language en -Permanent
 ```
 
-| Setting | Default | Purpose |
-| --- | --- | --- |
-| `OllamaUrl` | `http://localhost:11434` | Ollama base URL. |
-| `Model` | `qwen2.5-coder:7b` | Default generation and chat model. |
-| `Language` | `en` | Requested language for model-generated prose responses (`en` or `uk`); it does not localize application text. |
-| `Font` | `Cascadia Code` | Preferred Windows Terminal font. |
-| `Temperature` | `0.2` | Default sampling temperature where a command does not override it. |
-| `TimeoutSeconds` | `120` | HTTP request timeout. |
-| `HotkeyChord` | `Ctrl+Alt+A` | Configured inline shortcut. |
-| `AutoCopy` | `false` | Copy behavior preference. |
-| `ShowExplanation` | `true` | Explanation display preference. |
-| `UseAliases` | `false` | Prefer short PowerShell aliases. |
-| `AgentModel` | `qwen2.5-coder:7b` | Default model for `ai-agent`. |
-| `ClaudeExecutable` | empty | Optional explicit Claude Code path. |
-| `AgentDataDirectory` | empty | Optional agent configuration directory override. |
+The non-permanent language command still saves `config.json` and updates the current process. `-Permanent` additionally writes user-level `TERMINAL_AI_LANG` for future processes. Application text remains English.
 
+<!-- sync:terminal -->
 ## Windows Terminal integration
 
-By default the installer copies `terminalai.json` to a Windows Terminal fragment directory without editing `settings.json`. The fragment defines four profiles and four actions for `ai`, `ai-fix`, `ai-script`, and an assistant split pane. Use `-ModifySettingsJson` only for the legacy action-injection path; the installer backs up the file first.
-
-Font commands read and update Windows Terminal settings:
+By default, the installer copies `terminalai.json` to the Windows Terminal fragment directory without editing `settings.json`. It adds two profiles and actions for `ai`, `ai-fix`, `ai-script`, and an assistant split pane. `-ModifySettingsJson` enables the legacy action-injection path after a backup.
 
 ```powershell
 ai fonts
@@ -294,87 +197,33 @@ ai font "Cascadia Code"
 Set-TerminalAiFont -Font "Cascadia Code" -Size 13
 ```
 
-## Architecture
-
-```text
-Install-TerminalAi.ps1
-  -> installs TerminalAI.psd1 / TerminalAI.psm1 and companion scripts
-  -> writes ~/.terminal-ai/config.json
-  -> adds a marked profile import block
-  -> deploys terminalai.json
-
-TerminalAI.psm1
-  -> TerminalAiConfig.ps1       configuration, response language, fonts
-  -> TerminalAiAssistant.ps1    interactive /api/chat session
-  -> TerminalAiAgent.ps1        optional Claude Code launcher
-  -> Ollama /api/generate       one-shot generation
-  -> AST analyzer and gate      pre-execution inspection
-  -> TerminalAI.Aot.dll         optional PowerShell 7 C# command path
-```
-
-The PowerShell and C# paths share the configuration file and major user workflows, but they are separate implementations. Behavior parity should be verified by tests rather than assumed.
-
-## Verification and development
-
-Syntax check:
-
-```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\check_syntax.ps1
-```
-
-Deterministic root checks, with live Ollama calls skipped:
-
-```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\Test-TerminalAi.ps1
-```
-
-Add `-RunLiveTests` only when Ollama is running and model inference is intentionally in scope.
-
-Focused suites:
-
-```powershell
-Get-ChildItem .\tests\*.Tests.ps1 | ForEach-Object { pwsh -NoProfile -File $_.FullName }
-Get-ChildItem .\AOT\tests\*.Tests.ps1 | ForEach-Object { pwsh -NoProfile -File $_.FullName }
-```
-
-Build the C# component:
-
-```powershell
-dotnet build .\AOT\TerminalAI.Aot.csproj -c Release
-```
-
-The post-build target copies the DLL to the repository root. A loaded DLL may remain locked by an existing PowerShell process; validate a new build in a fresh `pwsh -NoProfile` session.
-
+<!-- sync:troubleshooting -->
 ## Troubleshooting
 
-Run the built-in diagnostics first:
+- **Ollama connection fails:** run `ollama list`; if needed, start `ollama serve`, then confirm `OllamaUrl` with `Get-TerminalAiConfig`.
+- **A shortcut does not respond:** run `Import-Module TerminalAI -Force`, confirm PSReadLine is active, and try `F2`.
+- **Text encoding is wrong:** use a Unicode-capable font and UTF-8 console output; the installer adds UTF-8 profile settings.
+- **Installation state is unclear:** run `ai-doctor` or `Test-TerminalAiInstallation -PassThru`.
 
-```powershell
-ai-doctor
-Test-TerminalAiInstallation -PassThru
-```
-
-- **Ollama cannot be reached:** run `ollama list`, then `ollama serve` if necessary; confirm `OllamaUrl`.
-- **The model is missing:** run `ollama pull <model>` or select an installed model with `ai model <name>`.
-- **A shortcut does not respond:** use a PSReadLine-capable interactive host and reload with `Import-Module TerminalAI -Force`.
-- **Cyrillic is rendered incorrectly:** use a Unicode font and set `[Console]::InputEncoding`, `[Console]::OutputEncoding`, and `$OutputEncoding` to UTF-8.
-- **The C# command is unavailable:** use PowerShell 7+, verify the root DLL exists, and check the module import diagnostics.
-- **Agent mode is unavailable:** run `ai-agent -CheckOnly`; verify the Claude Code executable, Ollama, selected model, and working directory.
-
+<!-- sync:uninstall -->
 ## Uninstall
 
 ```powershell
 pwsh -ExecutionPolicy Bypass -File .\Uninstall-TerminalAi.ps1
-```
-
-The uninstaller removes the installed module directory, the marked profile block, and the Windows Terminal fragment for the selected scope. It preserves `~/.terminal-ai` by default. To remove configuration too:
-
-```powershell
+# Also remove ~/.terminal-ai/config.json:
 pwsh -ExecutionPolicy Bypass -File .\Uninstall-TerminalAi.ps1 -PurgeConfig
 ```
 
-Use `-Scope AllUsers` from an elevated PowerShell session for an all-users installation.
+Without `-PurgeConfig`, the uninstaller keeps `~/.terminal-ai`.
 
+<!-- sync:technical -->
+## Technical and maintainer documentation
+
+The [Technical and maintainer guide](docs/TECHNICAL.md) contains the full installer and parameter references, configuration fields, architecture, transport details, performance guidance, build and test commands, documentation checks, and release-channel verification.
+
+The English README is canonical. [README.uk.md](README.uk.md) is its Ukrainian translation and follows the same ordered sync sections.
+
+<!-- sync:license -->
 ## License status
 
-TerminalAI is released under the [MIT License](LICENSE).
+TerminalAI is distributed under the [MIT License](LICENSE).

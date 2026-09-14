@@ -198,6 +198,14 @@ Assert-Fixture "FIX-P4-10" "Native launcher (terminalai.exe) and batch script ex
     if ($cmdContent -notmatch "bootstrap\.ps1") { throw "cmd launcher does not reference bootstrap.ps1" }
 }
 
+Assert-Fixture "FIX-P4-11" "Documentation quality checker passes offline" {
+    $checker = Join-Path $projectRoot "tools\Test-DocumentationQuality.ps1"
+    if (-not (Test-Path -LiteralPath $checker)) { throw "Test-DocumentationQuality.ps1 missing" }
+    $out = & $checker -Root $projectRoot *>&1 | Out-String
+    if ($LASTEXITCODE -ne 0) { throw "Documentation quality check failed: $out" }
+    if ($out -match '(?m)^UNKNOWN:') { throw "Offline checker must not report unknown live state: $out" }
+}
+
 # --- Summary ---
 Write-Host "`n------------------------------------------------------------"
 Write-Host "Results: $passed / $($passed + $failed) passed ($failed failed)"

@@ -446,7 +446,7 @@ while ($true) {
             if ($isPermanent) {
                 Set-TerminalAiLanguage -Language $currentLang -Permanent | Out-Null
             } else {
-                Set-TerminalAiLanguage -Language $currentLang -Permanent | Out-Null
+                Set-TerminalAiLanguage -Language $currentLang | Out-Null
             }
             $txt = Get-AssistantDict -Lang $currentLang
             if ($isPermanent) {

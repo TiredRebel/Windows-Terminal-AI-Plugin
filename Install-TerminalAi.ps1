@@ -2,10 +2,10 @@
 # Multi-user installer supporting -Scope CurrentUser (default) and -Scope AllUsers.
 # English is primary default language; Ukrainian on demand via -Language uk.
 #
-# TerminalAI installs as four independent products:
-#   Core             PowerShell module (ai, ai-fix, ai-script, ai-chat, ai-doctor). Required.
+# TerminalAI installs as four selectable components:
+#   Core             PowerShell module (ai, ai-fix, ai-script, ai-chat, ai-doctor). Required by Aot and WindowsTerminal.
 #   Ollama           Detects/installs Ollama, analyzes hardware, pulls a model.
-#   Aot              Compiled C# accelerator module (aif / ai-fast). Needs PowerShell 7+ / .NET 10.
+#   Aot              Compiled managed .NET 10 helper module (aif / ai-fast). Needs PowerShell 7+.
 #   WindowsTerminal  Fragment extension, profiles, and command-palette actions.
 #
 # By default this script installs all four, exactly like earlier versions of
