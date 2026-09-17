@@ -220,6 +220,83 @@ Assert-Fixture "FIX-30" "Execution gate blocks WhatIf for external commands" {
     return ($res.Executed -eq $false -and $res.Status -eq "PreviewUnavailable")
 }
 
+# FIX-31: External dependency acquisition requires an explicit affirmative answer
+Assert-Fixture "FIX-31" "Installers require explicit consent for Ollama and model downloads" {
+    $installer = Get-Content (Join-Path $PSScriptRoot "..\installers\Install-Ollama.ps1") -Raw
+    $bootstrap = Get-Content (Join-Path $PSScriptRoot "..\bootstrap.ps1") -Raw
+    foreach ($source in @($installer, $bootstrap)) {
+        if ($source -notmatch '\[y/N\]') { return $false }
+        if ($source -notmatch '\$shouldInstall\s*=\s*\$false') { return $false }
+        if ($source -notmatch '\$shouldPull\s*=\s*\$false') { return $false }
+        if ($source -match '\$should(?:Install|Pull)\s*=\s*\$AutoConfirm') { return $false }
+    }
+    return $true
+}
+
+# FIX-32: Bootstrap cannot repeat external setup during the full installer handoff
+Assert-Fixture "FIX-32" "Bootstrap preserves consent controls and skips repeated Ollama setup" {
+    $bootstrap = Get-Content (Join-Path $PSScriptRoot "..\bootstrap.ps1") -Raw
+    return (
+        $bootstrap -match '\$relaunchArgs \+= "-SkipOllama"' -and
+        $bootstrap -match '\$relaunchArgs \+= "-NonInteractive"' -and
+        $bootstrap -match '& \$installerScript -Language \$Language -SkipOllamaCheck'
+    )
+}
+
+# FIX-33: Uninstall must preserve external dependencies
+Assert-Fixture "FIX-33" "Uninstaller never removes Ollama or Ollama models" {
+    $uninstaller = Get-Content (Join-Path $PSScriptRoot "..\Uninstall-TerminalAi.ps1") -Raw
+    return (
+        $uninstaller -notmatch '(?i)winget\s+uninstall\s+Ollama' -and
+        $uninstaller -notmatch '(?i)ollama\s+(?:rm|remove)\b' -and
+        $uninstaller -match 'Ollama and all Ollama models were preserved'
+    )
+}
+
+# FIX-34: Uninstall removes known application files without deleting neighboring data
+Assert-Fixture "FIX-34" "Uninstaller preserves unrelated files in custom destinations" {
+    $testRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("TerminalAiUninstallSafety_" + [guid]::NewGuid().ToString("N"))
+    $moduleRoot = Join-Path $testRoot "Modules"
+    $moduleDir = Join-Path $moduleRoot "TerminalAI"
+    $fragmentDir = Join-Path $testRoot "Fragments"
+    $configDir = Join-Path $testRoot "Config"
+    $profilePath = Join-Path $testRoot "profile.ps1"
+    $oldLocalAppData = $env:LOCALAPPDATA
+    $oldProgramData = $env:ProgramData
+    $oldConfigDir = $env:TERMINAL_AI_CONFIG_DIR
+    try {
+        New-Item -ItemType Directory -Path $moduleDir, $fragmentDir, $configDir -Force | Out-Null
+        [System.IO.File]::WriteAllText((Join-Path $moduleDir "TerminalAI.psm1"), "# owned")
+        [System.IO.File]::WriteAllText((Join-Path $moduleDir "keep.txt"), "keep")
+        [System.IO.File]::WriteAllText((Join-Path $fragmentDir "terminalai.json"), '{"profiles":[{"guid":"{62068dd4-52e9-41f7-9feb-987581e2e117}"}]}')
+        [System.IO.File]::WriteAllText((Join-Path $fragmentDir "keep.txt"), "keep")
+        [System.IO.File]::WriteAllText((Join-Path $configDir "config.json"), "{}")
+        [System.IO.File]::WriteAllText((Join-Path $configDir "keep.txt"), "keep")
+        [System.IO.File]::WriteAllText($profilePath, "# >>> TerminalAI Initialization >>>`nImport-Module TerminalAI`n# <<< TerminalAI Initialization <<<`n# keep")
+        $env:LOCALAPPDATA = Join-Path $testRoot "LocalAppData"
+        $env:ProgramData = Join-Path $testRoot "ProgramData"
+        $env:TERMINAL_AI_CONFIG_DIR = $configDir
+
+        & (Join-Path $PSScriptRoot "..\Uninstall-TerminalAi.ps1") `
+            -CustomModulePath $moduleRoot -CustomFragmentPath $fragmentDir `
+            -CustomProfilePath $profilePath -PurgeConfig | Out-Null
+
+        return (
+            -not (Test-Path (Join-Path $moduleDir "TerminalAI.psm1")) -and
+            (Test-Path (Join-Path $moduleDir "keep.txt")) -and
+            -not (Test-Path (Join-Path $fragmentDir "terminalai.json")) -and
+            (Test-Path (Join-Path $fragmentDir "keep.txt")) -and
+            -not (Test-Path (Join-Path $configDir "config.json")) -and
+            (Test-Path (Join-Path $configDir "keep.txt"))
+        )
+    } finally {
+        $env:LOCALAPPDATA = $oldLocalAppData
+        $env:ProgramData = $oldProgramData
+        $env:TERMINAL_AI_CONFIG_DIR = $oldConfigDir
+        if (Test-Path $testRoot) { Remove-Item -LiteralPath $testRoot -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+}
+
 Write-Host "`n═══════════════════════════════════════════════════════════════" -ForegroundColor Cyan
 Write-Host "  Results: $passed / $total passed ($failed failed)" -ForegroundColor $(if ($failed -eq 0) { "Green" } else { "Yellow" })
 Write-Host "═══════════════════════════════════════════════════════════════`n" -ForegroundColor Cyan

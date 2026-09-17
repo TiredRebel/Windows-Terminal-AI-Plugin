@@ -71,6 +71,8 @@ pwsh -ExecutionPolicy Bypass -File .\Install-TerminalAi.ps1
 pwsh -ExecutionPolicy Bypass -File .\Install-TerminalAi.ps1 -Products Core,Ollama -Language uk
 ```
 
+Встановлення Ollama та завантаження моделі є окремими зовнішніми змінами. Параметр `-AutoConfirm` не підтверджує жодну з них: для кожної операції потрібно інтерактивно ввести `y` або `yes`. Натискання Enter, перенаправлене введення та `-NonInteractive` пропускають ці операції.
+
 Доступність у PowerShell Gallery і WinGet зараз не підтверджено. Не використовуйте команди встановлення з цих каналів до перевірки. Також доступні встановлення з вихідного коду та тимчасовий завантажувач:
 
 ```powershell
@@ -222,7 +224,7 @@ pwsh -ExecutionPolicy Bypass -File .\Uninstall-TerminalAi.ps1
 pwsh -ExecutionPolicy Bypass -File .\Uninstall-TerminalAi.ps1 -PurgeConfig
 ```
 
-Без `-PurgeConfig` скрипт видалення зберігає `~/.terminal-ai`.
+Скрипт видалення прибирає лише відомі файли TerminalAI. Він завжди зберігає Ollama, усі моделі Ollama та сторонні файли у спільних або користувацьких каталогах. Без `-PurgeConfig` каталог `~/.terminal-ai` зберігається; з `-PurgeConfig` видаляється лише файл TerminalAI `config.json`, а інші файли залишаються без змін.
 
 <!-- sync:technical -->
 ## Технічна документація та супровід

@@ -14,7 +14,8 @@ param(
     [string]$Language = "en",
 
     [string]$PreferredModel,
-    [switch]$AutoConfirm
+    [switch]$AutoConfirm,
+    [switch]$NonInteractive
 )
 
 $ErrorActionPreference = "Stop"
@@ -49,12 +50,10 @@ if (-not $ollamaCmd) {
     $msgNoOllama = "   ⚠ Ollama was not found on your system."
     Write-Host $msgNoOllama -ForegroundColor DarkYellow
     $shouldInstall = $false
-    if ($AutoConfirm) {
-        $shouldInstall = $true
-    } elseif (-not [Console]::IsInputRedirected) {
-        $promptInstall = "   Do you want to install Ollama automatically now? [Y/n]"
+    if (-not $NonInteractive -and -not [Console]::IsInputRedirected) {
+        $promptInstall = "   Ollama is an external dependency and remains after TerminalAI uninstall. Install it now? [y/N]"
         $ans = Read-Host $promptInstall
-        $shouldInstall = ($ans -match '^(y|yes|$)' -or [string]::IsNullOrWhiteSpace($ans))
+        $shouldInstall = ($ans -match '^(?i:y|yes)$')
     }
 
     if ($shouldInstall) {
@@ -195,17 +194,10 @@ if ($installedModels -notcontains $selectedModel -and (Get-Command ollama -Error
     $msgMissing = "`n   ⚠ Model '$selectedModel' is not yet downloaded in Ollama."
     Write-Host $msgMissing -ForegroundColor DarkYellow
     $shouldPull = $false
-    if ($AutoConfirm) {
-        $shouldPull = $true
-    } elseif (-not [Console]::IsInputRedirected) {
-        $promptPull = "   Download '$selectedModel' now via 'ollama pull'? [Y/n] (or enter custom model name)"
+    if (-not $NonInteractive -and -not [Console]::IsInputRedirected) {
+        $promptPull = "   Ollama models are external data and remain after TerminalAI uninstall. Download '$selectedModel' now? [y/N]"
         $pullChoice = Read-Host $promptPull
-        if ($pullChoice -match '^(y|yes|$)' -or [string]::IsNullOrWhiteSpace($pullChoice)) {
-            $shouldPull = $true
-        } elseif ($pullChoice -notmatch '^(n|no)$') {
-            $selectedModel = $pullChoice.Trim()
-            $shouldPull = $true
-        }
+        $shouldPull = ($pullChoice -match '^(?i:y|yes)$')
     }
 
     if ($shouldPull) {

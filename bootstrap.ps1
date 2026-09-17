@@ -83,7 +83,11 @@ if (-not $isPwsh) {
         if ($ans -match '^(y|yes|$)' -or [string]::IsNullOrWhiteSpace($ans)) {
             $scriptPath = $MyInvocation.MyCommand.Path
             if ($scriptPath -and (Test-Path $scriptPath)) {
-                Start-Process -FilePath $foundPwsh -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-File", "`"$scriptPath`"", "-Mode", $Mode, "-Language", $Language
+                $relaunchArgs = @("-NoExit", "-ExecutionPolicy", "Bypass", "-File", "`"$scriptPath`"", "-Mode", $Mode, "-Language", $Language, "-Model", $Model)
+                if ($SkipOllama) { $relaunchArgs += "-SkipOllama" }
+                if ($NonInteractive) { $relaunchArgs += "-NonInteractive" }
+                if ($AutoConfirm) { $relaunchArgs += "-AutoConfirm" }
+                Start-Process -FilePath $foundPwsh -ArgumentList $relaunchArgs
                 return
             }
         }
@@ -114,11 +118,11 @@ if (-not $SkipOllama) {
         $msgNoOllama = "   ⚠ Ollama is not installed on this system."
         Write-Host $msgNoOllama -ForegroundColor DarkYellow
 
-        $shouldInstall = $AutoConfirm
-        if (-not $shouldInstall -and -not [Console]::IsInputRedirected -and -not $NonInteractive) {
-            $promptInstall = "   Install Ollama automatically now? [Y/n]"
+        $shouldInstall = $false
+        if (-not [Console]::IsInputRedirected -and -not $NonInteractive) {
+            $promptInstall = "   Ollama is an external dependency and remains after TerminalAI uninstall. Install it now? [y/N]"
             $ans = Read-Host $promptInstall
-            $shouldInstall = ($ans -match '^(y|yes|$)' -or [string]::IsNullOrWhiteSpace($ans))
+            $shouldInstall = ($ans -match '^(?i:y|yes)$')
         }
 
         if ($shouldInstall) {
@@ -189,11 +193,11 @@ if (-not $SkipOllama) {
         
         # Check active model
         if ($installedModels -notcontains $Model) {
-            $msgPull = "Recommended model '$Model' is not installed. Download now? [Y/n]"
-            $shouldPull = $AutoConfirm
-            if (-not $shouldPull -and -not [Console]::IsInputRedirected -and -not $NonInteractive) {
+            $msgPull = "Ollama models are external data and remain after TerminalAI uninstall. Download '$Model' now? [y/N]"
+            $shouldPull = $false
+            if (-not [Console]::IsInputRedirected -and -not $NonInteractive) {
                 $ansPull = Read-Host "   $msgPull"
-                $shouldPull = ($ansPull -match '^(y|yes|$)' -or [string]::IsNullOrWhiteSpace($ansPull))
+                $shouldPull = ($ansPull -match '^(?i:y|yes)$')
             }
             if ($shouldPull -and $ollamaCmd) {
                 Write-Host "   ▶ Pulling model '$Model' (this may take a couple of minutes)..." -ForegroundColor Cyan
@@ -258,7 +262,8 @@ if ($Mode -eq "Install") {
     $installerScript = Join-Path $runtimeDir "Install-TerminalAi.ps1"
     if (Test-Path $installerScript) {
         Write-Host "`n▶ Launching full TerminalAI installer..." -ForegroundColor Cyan
-        & $installerScript -Language $Language
+        & $installerScript -Language $Language -SkipOllamaCheck `
+            -AutoConfirm:$AutoConfirm -NonInteractive:$NonInteractive
     } else {
         Write-Error "Installer script not found: $installerScript"
     }

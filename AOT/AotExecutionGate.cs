@@ -90,6 +90,7 @@ public static class AotExecutionGate
             WriteColorLine(ui, ConsoleColor.Cyan,
                 "    🔍 [WhatIf Preview] Running command in safe simulation mode...");
 
+            bool previewActivity = Win32Console.BeginActivity();
             try
             {
                 var whatIfScript = $"$WhatIfPreference = $true; $ErrorActionPreference = 'Continue'; . {{ {command} }}";
@@ -120,6 +121,7 @@ public static class AotExecutionGate
                 WriteColorLine(ui, ConsoleColor.Red, $"[WhatIf Error] {ex.Message}");
                 return new ExecutionGateResult(false, "ExecutionError", command, analysis, ex.Message);
             }
+            finally { Win32Console.EndActivity(previewActivity); }
         }
 
         // 4. Security Check & Confirmation
@@ -185,6 +187,7 @@ public static class AotExecutionGate
         }
 
         // 5. Safe Execution
+        bool activity = Win32Console.BeginActivity();
         try
         {
             WriteColorLine(ui, ConsoleColor.Yellow,
@@ -218,6 +221,7 @@ public static class AotExecutionGate
             WriteColorLine(ui, ConsoleColor.Red, $"    ✖ {ex.Message}\n");
             return new ExecutionGateResult(false, "ExecutionError", command, analysis, ex.Message);
         }
+        finally { Win32Console.EndActivity(activity); }
     }
 
     private static void RenderSyntaxError(PSHostUserInterface? ui, AstAnalysisResult analysis, bool isUk)

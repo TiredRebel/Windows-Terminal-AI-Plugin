@@ -52,6 +52,22 @@ using System.Threading;
 using System.Threading.Tasks;
 
 public static class TerminalAiPasteHelper {
+    public static volatile bool CancelRequested;
+
+    private static void OnCancelKeyPress(object sender, ConsoleCancelEventArgs args) {
+        CancelRequested = true;
+        args.Cancel = true;
+    }
+
+    public static void BeginCancelCapture() {
+        CancelRequested = false;
+        Console.CancelKeyPress += OnCancelKeyPress;
+    }
+
+    public static void EndCancelCapture() {
+        Console.CancelKeyPress -= OnCancelKeyPress;
+    }
+
     [DllImport("user32.dll", SetLastError = true)]
     public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 
@@ -82,6 +98,45 @@ public static class TerminalAiPasteHelper {
 }
 
 # --- HELPERS ---
+
+function Update-TerminalAiActivityDepth {
+    param([int]$Change)
+
+    # Share console state with the managed helper and across nested calls.
+    $domain = [AppDomain]::CurrentDomain
+    [Threading.Monitor]::Enter($domain)
+    try {
+        $depth = [int]$domain.GetData('TerminalAI.ActivityDepth')
+        if ($Change -gt 0) {
+            if ($depth -eq 0) { [Console]::Write(([char]27 + ']9;4;3;0' + [char]7)) }
+            $domain.SetData('TerminalAI.ActivityDepth', ($depth + 1))
+            return $true
+        }
+        if ($depth -gt 0) {
+            $domain.SetData('TerminalAI.ActivityDepth', ($depth - 1))
+            if ($depth -eq 1) { [Console]::Write(([char]27 + ']9;4;0;0' + [char]7)) }
+        }
+    }
+    finally { [Threading.Monitor]::Exit($domain) }
+}
+
+function Start-TerminalAiActivity {
+    try {
+        if (-not [Environment]::UserInteractive -or -not $env:WT_SESSION -or
+            [Console]::IsInputRedirected -or [Console]::IsOutputRedirected -or [Console]::IsErrorRedirected) {
+            return $false
+        }
+        return (Update-TerminalAiActivityDepth -Change 1)
+    }
+    catch { return $false }
+}
+
+function Stop-TerminalAiActivity {
+    param([bool]$Active)
+    if ($Active) {
+        try { Update-TerminalAiActivityDepth -Change -1 } catch { }
+    }
+}
 
 function Format-AiCodeOutput {
     param([string]$Text)
@@ -808,6 +863,7 @@ function Invoke-OllamaApi {
 
         $bodyJson = $payload | ConvertTo-Json -Depth 6
 
+        $activity = Start-TerminalAiActivity
         try {
             $response = Invoke-RestMethod -Uri $targetUrl `
                 -Method Post `
@@ -823,6 +879,7 @@ function Invoke-OllamaApi {
             Write-Error " [TerminalAI] Failed to connect to Ollama at '$targetUrl'. Make sure Ollama is running ('ollama serve'). Error: $msg"
             return $null
         }
+        finally { Stop-TerminalAiActivity -Active $activity }
     }
     else {
         $targetUrl = "$($cfg.OllamaUrl.TrimEnd('/'))/api/generate"
@@ -844,6 +901,7 @@ function Invoke-OllamaApi {
 
         $bodyJson = $payload | ConvertTo-Json -Depth 6
 
+        $activity = Start-TerminalAiActivity
         try {
             $response = Invoke-RestMethod -Uri $targetUrl `
                 -Method Post `
@@ -860,6 +918,7 @@ function Invoke-OllamaApi {
             Write-Error " [TerminalAI] $errPrefix $msg"
             return $null
         }
+        finally { Stop-TerminalAiActivity -Active $activity }
     }
 }
 
@@ -1398,6 +1457,7 @@ function Invoke-AiExecutionGate {
         }
 
         Write-Host "    🔍 [WhatIf Preview] Running command in safe simulation mode..." -ForegroundColor Cyan
+        $activity = Start-TerminalAiActivity
         try {
             $sb = [ScriptBlock]::Create($Command)
             if ($ReturnOutput) {
@@ -1445,6 +1505,7 @@ function Invoke-AiExecutionGate {
             if ($ReturnOutput) { return $_ }
             return $null
         }
+        finally { Stop-TerminalAiActivity -Active $activity }
     }
 
     # Risk check
@@ -1575,6 +1636,7 @@ function Invoke-AiExecutionGate {
     }
 
     # Execute the command
+    $activity = Start-TerminalAiActivity
     try {
         $sb = [ScriptBlock]::Create($Command)
         if ($ReturnOutput) {
@@ -1616,6 +1678,7 @@ function Invoke-AiExecutionGate {
             return $_
         }
     }
+    finally { Stop-TerminalAiActivity -Active $activity }
 }
 
 function Invoke-AiCommand {
@@ -2908,6 +2971,10 @@ function Register-TerminalAiKeyHandler {
             return
         }
 
+        $activity = $false
+        $httpClient = $null
+        $originalControlCMode = $null
+        $captureCancel = $false
         try {
             $activeModel = $cfg.Model
             $sysPrompt = Get-AiSystemPrompt
@@ -2924,6 +2991,13 @@ function Register-TerminalAiKeyHandler {
                 }
             }
 
+            $activity = Start-TerminalAiActivity
+            if (-not [Console]::IsInputRedirected) {
+                $originalControlCMode = [Console]::TreatControlCAsInput
+                [TerminalAiPasteHelper]::BeginCancelCapture()
+                $captureCancel = $true
+                [Console]::TreatControlCAsInput = $false
+            }
             $asyncCall = Send-OllamaHttpAsync -Endpoint "api/generate" -Payload $payload
             $httpClient = $asyncCall.Client
             $postTask = $asyncCall.Task
@@ -2943,6 +3017,9 @@ function Register-TerminalAiKeyHandler {
             [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, $currLine.Length, "# [AI ⠋ 0s] $displayQuery")
 
             while (-not $postTask.IsCompleted) {
+                if ($captureCancel -and [TerminalAiPasteHelper]::CancelRequested) {
+                    throw [OperationCanceledException]::new('Inline generation canceled.')
+                }
                 $spinner = $spinnerFrames[$frameIdx % $spinnerFrames.Length]
                 $sec = [Math]::Floor($stopwatch.Elapsed.TotalSeconds)
                 $statusText = "# [AI $spinner ${sec}s] $displayQuery"
@@ -2969,6 +3046,9 @@ function Register-TerminalAiKeyHandler {
             catch { }
             finally {
                 $httpClient.Dispose()
+                $httpClient = $null
+                Stop-TerminalAiActivity -Active $activity
+                $activity = $false
             }
 
             $currLine = ""
@@ -2986,6 +3066,12 @@ function Register-TerminalAiKeyHandler {
                 [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, "$msg $displayQuery".Length, $line)
             }
         }
+        catch [OperationCanceledException] {
+            $currLine = ""
+            $currCursor = 0
+            [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$currLine, [ref]$currCursor)
+            [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, $currLine.Length, $line)
+        }
         catch {
             # Restore the line safely after an exception
             try {
@@ -2997,6 +3083,12 @@ function Register-TerminalAiKeyHandler {
                 Start-Sleep -Milliseconds 900
                 [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, "$errMsg $displayQuery".Length, $line)
             } catch { }
+        }
+        finally {
+            if ($httpClient) { $httpClient.Dispose() }
+            Stop-TerminalAiActivity -Active $activity
+            if ($captureCancel) { [TerminalAiPasteHelper]::EndCancelCapture() }
+            if ($null -ne $originalControlCMode) { [Console]::TreatControlCAsInput = $originalControlCMode }
         }
     }
 

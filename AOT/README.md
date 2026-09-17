@@ -45,6 +45,8 @@ The main installer installs Core before the Aot product:
 pwsh -ExecutionPolicy Bypass -File .\Install-TerminalAi.ps1 -Products Core,Aot
 ```
 
+If `Ollama` is also selected, installing it or downloading a model requires a separate interactive `y` or `yes`; `-AutoConfirm` and `-NonInteractive` do not authorize those external changes. TerminalAI uninstallation preserves Ollama and all models.
+
 To build and import the project from a source checkout:
 
 ```powershell

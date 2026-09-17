@@ -60,8 +60,18 @@ if ($CustomModulePath) {
 foreach ($baseRoot in $candidateRoots) {
     $destModuleDir = Join-Path $baseRoot "TerminalAI"
     if (Test-Path $destModuleDir) {
-        Remove-Item -Path $destModuleDir -Recurse -Force -ErrorAction SilentlyContinue
-        $msgMod = "✔ Module directory removed: $destModuleDir"
+        $terminalAiFiles = @(
+            "TerminalAI.psd1", "TerminalAI.psm1", "TerminalAiConfig.ps1",
+            "TerminalAiAssistant.ps1", "TerminalAiAgent.ps1",
+            "TerminalAI.Aot.dll", "TerminalAI.Aot.dll-Help.xml"
+        )
+        foreach ($file in $terminalAiFiles) {
+            Remove-Item -LiteralPath (Join-Path $destModuleDir $file) -Force -ErrorAction SilentlyContinue
+        }
+        if (-not (Get-ChildItem -LiteralPath $destModuleDir -Force -ErrorAction SilentlyContinue)) {
+            Remove-Item -LiteralPath $destModuleDir -Force -ErrorAction SilentlyContinue
+        }
+        $msgMod = "✔ TerminalAI module files removed: $destModuleDir"
         Write-Host $msgMod -ForegroundColor Green
     }
 }
@@ -114,7 +124,13 @@ foreach ($wtSettingsFile in $wtSettingsCandidates) {
         try {
             $wtJson = Get-Content -Path $wtSettingsFile -Raw | ConvertFrom-Json
             if ($wtJson.actions) {
-                $filteredActions = $wtJson.actions | Where-Object { $_.name -notmatch '^AI:' }
+                $terminalAiActionNames = @(
+                    "AI: Ask Ollama (ai)",
+                    "AI: Fix last error (ai-fix)",
+                    "AI: Generate script (ai-script)",
+                    "AI: Open assistant in split pane"
+                )
+                $filteredActions = $wtJson.actions | Where-Object { $terminalAiActionNames -notcontains $_.name }
                 $wtJson.actions = @($filteredActions)
                 $newSettingsJson = $wtJson | ConvertTo-Json -Depth 10
                 Set-Content -Path $wtSettingsFile -Value $newSettingsJson -Encoding UTF8
@@ -138,25 +154,46 @@ $fragDir = if ($CustomFragmentPath) {
 }
 
 if (Test-Path $fragDir) {
-    Remove-Item -Path $fragDir -Recurse -Force -ErrorAction SilentlyContinue
-    $msgFrag = "✔ Removed Fragment Extension from $fragDir"
-    Write-Host $msgFrag -ForegroundColor Green
+    $fragFile = Join-Path $fragDir "terminalai.json"
+    $removedFragment = $false
+    if (Test-Path $fragFile) {
+        $fragmentContent = Get-Content -LiteralPath $fragFile -Raw -ErrorAction SilentlyContinue
+        if ($fragmentContent -match '\{62068dd4-52e9-41f7-9feb-987581e2e117\}') {
+            Remove-Item -LiteralPath $fragFile -Force -ErrorAction SilentlyContinue
+            $removedFragment = $true
+        } else {
+            Write-Warning "Preserved unrecognized file at $fragFile; it was not verified as TerminalAI-owned."
+        }
+    }
+    if ($removedFragment -and -not (Get-ChildItem -LiteralPath $fragDir -Force -ErrorAction SilentlyContinue)) {
+        Remove-Item -LiteralPath $fragDir -Force -ErrorAction SilentlyContinue
+    }
+    if ($removedFragment) {
+        $msgFrag = "✔ Removed TerminalAI Fragment Extension from $fragDir"
+        Write-Host $msgFrag -ForegroundColor Green
+    }
 }
 
 # 5. Clean up or retain configuration directory
 $cfgDir = if ($env:TERMINAL_AI_CONFIG_DIR) { $env:TERMINAL_AI_CONFIG_DIR } else { Join-Path $HOME ".terminal-ai" }
 if ($PurgeConfig) {
-    if (Test-Path $cfgDir) {
-        Remove-Item -Path $cfgDir -Recurse -Force -ErrorAction SilentlyContinue
-        $msgCfgDel = "✔ Removed configuration directory: $cfgDir"
+    $configFile = Join-Path $cfgDir "config.json"
+    if (Test-Path $configFile) {
+        Remove-Item -LiteralPath $configFile -Force -ErrorAction SilentlyContinue
+        $msgCfgDel = "✔ Removed TerminalAI configuration file: $configFile"
         Write-Host $msgCfgDel -ForegroundColor Green
+    }
+    if ((Test-Path $cfgDir) -and -not (Get-ChildItem -LiteralPath $cfgDir -Force -ErrorAction SilentlyContinue)) {
+        Remove-Item -LiteralPath $cfgDir -Force -ErrorAction SilentlyContinue
     }
 } else {
     if (Test-Path $cfgDir) {
-        $msgCfgPreserved = "ℹ Configuration preserved at $cfgDir (use -PurgeConfig to remove completely)."
+        $msgCfgPreserved = "ℹ Configuration preserved at $cfgDir (use -PurgeConfig to remove TerminalAI's config.json)."
         Write-Host $msgCfgPreserved -ForegroundColor DarkCyan
     }
 }
+
+Write-Host "ℹ Ollama and all Ollama models were preserved because they are shared external dependencies." -ForegroundColor DarkCyan
 
 $msgDone = "Uninstallation complete.`n"
 Write-Host $msgDone -ForegroundColor Green

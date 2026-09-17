@@ -7,6 +7,48 @@ namespace TerminalAI.Aot;
 
 public static class Win32Console
 {
+    private const string ActivityDepthKey = "TerminalAI.ActivityDepth";
+
+    public static bool BeginActivity()
+    {
+        try
+        {
+            if (!Environment.UserInteractive || string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WT_SESSION")) ||
+                Console.IsInputRedirected || Console.IsOutputRedirected || Console.IsErrorRedirected)
+                return false;
+            return BeginActivityCore();
+        }
+        catch { return false; }
+    }
+
+    private static bool BeginActivityCore()
+    {
+        // ponytail: one console per process; use per-console state if multiple consoles are supported.
+        lock (AppDomain.CurrentDomain)
+        {
+            int depth = (int?)AppDomain.CurrentDomain.GetData(ActivityDepthKey) ?? 0;
+            if (depth == 0) Console.Write("\u001b]9;4;3;0\u0007");
+            AppDomain.CurrentDomain.SetData(ActivityDepthKey, depth + 1);
+            return true;
+        }
+    }
+
+    public static void EndActivity(bool active)
+    {
+        if (!active) return;
+        try
+        {
+            lock (AppDomain.CurrentDomain)
+            {
+                int depth = (int?)AppDomain.CurrentDomain.GetData(ActivityDepthKey) ?? 0;
+                if (depth <= 0) return;
+                AppDomain.CurrentDomain.SetData(ActivityDepthKey, --depth);
+                if (depth == 0) Console.Write("\u001b]9;4;0;0\u0007");
+            }
+        }
+        catch { }
+    }
+
     [DllImport("user32.dll", SetLastError = true)]
     private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 

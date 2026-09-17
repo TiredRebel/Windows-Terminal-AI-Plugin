@@ -92,6 +92,7 @@ public static class OllamaClient
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(TimeSpan.FromSeconds(effectiveTimeout));
 
+        bool activity = Win32Console.BeginActivity();
         try
         {
             using var resp = await Http.PostAsync(endpoint, content, cts.Token).ConfigureAwait(false);
@@ -128,6 +129,10 @@ public static class OllamaClient
         {
             var jsonMsg = $"Received malformed JSON response from Ollama: {ex.Message}";
             throw new InvalidOperationException(jsonMsg, ex);
+        }
+        finally
+        {
+            Win32Console.EndActivity(activity);
         }
     }
 

@@ -45,6 +45,8 @@
 pwsh -ExecutionPolicy Bypass -File .\Install-TerminalAi.ps1 -Products Core,Aot
 ```
 
+Якщо також вибрано `Ollama`, для його встановлення або завантаження моделі потрібно окремо інтерактивно ввести `y` чи `yes`; параметри `-AutoConfirm` і `-NonInteractive` не дозволяють ці зовнішні зміни. Видалення TerminalAI зберігає Ollama та всі моделі.
+
 Щоб зібрати й імпортувати проєкт із репозиторію:
 
 ```powershell

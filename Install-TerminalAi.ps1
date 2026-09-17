@@ -35,6 +35,7 @@ param(
     [switch]$SkipOllamaCheck,
     [string]$PreferredModel,
     [switch]$AutoConfirm,
+    [switch]$NonInteractive,
     [switch]$ModifySettingsJson,
     [string]$CustomProfilePath,
     [string]$CustomModulePath,
@@ -99,7 +100,8 @@ foreach ($product in $orderedProducts) {
         }
         "Ollama" {
             & (Join-Path $installersDir "Install-Ollama.ps1") `
-                -Language $Language -PreferredModel $PreferredModel -AutoConfirm:$AutoConfirm
+                -Language $Language -PreferredModel $PreferredModel `
+                -AutoConfirm:$AutoConfirm -NonInteractive:$NonInteractive
         }
         "Aot" {
             & (Join-Path $installersDir "Install-Aot.ps1") `

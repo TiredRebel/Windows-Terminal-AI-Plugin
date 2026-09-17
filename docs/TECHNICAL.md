@@ -16,7 +16,8 @@ The root installer accepts these options:
 | `-PreferredModel <name>` | Select an Ollama model without hardware-based recommendation. |
 | `-SkipOllamaCheck` | Compatibility shortcut that removes Ollama from the product selection. |
 | `-SkipTerminalConfig` | Compatibility shortcut that removes WindowsTerminal from the product selection. |
-| `-AutoConfirm` | Accept supported installer defaults. |
+| `-AutoConfirm` | Accept supported TerminalAI installer defaults. It never approves installing Ollama or downloading a model. |
+| `-NonInteractive` | Disable prompts. External Ollama installation and model downloads are skipped. |
 | `-ModifySettingsJson` | Also update the legacy Windows Terminal `settings.json` action list after a backup. |
 | `-CustomProfilePath`, `-CustomModulePath`, `-CustomFragmentPath` | Override destinations for controlled deployments and tests. |
 
@@ -30,6 +31,8 @@ pwsh -ExecutionPolicy Bypass -File .\installers\Install-WindowsTerminal.ps1
 ```
 
 Install Core before Aot or WindowsTerminal. The main installer preserves that order automatically. Windows PowerShell 5.1 skips the managed .NET 10 helper because it cannot load the `net10.0` assembly.
+
+Ollama and its models are shared external dependencies. Installing Ollama or downloading a model requires an interactive `y` or `yes`; Enter and non-interactive input decline. TerminalAI uninstallation never removes Ollama or its models and deletes only known TerminalAI files. `-PurgeConfig` removes `config.json`, not the entire configuration directory.
 
 For a temporary session, `bootstrap.ps1` downloads the versioned GitHub Release asset, imports the module into the current process, checks Ollama and the model, and uses process-scoped language selection. Portable mode does not update the current-user profile or existing TerminalAI configuration. Extracted runtime files and other downloads may remain under `$env:TEMP`; inspect remote content before executing a piped script.
 

@@ -71,6 +71,8 @@ For Windows PowerShell 5.1, replace `pwsh` with `powershell.exe`. The default in
 pwsh -ExecutionPolicy Bypass -File .\Install-TerminalAi.ps1 -Products Core,Ollama -Language uk
 ```
 
+Installing Ollama and downloading a model are separate external changes. `-AutoConfirm` does not approve either operation: each requires an interactive `y` or `yes`. Pressing Enter, redirected input, and `-NonInteractive` skip them.
+
 PowerShell Gallery and WinGet availability is not currently confirmed. Do not use their installation commands until the channel is verified. Source checkout and temporary bootstrap options remain available:
 
 ```powershell
@@ -222,7 +224,7 @@ pwsh -ExecutionPolicy Bypass -File .\Uninstall-TerminalAi.ps1
 pwsh -ExecutionPolicy Bypass -File .\Uninstall-TerminalAi.ps1 -PurgeConfig
 ```
 
-Without `-PurgeConfig`, the uninstaller keeps `~/.terminal-ai`.
+The uninstaller removes only known TerminalAI files. It always preserves Ollama, every Ollama model, and unrelated files in shared or custom directories. Without `-PurgeConfig`, it keeps `~/.terminal-ai`; with `-PurgeConfig`, it removes only TerminalAI's `config.json` and leaves other files intact.
 
 <!-- sync:technical -->
 ## Technical and maintainer documentation

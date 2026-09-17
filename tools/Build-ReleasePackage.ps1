@@ -1,4 +1,4 @@
-# Build-ReleasePackage.ps1 - fresh source build, provenance, ZIP, and WinGet manifests
+﻿# Build-ReleasePackage.ps1 - fresh source build, provenance, ZIP, and WinGet manifests
 [CmdletBinding()]
 param(
     [string]$Version = "0.1.0-preview2",

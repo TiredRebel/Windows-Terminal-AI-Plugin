@@ -408,6 +408,19 @@ function Invoke-AiAgent {
     $argList.Add("--model")
     $argList.Add($targetModel)
 
+    # Let the interactive child manage busy/idle transitions, including tool approvals.
+    $terminalActivity = $false
+    try {
+        $terminalActivity = [Environment]::UserInteractive -and $env:WT_SESSION -and
+            -not [Console]::IsInputRedirected -and -not [Console]::IsOutputRedirected -and -not [Console]::IsErrorRedirected
+    } catch { }
+    if ($terminalActivity -and -not $Print -and $readiness.ClaudeVersion -match '^(\d+\.\d+\.\d+)') {
+        if ([version]$Matches[1] -ge [version]'2.1.119') {
+            $argList.Add('--settings')
+            $argList.Add('{"terminalProgressBarEnabled":true}')
+        }
+    }
+
     if ($Resume) {
         $argList.Add("--resume")
     }
@@ -450,6 +463,7 @@ function Invoke-AiAgent {
     $psi.EnvironmentVariables["ANTHROPIC_API_KEY"] = "ollama"
     $psi.EnvironmentVariables["CLAUDE_CONFIG_DIR"] = $agentConfigDir
     $psi.EnvironmentVariables["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
+    $psi.EnvironmentVariables["CLAUDE_CODE_DISABLE_TERMINAL_TITLE"] = "1"
 
     # Ambient key neutralization
     foreach ($k in @("OPENAI_API_KEY", "GEMINI_API_KEY", "DEEPSEEK_API_KEY")) {
@@ -460,9 +474,13 @@ function Invoke-AiAgent {
 
     Write-Host "⚡ [TerminalAI] Starting Claude Code agent (Model: $targetModel)..." -ForegroundColor Cyan
 
+    $activity = $false
+    $proc = $null
     try {
+        if ($Print) { $activity = Start-TerminalAiActivity }
         $proc = [System.Diagnostics.Process]::Start($psi)
-        $proc.WaitForExit()
+        # A bounded wait lets PowerShell respond to pipeline cancellation.
+        while (-not $proc.WaitForExit(100)) { }
         $exitCode = $proc.ExitCode
         if ($exitCode -ne 0) {
             Write-Host "`nℹ [TerminalAI] Claude Code exited with code $exitCode" -ForegroundColor DarkYellow
@@ -472,5 +490,24 @@ function Invoke-AiAgent {
     catch {
         Write-Error "[TerminalAI] Failed to start Claude Code agent: $($_.Exception.Message)"
         return 1
+    }
+    finally {
+        Stop-TerminalAiActivity -Active $activity
+        if ($proc) {
+            try {
+                if (-not $proc.HasExited) {
+                    if ($PSVersionTable.PSVersion.Major -ge 7) { $proc.Kill($true) }
+                    else { $proc.Kill() }
+                }
+            } catch { }
+            $proc.Dispose()
+        }
+        # Restore the enclosing operation after the child relinquishes the console.
+        if ($terminalActivity -and -not $Print) {
+            try {
+                $state = if ([AppDomain]::CurrentDomain.GetData('TerminalAI.ActivityDepth')) { '3' } else { '0' }
+                [Console]::Write(([char]27 + "]9;4;$state;0" + [char]7))
+            } catch { }
+        }
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Management.Automation;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace TerminalAI.Aot;
 
@@ -10,6 +11,14 @@ namespace TerminalAI.Aot;
 [Alias("ai-fast", "aif")]
 public class InvokeAiCommandFastCmdlet : PSCmdlet
 {
+    private readonly CancellationTokenSource requestCancellation = new();
+
+    protected override void StopProcessing()
+    {
+        requestCancellation.Cancel();
+        base.StopProcessing();
+    }
+
     [Parameter(Position = 0, Mandatory = false, ValueFromRemainingArguments = true)]
     public string[] Prompt { get; set; } = Array.Empty<string>();
 
@@ -230,7 +239,7 @@ Rules:
         string command;
         try
         {
-            command = OllamaClient.GenerateAsync(cfg.OllamaUrl, activeModel, fullPrompt, systemPrompt, cfg.Temperature, cfg.TimeoutSeconds, isUk).GetAwaiter().GetResult();
+            command = OllamaClient.GenerateAsync(cfg.OllamaUrl, activeModel, fullPrompt, systemPrompt, cfg.Temperature, cfg.TimeoutSeconds, isUk, requestCancellation.Token).GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {
@@ -379,7 +388,7 @@ Rules:
         try
         {
             var userPrompt = $"Explain this PowerShell command:\n\n{command}";
-            var explanation = OllamaClient.GenerateRawAsync(cfg.OllamaUrl, model, userPrompt, explainSystemPrompt, 0.3, cfg.TimeoutSeconds, isUk).GetAwaiter().GetResult();
+            var explanation = OllamaClient.GenerateRawAsync(cfg.OllamaUrl, model, userPrompt, explainSystemPrompt, 0.3, cfg.TimeoutSeconds, isUk, requestCancellation.Token).GetAwaiter().GetResult();
             if (!string.IsNullOrWhiteSpace(explanation))
             {
                 var title = "Command Explanation";
@@ -409,7 +418,7 @@ Rules:
 
         try
         {
-            var answer = OllamaClient.GenerateRawAsync(cfg.OllamaUrl, model, question, askSystemPrompt, 0.3, cfg.TimeoutSeconds, isUk).GetAwaiter().GetResult();
+            var answer = OllamaClient.GenerateRawAsync(cfg.OllamaUrl, model, question, askSystemPrompt, 0.3, cfg.TimeoutSeconds, isUk, requestCancellation.Token).GetAwaiter().GetResult();
             if (!string.IsNullOrWhiteSpace(answer))
             {
                 var cardTitle = "AI Answer";
@@ -725,7 +734,7 @@ Rules:
     {
         try
         {
-            var models = OllamaClient.GetModelsAsync(cfg.OllamaUrl, 15, isUk).GetAwaiter().GetResult();
+            var models = OllamaClient.GetModelsAsync(cfg.OllamaUrl, 15, isUk, requestCancellation.Token).GetAwaiter().GetResult();
             if (models.Count == 0)
             {
                 var msg = " [TerminalAI] No models found or Ollama is not running.";

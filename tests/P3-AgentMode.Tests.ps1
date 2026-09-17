@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Automated test suite for Phase P3: Optional Claude Code Agent Mode (Invoke-AiAgent / ai-agent).
     Validates binary discovery, Ollama Messages endpoint integration, environment isolation,
